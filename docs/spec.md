@@ -78,6 +78,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
 | `remote port`, `idempotent` handlers, `via` wiring | Honest communication between containers (§5.5) |
 | `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `ok` | No forgotten or early acknowledgement (§5.5.0) |
+| `max` bounds on variable-size fields of topic messages | The compiler calculates the memory limit of each queue (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
@@ -564,6 +565,22 @@ must state which, so that no runtime queue can grow in memory without a limit.
   depth, the highest depth so far, and an estimate of the time until the queue is full.
   `keel audit` lists the capacity, the policy, and the `ttl` of each topic. Thus a reviewer can see
   the memory limit of the whole system in one location.
+- **Message types are bounded.** A capacity counts messages, so it bounds memory only if each
+  message has a maximum size. Each variable-size field of a topic message type declares a maximum:
+
+  ```go
+  type OrderPlaced struct {
+      ID    string max 64
+      Lines []Line max 100
+      Note  string max 4KB
+  }
+  ```
+
+  A field without a maximum is a compile error in a topic message type. The compiler calculates the
+  maximum encoded size of each message type. For each queue, it calculates the memory limit:
+  capacity × maximum message size. `keel audit` shows each limit and the total for the system. A
+  value over a maximum fails the invariant of the message at publish, and the publishing task
+  aborts, as for any contract violation.
 
 #### 5.5.2 Message evolution
 
