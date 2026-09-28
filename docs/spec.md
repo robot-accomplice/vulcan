@@ -37,7 +37,7 @@ use the same terms.
 | **System** | The whole software product. The root node of the architecture tree. |
 | **Container** | A node that runs as one process. The compiler builds each container into one executable binary. Most systems have one container, so they compile to one binary. (The C4 meaning. It is not a Docker container.) |
 | **Group** | An optional node inside a container that groups leaves, for zoom levels in diagrams. |
-| **Composite** | A system, container, or group. It holds children and wiring, and no code. |
+| **Composite** | A system, container, or group. A section of `system.keel`, with no code. |
 | **Leaf** | A `component` node: one flat directory of code. |
 | **Library** | A node that holds shared types and reusable code, with no ports, no topics, and no mutable state. It can use an I/O handle but never acquire one. |
 | **Foreign library** | The only kind of library that can import a Go package. It converts values at the boundary. |
@@ -49,7 +49,7 @@ use the same terms.
 | **Remote port** | A port that crosses containers. A remote method port is a synchronous call; a remote topic is an event. |
 | **Publisher / subscriber** | The leaf that publishes on an `out` topic / the leaf that handles an `in` topic. |
 | **Handler** | The function, marked `handle`, that processes the messages of one `in` topic. |
-| **Wire** | A line in a composite that connects a required port or an `in` topic to a provider. |
+| **Wire** | A line in `system.keel` that connects a required port or an `in` topic to a provider. |
 | **Transport** | The mechanism that carries topic messages between containers, named on a wire with `via`. |
 | **Outbox / inbox** | The runtime queue at the publisher / at the subscriber. |
 | **Dead-letter topic** | Where a subscription sends a message that it cannot handle. |
@@ -121,7 +121,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
-| Declaration files (`system.keel`, `component.keel`, and so on) have their own syntax: `provides X from Y`, `parent.X`, `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), method renames (`{ Pay = Charge }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
+| Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), method renames (`{ Pay = Charge }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
 | Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
 | Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Explicit handling of bounds and overflow (§7b, §7c) |
@@ -158,66 +158,91 @@ port Payments { ... }          // a keyword: it starts a declaration
 
 ## 5. Architecture model
 
-The architecture is a tree that follows the C4 model. Code is only in small, flat leaves. Each node
-above the leaves is only structure: children, ports, and wiring.
+The architecture is a tree that follows the C4 model. Code is only in small, flat leaves. The
+architecture of the whole system is in **one file**, and the boundary of each leaf is in **one file
+next to its code**. Thus a reader finds any wire in one location, and any boundary in one location.
 
 ### 5.1 Hierarchy
 
 ```
 system Shop                         C4 System, with the people and external systems around it
- ├ container Api                    C4 Container: a deployable or process
+ ├ container Api                    C4 Container: one process
  │  ├ component Billing   (leaf)    C4 Component: one flat directory of code
  │  └ component Orders    (leaf)
  └ container Worker
-    └ group Fulfilment              optional composite, for zoom levels inside a container
+    └ group Fulfilment              optional, for zoom levels in diagrams
        ├ component Picking  (leaf)
        └ component Shipping (leaf)
 ```
 
-A *leaf* is a `component` node. A *composite* is a `system`, `container`, or `group` node.
+A *leaf* is a `component` node. A *composite* is a `system`, `container`, or `group`. A composite
+has no directory of its own declarations and no code: it is a section of the architecture file.
 
-| Kind | Holds | Code? |
-|---|---|---|
-| `system` | containers, `person` and `external` declarations | no |
-| `container` | groups and components | no |
-| `group` | groups and components | no |
-| `component` | source files and tests | yes, but no child nodes |
-| `library` | shared types and reusable code | yes, but no ports, topics, or mutable state (§5.4a) |
+| Kind | Declared in | Holds | Code? |
+|---|---|---|---|
+| `system` | `system.keel` | containers, `person` and `external` declarations, all wires | no |
+| `container` | a section of `system.keel` | groups and leaves | no |
+| `group` | a section of `system.keel` | leaves; a label for diagrams only | no |
+| `component` | `component.keel` in the leaf directory | the boundary of the leaf | yes, in the same directory |
+| `library` | `library.keel` in the library directory | shared types and reusable code | yes, but no ports, topics, or mutable state (§5.4a) |
 
 ### 5.2 Layout
 
-The directory tree is the same as the architecture tree. Each node is a directory. Each directory
-holds exactly one declaration file, and the name of the file is the kind of the node:
-`system.keel`, `container.keel`, `group.keel`, `component.keel`, or `library.keel`.
+- **`system.keel`**, at the root, is the architecture file. It declares the containers and groups,
+  the leaves in each, the layers, the people, the external systems, and **every wire**.
+- **Each leaf is a directory** with one `component.keel` and its source files. `component.keel`
+  declares the **boundary** of the leaf: its layer, and the full declaration of each port that it
+  provides and requires.
+- **Directories mirror the tree**: `api/orders/`, `worker/fulfilment/picking/`. The compiler checks
+  that the directories and `system.keel` agree.
+- Libraries are in `lib/`.
 
-- A composite directory holds no source files.
-- A leaf directory and a library directory hold no child nodes.
-- Libraries are in the `lib/` directory of the system.
-
-Thus each thing has one location.
+Thus each thing has one location: the wires in `system.keel`, a boundary in its `component.keel`,
+and code next to its boundary.
 
 ### 5.3 Declarations
 
-A leaf declares the ports that it provides and the ports that it requires:
+**A leaf declares its boundary** in `component.keel`: its layer, and the ports that it provides and
+requires, with their methods and contracts.
 
 ```go
+// api/billing/component.keel
 // Billing charges customers and records the charge in the ledger.
 component Billing {
-    layer    app
-    provides Payments
-    requires Ledger, Clock
+    layer app
+
+    // Payments charges a customer's stored payment method.
+    provides port Payments {
+        // Charge moves amount from the customer to the merchant.
+        func Charge(customer CustomerID, amount Money) (Receipt, error)
+            requires amount > 0
+            ensures  result.Amount == amount
+    }
+
+    requires port Ledger { ... }
+    requires port Clock  { ... }
+}
+
+// api/orders/component.keel
+component Orders {
+    layer app
+
+    // Checkout takes payment for a confirmed order.
+    requires port Checkout {
+        func Pay(customer CustomerID, amount Money) (Receipt, error)
+            requires amount > 0 && amount < MaxOrder
+    }
 }
 ```
 
-A port is an interface with contracts. **Each node owns the ports on its own boundary. It knows
-nothing about the nodes on the other side.**
+**Each leaf owns the ports on its own boundary. It knows nothing about the leaves on the other
+side.**
 
-- The provider declares each port in its `provides` list: "what I offer".
-- The consumer declares each port in its `requires` list: "what I need". This is the hexagonal
-  style.
+- The provider declares each port that it provides: "what I offer".
+- The consumer declares each port that it requires: "what I need". This is the hexagonal style.
 
-A provider does not know which nodes use it. A consumer does not know which node serves it. Only
-the parent that wires the two nodes together knows both of them.
+A provider does not know which leaves use it. A consumer does not know which leaf serves it. Only
+`system.keel` knows both.
 
 **Inside a leaf, each required port is a package-level name**, the name of the port itself. Code
 calls it like a Go package: `Checkout.Pay(c, amt)`. The wiring binds the name at startup, and the
@@ -233,30 +258,46 @@ instrumentation of the contract**: the port signature, its `requires` and `ensur
 record of the boundary in diagrams and in the audit. Topics and transports (§5.5) exist only for
 separate processes.
 
-```go
-// In Billing (provider): what Billing offers.
-// Payments charges a customer's stored payment method.
-port Payments {
-    // Charge moves amount from the customer to the merchant.
-    func Charge(customer CustomerID, amount Money) (Receipt, error)
-        requires amount > 0
-        ensures  result.Amount == amount
-}
+**The architecture file wires the leaves.** Inside a container section, a wire names leaves by
+name. A wire between containers names each leaf by its path: `Container/Leaf`, or
+`Container/Group/Leaf`.
 
-// In Orders (consumer): what Orders needs, with its own names and contract.
-// Checkout takes payment for a confirmed order.
-port Checkout {
-    func Pay(customer CustomerID, amount Money) (Receipt, error)
-        requires amount > 0 && amount < MaxOrder
+```go
+// system.keel
+// Shop is the online store.
+system Shop {
+    layers domain < app < infra
+
+    person   Customer "Buys goods through the web store"
+    external Stripe   "Card payment processor"
+
+    container Api {
+        Billing, Orders, LedgerStore, SystemClock, StripeGateway
+
+        Orders.Checkout: Billing.Payments { Pay = Charge }
+        Billing.Ledger:  LedgerStore.Ledger
+        Billing.Clock:   SystemClock.Clock
+    }
+
+    container Worker {
+        group Fulfilment { Picking, Shipping }
+    }
+
+    // Between containers: remote ports only (§5.5).
+    Worker/Fulfilment/Picking.Intake.Placed: Api/Orders.OrderFlow.Placed via direct{ deadletters: Ops.Alerts }
+    Api/Orders.OrderFlow.Shipped: Worker/Fulfilment/Picking.Intake.Shipped via direct{ deadletters: Ops.Alerts }
+
+    uses Customer -> Api "places orders over HTTPS"
+    // Api -> Stripe comes from the gateway declaration (§5.4b).
 }
 ```
 
-**Port compatibility.** When a parent wires a provided port to a required port, the compiler does
+**Port compatibility.** At each wire from a required port to a provided port, the compiler does
 these checks:
 
 1. **Signatures.** Each method of the required port must exist on the provided port, with an
    identical signature. The provided port can have more methods. The wire can rename methods:
-   `Orders { Checkout: Billing.Payments { Pay = Charge } }`. A rename changes only the name; the
+   `Orders.Checkout: Billing.Payments { Pay = Charge }`. A rename changes only the name; the
    parameter and result types must still be identical.
 2. **Contracts (substitutability).** For each method:
    - The consumer's `requires` must imply the provider's `requires`. Thus the provider accepts all
@@ -268,80 +309,32 @@ these checks:
    check in `keel audit`.
 
 If two ports differ in more than names, write an adapter. An adapter is an ordinary leaf that
-requires one port and provides the other. Keel has no special adapter construct, because
-composites hold no code. The near-duplicate check (§10) ignores port declarations: the two sides
-of a boundary are separate contracts on purpose.
-
-A composite wires its direct children and publishes some of their ports. Sometimes no sibling
-satisfies a child's requirement. Then that requirement becomes a requirement of the composite, and
-the composite's own parent satisfies it:
-
-```go
-// Api serves the public HTTP interface.
-container Api {
-    requires Orders.OrderFlow           // Orders' remote port, passed up by its path (§5.5)
-
-    Billing     { Ledger: LedgerStore.Ledger, Clock: SystemClock.Clock }
-    Orders      { Checkout: Billing.Payments { Pay = Charge }, OrderFlow: parent.Orders.OrderFlow }
-    LedgerStore {}
-    SystemClock {}
-}
-
-// Worker picks and ships orders.
-container Worker {
-    provides Intake from Fulfilment     // re-exported; the Fulfilment group stays hidden
-
-    Fulfilment {}
-}
-```
-
-The compiler does the port-compatibility check, with the rename, at
-`Orders { Checkout: Billing.Payments { Pay = Charge } }`.
-
-The system adds the outer ring of C4: the people and the external systems that the system
-interacts with.
-
-```go
-// Shop is the online store.
-system Shop {
-    layers domain < app < infra
-
-    person   Customer "Buys goods through the web store"
-    external Stripe   "Card payment processor"
-
-    Worker { Intake.Placed:     Api.OrderFlow.Placed  via direct }   // topics: events
-    Api    { OrderFlow.Shipped: Worker.Intake.Shipped via direct }   // between containers
-
-    uses Customer -> Api "places orders over HTTPS"
-    // Api -> Stripe comes from the gateway declaration (§5.4b).
-}
-```
+requires one port and provides the other. Keel has no special adapter construct. The near-duplicate
+check (§10) ignores port declarations: the two sides of a boundary are separate contracts on
+purpose.
 
 Keel does not wire external systems with ports. The language does not control them, and they use
 their own protocols. Instead, one **gateway leaf** in each container talks to each external system
-(§5.4b). The compiler draws that
-relationship in diagrams from the gateway declaration. A `uses` line records a relationship that
-no declaration shows, such as a person who uses a container.
+(§5.4b). The compiler draws that relationship in diagrams from the gateway declaration. A `uses`
+line records a relationship that no declaration shows, such as a person who uses a container.
 
 ### 5.4 Rules the compiler enforces
 
-1. **Ports only.** Code in a leaf can use another node **only** through a port in its `requires`
-   list, or through an imported library (§5.4a). Any other reference to another node is a compile
-   error.
-2. **Code only in leaves.** Composites hold no source files. Leaves hold no child nodes.
-3. **Encapsulation at each level.** Outside its parent, a node does not exist. A composite exposes
-   only the ports that it publishes with `provides X from Child`.
-4. **Complete wiring.** Each composite wires each `requires` entry and each `in` topic of each
-   direct child exactly once. The wire goes to a port or a topic of a sibling, or to a `requires`
-   entry of the composite. An `out` topic is never wired by itself (§5.5).
-5. **Complete provision.** A leaf implements each port in its `provides` list. A composite gets
-   each port in its `provides` list from a child.
+1. **Ports only.** Code in a leaf can use another leaf **only** through a port that the leaf
+   requires, or through an imported library (§5.4a). Any other reference to another leaf is a
+   compile error.
+2. **Code only in leaves and libraries.** `system.keel` holds no code. A leaf directory holds no
+   child leaves.
+3. **Container boundaries.** A wire between leaves in different containers must use a `remote`
+   port (§5.5). A wire inside one container must not. A group is only a label for diagrams: it
+   adds no boundary.
+4. **Complete wiring.** `system.keel` wires each required port and each `in` topic of each leaf
+   exactly once. An `out` topic is never wired by itself (§5.5).
+5. **Complete provision.** A leaf implements each port that it provides.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
-7. **Boundary ownership.** A leaf declares the ports that it provides and the ports that it
-   requires. The code and the declaration of a leaf never name a port of another node. Only a
-   composite names the ports of its children: in its wires, in `provides X from Child`, and in
-   `requires Child.X`, which passes a child's port up by its path. A composite never declares a
-   second copy of a port.
+7. **Boundary ownership.** A leaf declares the ports that it provides and requires, in its own
+   `component.keel`. The code and the boundary of a leaf never name a port of another leaf. Only
+   `system.keel` names the ports of two leaves together, in a wire.
 8. **Layers.** The `layers` order of the system constrains **source dependencies**: the libraries
    that a leaf imports, and the types in its port signatures. A leaf can use these only from its
    own layer or a lower layer. Layers do not constrain wires. Two wired leaves share no source
@@ -349,7 +342,7 @@ no declaration shows, such as a person who uses a container.
    leaf can require a port that an `infra` adapter provides, and an `infra` HTTP handler can
    require a port that a `domain` leaf provides. But a port in an `app` leaf cannot mention an
    `infra` type such as `sql.Row`.
-9. **No cycles.** At each level, the dependency graph of the siblings has no cycles.
+9. **No cycles.** The graph of wires between the leaves of one container has no cycles.
 10. **Private types.** A type is private to its leaf, unless the type is in a port signature.
 11. **Leaf size budget.** The budget measures what a model reads to work on a leaf: all non-test
     source of the leaf plus its `keel context` output, in tokens. Each project sets one
@@ -544,10 +537,10 @@ remote port Intake {
     Shipped out topic[ShipmentSent]
 }
 
-// In Shop. Each subscriber names its source; the wire names the transport and its settings.
-Worker    { Intake.Placed:     Api.OrderFlow.Placed  via direct{ deadletters: Ops.Alerts } }
-Analytics { Ingest.Placed:     Api.OrderFlow.Placed  via direct{ deadletters: Ops.Alerts } }
-Api       { OrderFlow.Shipped: Worker.Intake.Shipped via direct{ deadletters: Ops.Alerts } }
+// In system.keel. Each subscriber names its source; the wire names the transport and settings.
+Worker/Fulfilment/Picking.Intake.Placed: Api/Orders.OrderFlow.Placed via direct{ deadletters: Ops.Alerts }
+Analytics/Ingest.Feed.Placed:            Api/Orders.OrderFlow.Placed via direct{ deadletters: Ops.Alerts }
+Api/Orders.OrderFlow.Shipped: Worker/Fulfilment/Picking.Intake.Shipped via direct{ deadletters: Ops.Alerts }
 ```
 
 **Why publish: it is the loosest coupling possible.** The only job of the publisher is to publish.
@@ -559,8 +552,8 @@ These rules are part of the language, for every transport:
 - **Publish, never wait for a subscriber.** A publish gives the message to the transport and
   returns. Subscribers cannot make a publish fail. What happens when the transport is full is the
   policy of the transport.
-- **Zero, one, or many subscribers.** The parent wires topics one at a time, from the subscriber
-  side. Each `in` topic is wired exactly once, to one `out` topic of the same message type. An
+- **Zero, one, or many subscribers.** `system.keel` wires topics one at a time, from the
+  subscriber side. Each `in` topic is wired exactly once, to one `out` topic of the same message type. An
   `out` topic is never wired by itself: its subscribers are the `in` topics wired to it, zero or
   more. Thus a new subscriber adds one wire, and the wiring of the publisher does not change.
 - **An unread topic causes a warning.** A topic with zero subscribers compiles, with a warning. A
@@ -669,9 +662,9 @@ containers needs no broker. It sends from the publisher straight to each subscri
   `keel trace <id>` shows them.
 
 ```go
-Worker { Intake.Placed:  Api.OrderFlow.Placed via direct{
-             capacity: 5_000, ttl: 24h, deadletters: Ops.Alerts } }
-Obs    { Ingest.Samples: Api.Metrics.Samples  via kafka{ topic: "samples" } }
+Worker/Fulfilment/Picking.Intake.Placed: Api/Orders.OrderFlow.Placed via direct{
+    capacity: 5_000, ttl: 24h, deadletters: Ops.Alerts }
+Obs/Ingest.Feed.Samples: Api/Metrics.Telemetry.Samples via kafka{ topic: "samples" }
 // startup: --transport.direct.peers=worker=10.0.0.7:7000
 ```
 
@@ -748,8 +741,8 @@ developer decides for each boundary.
 ### 5.6 Diagrams
 
 `keel diagram --level context|container|component|code [--focus <node>]` draws each C4 level from
-the declarations above. Composites hold no code. Thus a diagram at any zoom level shows where all
-behavior is. A parent cannot hide logic.
+`system.keel` and the `component.keel` files. Composites hold no code. Thus a diagram at any zoom
+level shows where all behavior is. A container or a group cannot hide logic.
 
 ## 6. Type system
 
@@ -1218,7 +1211,7 @@ The tools assume that one of their users is an LLM (R8):
 | Command | Purpose |
 |---|---|
 | `keel guide` | Prints a short language primer, small enough for a prompt, and the conventions of the project. The spec stays small, so that this primer can be complete. |
-| `keel context <component>` | Emits the minimum context to work on one leaf: its declaration, its ports and contracts, and the signatures of what it requires (R1). |
+| `keel context <component>` | Emits the minimum context to work on one leaf: its `component.keel`, the wires in `system.keel` that connect it, and the signatures of the ports on the other end of each wire (R1). |
 | `keel query <symbol>` | Looks up a symbol exactly in the symbol index of the compiler. This prevents invented APIs (R4). |
 | `keel explain <code>` | Gives a long explanation of a diagnostic, with examples. |
 | `keel doc` / `keel diagram` | Generates docs, and C4 diagrams at each level (context, container, component, code), from the source (§5.6). |
