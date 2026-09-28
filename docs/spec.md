@@ -1,12 +1,12 @@
-# Keel — Language Specification (Draft 0)
+# Keel: Language Specification (Draft 0)
 
-> **Working name: Keel** — placeholder until a better name is chosen (Q1). Source extension: `.keel`.
+> **Working name: Keel.** It is a placeholder until a better name is chosen (Q1). Source extension: `.keel`.
 > Status: brainstorming draft, 2026-09-28. Nothing here is implemented.
 
 ## 1. Purpose
 
 Keel is a compiled, garbage-collected, statically typed language designed for software that humans and
-LLMs write *together*. Its thesis: most failures in human/AI co-development come from missing structure —
+LLMs write *together*. Its thesis: most failures in human/AI co-development come from missing structure:
 the model can't see the architecture, invents APIs, duplicates instead of reusing, and masks errors; the
 human can't review what the model produced. Keel makes that structure part of the language, so the
 compiler can see it, enforce it, draw it, and teach it.
@@ -42,7 +42,7 @@ Research on how LLMs fail when writing applications with humans (sources in Appe
 
 ## 4. Syntax
 
-Go is the model. A Go programmer — or a model trained on Go — should read Keel on first sight.
+Go is the model. A Go programmer, or a model trained on Go, should read Keel on first sight.
 Deviations must be justified in this spec and listed here:
 
 | Deviation from Go | Why |
@@ -63,8 +63,8 @@ Deviations must be justified in this spec and listed here:
 | Sum types with exhaustive `switch` | Typed errors, task exits, state machines (§6) |
 | Generics use `<T Bound>`, not `[T Bound]` | C-family familiarity; unbounded params need no `any` (§6.1) |
 
-Everything else — `:=`, `func`, structs, methods with receivers, `for`, `switch`, slices, maps, `defer`,
-packages-as-directories, gofmt-style formatting — follows Go unless a later section says otherwise.
+Everything else (`:=`, `func`, structs, methods with receivers, `for`, `switch`, slices, maps, `defer`,
+packages-as-directories, gofmt-style formatting) follows Go unless a later section says otherwise.
 
 ## 5. Architecture model
 
@@ -74,9 +74,9 @@ node above the leaves is pure structure: children, ports, and wiring.
 ### 5.1 Hierarchy
 
 ```
-system Shop                         C4 System    — plus the people and external systems around it
- ├ container Api                    C4 Container — a deployable or process
- │  ├ component Billing   (leaf)    C4 Component — one flat directory of code
+system Shop                         C4 System, with the people and external systems around it
+ ├ container Api                    C4 Container: a deployable or process
+ │  ├ component Billing   (leaf)    C4 Component: one flat directory of code
  │  └ component Orders    (leaf)
  └ container Worker
     └ group Fulfilment              optional composite, for zoom levels inside a container
@@ -89,8 +89,8 @@ system Shop                         C4 System    — plus the people and externa
 | `system` | containers, `person` and `external` declarations | no |
 | `container` | groups and components | no |
 | `group` | groups and components | no |
-| `component` | source files and tests | yes — and no child nodes |
-| `library` | shared types and reusable code | yes — but no ports, topics, or mutable state (§5.4a) |
+| `component` | source files and tests | yes, but no child nodes |
+| `library` | shared types and reusable code | yes, but no ports, topics, or mutable state (§5.4a) |
 
 ### 5.2 Layout
 
@@ -177,7 +177,7 @@ container Worker {
 
 `Orders { Checkout: Billing.Payments }` is where the port-compatibility check runs.
 
-The system adds C4's outer ring — the people and external systems it interacts with:
+The system adds C4's outer ring: the people and external systems it interacts with:
 
 ```go
 // Shop is the online store.
@@ -206,8 +206,8 @@ relationship so it appears in diagrams.
 2. **Code only in leaves.** Composites hold no source files; leaves hold no child nodes.
 3. **Encapsulation at every level.** Outside its parent, a node does not exist. A composite exposes
    only the ports it publishes with `provides X from Child`.
-4. **Complete wiring.** Each composite wires every `requires` of every direct child exactly once —
-   to a sibling's port, or to one of the composite's own `requires`.
+4. **Complete wiring.** Each composite wires every `requires` of every direct child exactly once, either to
+   a sibling's port or to one of the composite's own `requires`.
 5. **Complete provision.** A leaf implements every port it `provides`; a composite sources every
    port it `provides` from a child.
 6. **Compatible wiring.** Every wire satisfies the port-compatibility check in §5.3.
@@ -222,7 +222,7 @@ relationship so it appears in diagrams.
 
 ### 5.4a Libraries
 
-Types shared across a wire — `Money` in a port signature on both sides — must be the *same* type,
+Types shared across a wire, such as `Money` in a port signature on both sides, must be the *same* type,
 so they cannot belong to either leaf. They live in a **library**: a node that holds shared types
 and reusable code but takes no part in the running architecture.
 
@@ -310,23 +310,23 @@ or when they read.
   `ignore deadletters, "reason"`, recorded in `keel audit` like `ignore err`.
 - **Delivery guarantees are the author's decision, not the language's.** The language supplies the
   means to declare them per remote topic (at-most-once or at-least-once; ordered or unordered).
-  **Default: at-least-once, unordered** — nothing is lost, and because a message may arrive twice,
+  **Default: at-least-once, unordered.** Nothing is lost, and because a message may arrive twice,
   subscribers are written to be idempotent (handling a message twice has the same effect as once).
 - **Unread topics warn.** A published topic wired to zero subscribers compiles, with a warning:
   publishers may exist before their readers, but an unread topic should never go unnoticed.
 - **Subscriber aborts never reach the publisher's code.** When a subscriber aborts while handling a
-  message, the publisher is unaffected. The outbox records the event — which message, which
-  subscriber, which attempt — and the message is retried, then dead-lettered, under the topic's
+  message, the publisher is unaffected. The outbox records the event (which message, which
+  subscriber, which attempt), and the message is retried, then dead-lettered, under the topic's
   delivery guarantee.
-- **An outbox failure aborts.** If the outbox itself fails — a write cannot be stored, the store is
-  corrupt — the publishing task aborts (§7.1). The publisher's code still never sees an error.
+- **An outbox failure aborts.** If the outbox itself fails (a write cannot be stored, or the store is
+  corrupt), the publishing task aborts (§7.1). The publisher's code still never sees an error.
 - **Outbox durability follows the delivery guarantee.** An at-least-once topic's outbox is on
   local disk, so undelivered messages survive a process restart. An at-most-once topic's outbox
   may be in memory, since loss is already allowed.
 - **At-least-once holds while the delivery mechanism is intact.** The language retries a message
   until it is delivered or dead-lettered. It does not promise survival of the delivery mechanism
-  itself (a lost or corrupt disk). Making delivery survive that — persistent brokers, replication,
-  and so on — is system design outside the language's purview.
+  itself (a lost or corrupt disk). Making delivery survive that, with persistent brokers, replication,
+  and so on, is system design outside the language's purview.
 - **Message tracing is off by default; opt in per topic or project-wide.** When on, the runtime
   gives each message an ID and records its lifecycle (published, delivered to X, aborted, retried,
   acknowledged or dead-lettered), and `keel trace <id>` reconstructs it. Retention is bounded, like
@@ -342,19 +342,19 @@ or when they read.
 Decoupling requires buffering, and every buffer must eventually refuse or forget. Keel makes the
 wiring choose which, in writing, so no runtime queue can grow memory without limit.
 
-- **Every runtime queue has a capacity** — outbox, retry queue, subscriber inbox, and dead-letter
+- **Every runtime queue has a capacity**: the outbox, retry queue, subscriber inbox, and dead-letter
   topic. A capacity comes from the wire, from the one central project default, or from a startup
   flag (`flag("name")`, checked at process start as in §5.5). A remote topic whose queues do not
   all resolve to a capacity is a compile error.
 - **The full-queue policy comes from one project-wide default unless a wire overrides it.** The
-  default ships as `block` — nothing is lost — and a project may change it in its config. A wire
+  default ships as `block`, which never loses a message, and a project may change it in its config. A wire
   overrides it where the message calls for something else. `keel audit` shows, per topic, whether
   the policy is the project default or an override.
 
   | `whenFull` | Effect | Typical use |
   |---|---|---|
-  | `block` | Publisher waits for room (coupled to slow readers in time only) | Business events — losing one is unacceptable |
-  | `dropOldest` / `dropNewest` | Message discarded, counted, dead-lettered; listed in `keel audit` | Telemetry — stale is fine |
+  | `block` | Publisher waits for room (coupled to slow readers in time only) | Business events, where losing one is unacceptable |
+  | `dropOldest` / `dropNewest` | Message discarded, counted, dead-lettered; listed in `keel audit` | Telemetry, where stale is fine |
   | `abort` | The task aborts (§7.1) | When neither waiting nor loss is acceptable |
 
   ```go
@@ -366,8 +366,8 @@ wiring choose which, in writing, so no runtime queue can grow memory without lim
 
 - **Messages expire.** Every topic has a time to live (`ttl`), resolved like capacity. An expired
   message is dead-lettered, so a dead subscriber cannot pin memory.
-- **The dead-letter topic overflows to `abort`.** It cannot `block` — that would stall the
-  pipeline on its own error path — and it cannot drop, because dropping a dead letter is a silent
+- **The dead-letter topic overflows to `abort`.** It cannot `block`, because that would stall the
+  pipeline on its own error path, and it cannot drop, because dropping a dead letter is a silent
   failure. A full dead-letter topic is loud.
 - **Limits are visible before they are hit.** The runtime reports each queue's depth, high-water
   mark, and a time-to-full estimate. `keel audit` lists every topic's capacity, policy, and TTL,
@@ -377,23 +377,23 @@ wiring choose which, in writing, so no runtime queue can grow memory without lim
 
 `keel diagram --level context|container|component|code [--focus <node>]` renders each C4 level from
 the declarations above. Because composites hold no code, a diagram at any zoom level shows where all
-behavior lives — a parent cannot hide logic.
+behavior lives; a parent cannot hide logic.
 
 ## 6. Type system
 
 - **Strong and static.** No implicit conversions.
 - **Inferred wherever possible.** Locals, closures, and generic instantiations are inferred.
-  Port signatures and exported functions are explicit — they are the contract surface humans review.
+  Port signatures and exported functions are explicit, because they are the contract surface humans review.
 - **Private signatures may omit types only when inference is safe.** A private function (not
   exported, not in a port) may leave out parameter or return types when all of these hold:
-  1. The type is inferred from the function's **own body only** — never from its call sites, so
+  1. The type is inferred from the function's **own body only**, never from its call sites, so
      editing a caller can never change a function's type.
   2. The body determines **exactly one** type. If a field access or method call fits more than one
      type, the compiler reports an error with a fix-it that inserts the annotation.
   3. The function is not recursive; recursive functions annotate their return type.
 
-  Tooling always shows the full inferred signature — `keel context`, `keel doc`, hover, and diffs
-  — so a model or reviewer never has to reconstruct a type by hand.
+  Tooling always shows the full inferred signature (in `keel context`, `keel doc`, hover, and diffs),
+  so a model or reviewer never has to reconstruct a type by hand.
 - **Inference must work on incomplete programs**, so tooling can offer type-valid completions (R5).
 - **Sum types** (tagged unions) with exhaustive `switch`. Needed for typed errors and for state
   machines; a deliberate addition over Go.
@@ -402,7 +402,7 @@ behavior lives — a parent cannot hide logic.
 
 ### 6.1 Generics
 
-Angle brackets, with bounds written like Go parameters (name, then type — no colon):
+Angle brackets, with bounds written like Go parameters (name, then type, with no colon):
 
 ```go
 func Max<T Ordered>(xs []T) ?T
@@ -433,7 +433,7 @@ Errors are returned in Go's `(T, error)` shape, but handling is **required and e
 
 - Using `T` from a call without handling its error is a compile error.
 - Postfix `?` returns the error to the caller: `r := billing.Charge(c, amt)?`. It is shorthand for
-  `if err != ok { return err }` and nothing else — it does not unwind, catch, or jump.
+  `if err != ok { return err }` and nothing else: it does not unwind, catch, or jump.
   (`?` rather than a `try` keyword, so neither humans nor models read it as a try/catch block.)
 - Discarding an error requires a stated reason, which is recorded for audit:
   `ignore err, "cache miss is not an error here"`.
@@ -446,9 +446,9 @@ Errors are returned in Go's `(T, error)` shape, but handling is **required and e
 
 ### 7.1 Supervision
 
-Recovery happens only at **task boundaries** — Erlang's "let it crash" model in Go syntax.
+Recovery happens only at **task boundaries**. This is Erlang's "let it crash" model in Go syntax.
 
-- An aborted task's state is discarded. Its **parent** — the task that started it — receives the
+- An aborted task's state is discarded. Its **parent**, the task that started it, receives the
   abort as an ordinary value and decides what happens next: restart, fail that request, or report.
 - Starting a task returns a handle; the handle's exit is a sum type the parent `switch`es on:
 
@@ -481,7 +481,7 @@ half-changed after the task's own state is gone. Keel follows Rust:
 - A task that repairs or rebuilds the data may call `mu.ClearPoison()`. Each call is listed in
   `keel audit`.
 - Limit: poisoning protects only data guarded by a lock. Shared data mutated without a lock is a
-  data race — already a bug — and the race detector runs in test builds to find it.
+  data race, which is already a bug, and the race detector runs in test builds to find it.
 
 ## 7a. Null safety
 
@@ -498,7 +498,7 @@ null-pointer failure cannot occur.
   if u == none {
       return NotFound
   }
-  send(u.Email)              // u is User here — the check above proved it
+  send(u.Email)              // u is User here: the check above proved it
   ```
 
 - `x ?? fallback` supplies an explicit default. It is allowed because the fallback is written at
@@ -554,7 +554,7 @@ program does. Within that rule, three tiers are allowed:
 | Tier | Adds | Example |
 |---|---|---|
 | 1 | Comparisons, arithmetic, `&&` `\|\|` `!`, `=>` (implies), field access, `len`, `result`, `old(x)` (value on entry) | `ensures err == ok => acct.Balance == old(acct.Balance) - amt` |
-| 2 | Calls to functions marked `pure` — the compiler verifies they have no effects | `requires IsSorted(a) && IsSorted(b)` |
+| 2 | Calls to functions marked `pure` (the compiler verifies they have no effects) | `requires IsSorted(a) && IsSorted(b)` |
 | 3 | Quantifiers over collections: `all x in xs: …`, `any x in xs: …` | `requires all x in xs: !IsNaN(x)` |
 
 ```go
@@ -571,7 +571,7 @@ release builds, and a component may opt out of them.
 Checking:
 - **Statically** where the compiler can prove or refute them.
 - **At runtime** in debug and test builds; release builds keep them by default, with per-component opt-out.
-- **Port contracts bind every implementation**, including test fakes — a fake that violates its port's
+- **Port contracts bind every implementation**, including test fakes: a fake that violates its port's
   contract fails the test.
 
 Auditability:
@@ -594,7 +594,7 @@ Beyond type checking, the compiler reports (as diagnostics with fix-its):
 - **Error masking** patterns (R3).
 - **Architecture violations** (§5.4) with the exact dependency edge that broke the rule.
 - **Architecture diffs**: `keel archdiff main..HEAD` reports added/removed ports, dependencies and
-  contracts — the review surface for R6.
+  contracts. This is the review surface for R6.
 - Dead code and unused ports.
 
 Every diagnostic has a stable code, a human message, a *hint* explaining how to fix it idiomatically,
@@ -610,7 +610,7 @@ Tooling assumes one of its users is an LLM (R8):
 | `keel context <component>` | Emits the minimal context for working on one component: its declaration, its ports and contracts, and signatures of what it requires (R1). |
 | `keel query <symbol>` | Exact lookup against the compiler's symbol index; the cure for hallucinated APIs (R4). |
 | `keel explain <code>` | Long-form explanation of a diagnostic, with examples. |
-| `keel doc` / `keel diagram` | Docs and C4 diagrams at every level — context, container, component, code — generated from source (§5.6). |
+| `keel doc` / `keel diagram` | Docs and C4 diagrams at every level (context, container, component, code), generated from source (§5.6). |
 | `keel audit` / `keel archdiff` | Contract and architecture audit (§8, §10). |
 | `keel fmt` | The one formatter. |
 | `keel check` / `keel build` | Holistic boundary check; parallel per-component build (§12.2). |
@@ -622,20 +622,20 @@ editors and agents.
 
 - Native compilation, tracing GC.
 - **Backend: emit Go source first, LLVM later.** The compiler lowers to its own intermediate
-  representation (IR), and backends consume only that IR — never the syntax tree — so a second
+  representation (IR), and backends consume only that IR, never the syntax tree, so a second
   backend needs no front-end changes.
   - *Go backend (first).* Keel gets Go's GC, goroutine scheduler, channels, and cross-compilation
     for free, and Keel's semantics map onto Go closely. Emitted code carries `//line` directives, so
     Go's stack traces, profilers, and debuggers report `.keel` file positions, not generated Go.
   - *LLVM backend (deferred).* Deferred because it requires Keel's own GC and scheduler, which are
-    months of work that block nothing in the language design. Work starts when the IR is stable
-    — the self-hosted compiler (§12.1) builds on it unchanged across releases.
+    months of work that block nothing in the language design. Work starts when the IR is stable,
+    meaning the self-hosted compiler (§12.1) builds on it unchanged across releases.
 - Concurrency model follows Go (goroutine-style tasks, channels) unless a later decision changes it.
 
 ### 12.1 Compiler implementation
 
 - **Written in Go**, then **self-hosted in Keel**. Keel's semantics sit close to Go's, so the
-  compiler's source can be translated largely mechanically — the path Go itself took from C at 1.5.
+  compiler's source can be translated largely mechanically, which is the path Go itself took from C at 1.5.
   The self-hosted compiler becomes Keel's first large program and the proving ground for §5.
 - **Query-based and incremental from the start.** The compiler is a memoized query engine ("type of
   X", "ports of node Y", "context pack for Z") rather than a batch pipeline, so the LSP and the
@@ -654,7 +654,7 @@ Compilation has two separate modes that run in parallel with each other.
 | Parallelism | One pass over the whole tree | One job per leaf, all leaves in parallel |
 
 - **Why per-leaf compilation is possible.** A leaf declares every port it requires (§5.3), so it
-  compiles against its own declarations — never against another leaf's code. A change inside one
+  compiles against its own declarations, never against another leaf's code. A change inside one
   leaf rebuilds that leaf only.
 - **Both must pass before linking.** A binary is produced only when the holistic check passes and
   every leaf has compiled. Neither mode trusts the other's results implicitly.
@@ -678,10 +678,10 @@ leaves then compile in parallel against library declarations.
 
 ## 13. Non-goals (for now)
 
-- Manual memory management or ownership types — excluded by the GC principle.
-- Inheritance and class hierarchies — excluded by "OO light".
-- Macros / metaprogramming — each one makes code less navigable and less predictable for a model.
-- Effects/capabilities system (architecture option C) — deferred because it conflicts with Go
+- Manual memory management or ownership types: excluded by the GC principle.
+- Inheritance and class hierarchies: excluded by "OO light".
+- Macros and metaprogramming: each one makes code less navigable and less predictable for a model.
+- Effects/capabilities system (architecture option C): deferred because it conflicts with Go
   ergonomics; revisit once components and ports are proven.
 
 ## 14. Open questions
@@ -691,17 +691,17 @@ leaves then compile in parallel against library declarations.
 | Q1 | Final name and file extension. |
 | Q14 | *Parked.* Should the compiler enforce which leaves may call an `external` system? Parked because it depends on how external client libraries and foreign code are modeled, which follows the core port model; nothing else in the spec depends on it. |
 
-## Appendix A — Sources
+## Appendix A: Sources
 
-- Sonar, *Your AI agent doesn't know your codebase's context or constraints* — https://www.sonarsource.com/blog/your-ai-agent-doesnt-know-your-codebases-context-or-constraints/
-- Packmind, *Context engineering for large codebases* (cites Chroma 2025, 18 models) — https://packmind.com/context-engineering-ai-coding/context-engineering-large-codebases/
-- *Codified Context: Infrastructure for AI Agents in a Complex Codebase* — https://arxiv.org/html/2602.20478v1
-- GitClear, *The Maintainability Gap* (2026) — https://www.gitclear.com/the_ai_code_quality_maintainability_gap
-- *Package Hallucinations* (USENIX ;login:) — https://www.usenix.org/publications/loginonline/we-have-package-you-comprehensive-analysis-package-hallucinations-code
-- *On Mitigating Code LLM Hallucinations with API Documentation* — https://arxiv.org/abs/2407.09726
-- *Type-Constrained Code Generation with Language Models* — https://arxiv.org/pdf/2504.09246
-- METR, developer productivity study and 2026 design update — https://metr.org/blog/2026-02-24-uplift-update/
-- *"An Endless Stream of AI Slop"* — https://arxiv.org/pdf/2603.27249
-- Sonar, *The AI trust gap* — https://www.sonarsource.com/blog/ai-coding-trust-gap/
-- *No Resource, No Benchmarks, No Problem?* (no-resource languages) — https://arxiv.org/html/2606.16827v1
-- *A Survey on LLM-based Code Generation for Low-Resource and Domain-Specific Languages* (ACM TOSEM) — https://dl.acm.org/doi/10.1145/3770084
+- Sonar, *Your AI agent doesn't know your codebase's context or constraints*: https://www.sonarsource.com/blog/your-ai-agent-doesnt-know-your-codebases-context-or-constraints/
+- Packmind, *Context engineering for large codebases* (cites Chroma 2025, 18 models): https://packmind.com/context-engineering-ai-coding/context-engineering-large-codebases/
+- *Codified Context: Infrastructure for AI Agents in a Complex Codebase*: https://arxiv.org/html/2602.20478v1
+- GitClear, *The Maintainability Gap* (2026): https://www.gitclear.com/the_ai_code_quality_maintainability_gap
+- *Package Hallucinations* (USENIX ;login:): https://www.usenix.org/publications/loginonline/we-have-package-you-comprehensive-analysis-package-hallucinations-code
+- *On Mitigating Code LLM Hallucinations with API Documentation*: https://arxiv.org/abs/2407.09726
+- *Type-Constrained Code Generation with Language Models*: https://arxiv.org/pdf/2504.09246
+- METR, developer productivity study and 2026 design update: https://metr.org/blog/2026-02-24-uplift-update/
+- *"An Endless Stream of AI Slop"*: https://arxiv.org/pdf/2603.27249
+- Sonar, *The AI trust gap*: https://www.sonarsource.com/blog/ai-coding-trust-gap/
+- *No Resource, No Benchmarks, No Problem?* (no-resource languages): https://arxiv.org/html/2606.16827v1
+- *A Survey on LLM-based Code Generation for Low-Resource and Domain-Specific Languages* (ACM TOSEM): https://dl.acm.org/doi/10.1145/3770084
