@@ -33,6 +33,7 @@ faster. Each design decision in this spec serves that goal.
 |---|---|
 | Compiled, GC | Native binaries and a tracing GC. No manual memory management and no borrow checker. |
 | Go ergonomics | Go is the syntax model. Keel changes Go only where Go is weak, for example generics and error enforcement. |
+| Compiler first | If the compiler can check a rule, the compiler checks it. Each rule that depends on convention, review, or runtime is a candidate to move into the compiler. This is the most direct way to make tasks 2 and 3 of §1.1 shorter. |
 | Rust-grade compiler intelligence | Diagnostics explain *why* and propose fixes. The compiler checks exhaustiveness and finds duplication and error masking. |
 | Imposed structure | One project layout, one formatter, and one location for each kind of thing. |
 | Architecture is first-class | Systems, components, and ports are language constructs. The compiler enforces them. |
