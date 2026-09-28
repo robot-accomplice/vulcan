@@ -65,7 +65,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | Change from Go | Reason |
 |---|---|
 | `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
-| An unhandled error is a compile error. Postfix `?` propagates an error. | R3 (§7) |
+| `(T, error)` is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. `ok` replaces `nil` for errors. | R3, and no zero value on the error path (§7) |
 | No `nil` or `null` value. Optional types `?T`, narrowed by control flow. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
@@ -550,15 +550,41 @@ Recovery occurs only at task boundaries (§7.1).**
 An error is an ordinary value. It moves only through return values. Thus the source shows each path
 that an error can take.
 
-A function returns an error in the Go shape, `(T, error)`. But the code **must handle each error
-explicitly**:
+A function that can fail declares the Go shape, `(T, error)`. In Keel this shape is a **sum type**:
+the function returns a value **or** an error, never both. Thus the error path needs no value of
+`T`, and no zero value.
 
-- If the code uses `T` from a call and does not handle the error of the call, the code does not
-  compile.
-- Postfix `?` returns the error to the caller: `r := billing.Charge(c, amt)?`. It is a short form
-  of `if err != ok { return err }` and it does nothing more. It does not unwind, catch, or jump.
-  Keel uses `?` and not a `try` keyword, so that humans and models do not read it as a try/catch
-  block.
+```go
+func Charge(c CustomerID, a Money) (Receipt, error) {
+    tok := vault.Lookup(c)?   // on failure, returns the error; no Receipt needed
+    ...
+    return receipt            // success: the value only
+}
+
+r, err := Charge(c, a)
+if err != ok {
+    return err                // r is not usable here
+}
+use(r)                        // r is a Receipt here: the check above proved it
+```
+
+- `return v` returns success. `return err` returns failure. `return v, err` is a compile error,
+  because the result cannot be both.
+- `ok` is the value of `error` that means "no error". It replaces Go's `err == nil`. A function
+  that returns only `error` ends with `return ok` on success.
+- A shape with more values works the same way: `(A, B, error)` returns `a, b` or `err`.
+- At the call site, `r, err := f()` binds both names. The compiler narrows `r` by control flow, the
+  same as a `?T` (§7a): the code can use `r` only where the flow proves that `err == ok`.
+
+The code **must handle each error explicitly**:
+
+- If the code uses the value of a call and does not handle the error of the call, the code does
+  not compile.
+- Postfix `?` returns the error to the caller: `r := billing.Charge(c, amt)?`. If the call
+  succeeds, `?` gives its value. If the call fails, `?` returns the error from the enclosing
+  function, which must also return `error`. It does nothing more. It does not unwind, catch, or
+  jump. Keel uses `?` and not a `try` keyword, so that humans and models do not read it as a
+  try/catch block.
 - To discard an error, the code must give a reason. The audit records the reason:
   `ignore err, "cache miss is not an error here"`.
 - A port declares the kinds of error that each of its functions can return. A `switch` on these
@@ -847,6 +873,7 @@ first. Then the leaves compile in parallel against the library declarations.
 | # | Question |
 |---|---|
 | Q1 | The final name and file extension. |
+| Q20 | Without `nil`, some types have no zero value (types that hold pointers, interfaces, or functions). What happens to `make([]*T, n)`, a generic `var x T`, and a partial struct literal? |
 
 ## Appendix A: Sources
 
