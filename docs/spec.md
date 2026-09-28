@@ -983,8 +983,14 @@ A contract is a clause on a declaration. It is not a comment.
 ### 8.1 What a contract can contain
 
 Contract expressions are **pure**. They never do I/O, call ports, use channels or topics, change
-data, or read the clock or a random source. Thus a program does the same thing when its checks are
-on and when they are off. Within that rule, Keel permits three tiers:
+data, or read the clock or a random source. Contract expressions also cannot fail:
+
+- Arithmetic in a contract is exact. It cannot overflow.
+- An index in a contract must be proved in range by the contract itself, for example
+  `len(xs) > 0 && xs[0] > 0`. `requires xs[0] > 0` alone is a compile error.
+
+Thus a correct program does the same thing when its checks are on and when they are off. Within
+that rule, Keel permits three tiers:
 
 | Tier | Adds | Example |
 |---|---|---|
@@ -1007,7 +1013,9 @@ How the compiler checks contracts:
 
 - **Statically**, when the compiler can prove or disprove a contract.
 - **At runtime** in debug builds and test builds. Release builds keep the checks by default. A leaf
-  can turn them off.
+  can turn them off, with one exception: a **load-bearing** contract stays on. A contract is
+  load-bearing when a proof depends on it, for example a bounds proof (§7b) or a narrowing.
+  `keel audit` lists each load-bearing contract.
 - **Port contracts bind each implementation**, including test fakes. If a fake violates the
   contract of its port, the test fails.
 
