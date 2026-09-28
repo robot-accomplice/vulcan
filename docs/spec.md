@@ -45,7 +45,8 @@ use the same terms.
 | **External system** | Software outside the system, such as Stripe. Declared with `external`. |
 | **Person** | A human who uses the system. Declared with `person`. For diagrams. |
 | **Port** | An interface with contracts on the boundary of a node. The node that provides it or requires it declares it. |
-| **Topic** | A publish channel, `topic<T>`. The only link between containers. |
+| **Topic** | A publish channel, `topic<T>`, for asynchronous events between containers. |
+| **Remote port** | A port that crosses containers. A remote method port is a synchronous call; a remote topic is an event. |
 | **Publisher / subscriber** | The leaf that publishes on an `out` topic / the leaf that handles an `in` topic. |
 | **Handler** | The function, marked `handle`, that processes the messages of one `in` topic. |
 | **Wire** | A line in a composite that connects a required port or an `in` topic to a provider. |
@@ -112,7 +113,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
 | `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
-| `remote port`, `idempotent` handlers, `via` wiring | Honest communication between containers (§5.5) |
+| `remote port` (synchronous methods with `timeout` and transport errors, or topics), `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.4) |
 | `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `none` | No forgotten or early acknowledgement (§5.5.0) |
 | `max` bounds on variable-size fields of topic messages | The compiler calculates the memory limit of each queue (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
@@ -302,8 +303,8 @@ system Shop {
     person   Customer "Buys goods through the web store"
     external Stripe   "Card payment processor"
 
-    Worker { Intake.Placed:     Api.OrderFlow.Placed  via direct }   // topics are the only
-    Api    { OrderFlow.Shipped: Worker.Intake.Shipped via direct }   // links between containers
+    Worker { Intake.Placed:     Api.OrderFlow.Placed  via direct }   // topics: events
+    Api    { OrderFlow.Shipped: Worker.Intake.Shipped via direct }   // between containers
 
     uses Customer -> Api "places orders over HTTPS"
     // Api -> Stripe comes from the gateway declaration (§5.4b).
@@ -502,9 +503,12 @@ standard library, for example HTTP, JSON, SQL, and cryptography. It ships with t
 
 ### 5.5 Crossing containers
 
-Containers are separate processes. Thus a **topic** is the only thing that crosses from one
-container to another. A topic is a publish channel. It is like a Go channel, but it works across
-the process boundary. Method ports never cross a container boundary.
+Containers are separate processes. Two mechanisms cross from one container to another, and the
+developer chooses one for each boundary:
+
+- **A remote method port**, for a synchronous request and response (§5.5.4).
+- **A topic**, for asynchronous events. A topic is a publish channel. It is like a Go channel, but
+  it works across the process boundary.
 
 A topic has its own type, `topic<T>`. It is not a Go `chan T`, because the two behave differently:
 
@@ -554,10 +558,11 @@ how many subscribers there are, or when they read.
   the dead-letter route and size) go on the wire of the subscriber. The settings of the outbox
   (its capacity and its `whenFull` policy) go on an `outbox` line in the parent, or come from the
   project default (§5.5.1).
-- **No request/response.** A reply would bind the publisher to a subscriber. If a publisher must
-  know the result, it subscribes to a separate event that the other side publishes. `Shipped` in
-  the example above is such an event.
-- **To read data that another container owns, keep a read model.** The owner publishes change
+- **A topic has no reply.** A reply would bind the publisher to a subscriber. For a request and
+  response, use a remote method port (§5.5.4). If a publisher needs to know what happened later, it
+  subscribes to a separate event that the other side publishes. `Shipped` in the example above is
+  such an event.
+- **A read model is an alternative to a synchronous read.** The owner publishes change
   events. The reader subscribes, keeps a local copy, and answers queries from that copy. This is
   "event-carried state transfer". Reads can be slightly stale, and each reader stores its own copy.
 
@@ -784,6 +789,40 @@ compares each message type with the version that is already deployed.
   newer publisher.
 - **Any deploy order works.** Because each change in the lock is compatible in both directions,
   the containers can deploy in any order.
+
+#### 5.5.4 Remote method ports
+
+A remote method port is a synchronous request and response between containers. It uses the same
+syntax as a port inside a container. The `remote` marker adds what the network makes true:
+
+```go
+// In Api (the consumer declares what it needs):
+remote port Stock {
+    func Level(sku SKU) (int, error)
+        timeout 200ms
+}
+
+// In a leaf of Api:
+qty := Stock.Level(sku)?        // the caller must handle Unavailable and Timeout
+```
+
+- **Transport errors are part of the error set.** Each method of a remote port can also return
+  `Unavailable` and `Timeout`. A `switch` on its errors must handle them.
+- **Each call has a timeout.** The project config sets a default timeout. A method can override it
+  with `timeout`. If no timeout resolves, the code does not compile.
+- **A timeout means the outcome is unknown.** The call can have run or not. The runtime never
+  retries a remote call. If the caller retries, the method should be `idempotent`.
+- **Contracts are checked on both sides.** The caller checks `requires` before it sends. The callee
+  checks it again when it receives. The callee checks `ensures` before it replies, and the caller
+  checks it again when it receives the reply.
+- **Types must be serializable**, as for topic messages. The schema lock (§5.5.3) also covers the
+  parameter and result types of remote methods, so the same evolution rules apply.
+- **The wire names the transport** with `via`, as for topics. The built-in `direct` transport
+  supports request and response.
+
+**How to choose.** Use a remote method port when the caller needs an answer now. Use a topic when
+the publisher must not depend on who reads, or when many subscribers react to one event. The
+developer decides for each boundary.
 
 ### 5.6 Diagrams
 
