@@ -76,6 +76,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `test` and `fake` blocks | Testability by design (§9) |
 | `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
 | `remote port`, `idempotent` handlers, `via` wiring | Honest communication between containers (§5.5) |
+| `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `ok` | No forgotten or early acknowledgement (§5.5.0) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
@@ -485,6 +486,39 @@ how many subscribers there are, or when they read.
   `idempotent`. Without the marker, the code does not compile. The compiler cannot prove the claim,
   but the marker makes a hidden assumption visible. The marker appears in `keel context`, in
   `keel doc`, and in `keel audit`, where reviewers can check it.
+
+#### 5.5.0 Publishing and handling
+
+**Publish** is a method on an `out` topic. It is not Go's `<-`, because a topic does not behave
+like a `chan`:
+
+```go
+Placed.Publish(OrderPlaced{ID: id, Total: t})
+```
+
+**A handler** is a function bound to one `in` topic with `handle`:
+
+```go
+idempotent handle Shipped(m ShipmentSent) error {
+    orders.MarkShipped(m.OrderID)?
+    return ok          // the message is acknowledged here
+}
+```
+
+- Each `in` topic of a leaf has exactly one handler. Code cannot iterate over an `in` topic.
+- The runtime runs each message in its own task and supervises that task (§7.1).
+- **The acknowledgement point is the return of the handler:**
+
+  | Handler outcome | At-least-once topic | At-most-once topic |
+  |---|---|---|
+  | Returns `ok` | Acknowledged. | Acknowledged. |
+  | Returns an error | Retried, then sent to the dead-letter topic. | Discarded and counted. |
+  | Aborts | Retried, then sent to the dead-letter topic. | Discarded and counted. |
+
+  Thus code cannot forget to acknowledge a message, and it cannot acknowledge a message too early.
+- The runtime runs handlers of an unordered topic concurrently, up to a limit. The limit comes from
+  the wire of the subscriber or from the project default. On an ordered topic, the runtime runs one
+  handler at a time for each ordering key.
 
 #### 5.5.1 Bounded buffers
 
