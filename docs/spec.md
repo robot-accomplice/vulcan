@@ -77,6 +77,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
 | `remote port`, `idempotent` handlers, `via` wiring | Honest communication between containers (§5.5) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
+| `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
 | Generics use `<T Bound>`, not `[T Bound]` | Familiar from the C family. An unbounded parameter needs no `any` (§6.1) |
@@ -317,7 +318,7 @@ Rules:
 1. A container that talks to an external system has exactly one gateway leaf for that system. The
    gateway declares `gateway for <External>`, and `<External>` must be an `external` declaration in
    the system.
-2. Only a gateway leaf can import a raw network library, or a client library for an external
+2. Only a gateway leaf can import a network library (§5.4c), or a client library for an external
    system. Any other leaf that imports one causes a compile error. The compiler cannot read a URL
    string at compile time, so this import rule is the only way to enforce which leaves reach the
    network.
@@ -329,6 +330,48 @@ Rules:
 Why a gateway (§1.1): each rule about an external system goes in one leaf. A reviewer reads all
 traffic to that system in one location. Tests of other leaves fake a port with contracts, not HTTP.
 The compiler rejects network code in any other leaf, so the reviewer does not have to find it.
+
+### 5.4c Foreign libraries (Go interop)
+
+Keel uses Go packages, but only through a guarded boundary. A **foreign library** is the only node
+that can import a Go package. It gives a Keel API to the rest of the program.
+
+```go
+// lib/stripeclient/library.keel
+// StripeClient wraps the Stripe Go SDK.
+foreign library StripeClient {
+    client of Stripe
+    go "github.com/stripe/stripe-go/v82"
+}
+```
+
+**The boundary converts each crossing value:**
+
+| From Go | To Keel |
+|---|---|
+| a value that can be `nil` | `?T` |
+| a Go `error` | a Keel error |
+| a panic | an abort of the calling task (§7.1) |
+| an integer | an integer; Keel arithmetic on it follows §7c |
+
+**Rules:**
+
+1. Only a foreign library can import a Go package. Leaves, gateways, and other libraries import the
+   foreign library, never Go directly.
+2. The compiler reads the Go dependency graph of each foreign library. If the graph includes a Go
+   network package, the foreign library is a **network library**. Only a gateway (§5.4b), or a
+   client library that a gateway imports, can import a network library. Thus the gateway rule is
+   enforced through Go dependencies too.
+3. The Keel side of a foreign library has no mutable package-level state, the same as any library
+   (§5.4a).
+4. Go code inside the boundary can break Keel guarantees. It can start unsupervised goroutines, use
+   locks that do not become poisoned, and hold global state. `keel audit` lists each foreign
+   library and these limits, so that a reviewer can see where the guarantees stop.
+
+**The standard library.** The Keel standard library is a set of foreign libraries over the Go
+standard library, for example HTTP, JSON, SQL, and cryptography. It ships with the compiler.
+
+**Versions.** A Keel project uses Go modules (`go.mod`) to pin the versions of Go packages.
 
 ### 5.5 Crossing containers
 
@@ -663,7 +706,7 @@ null-pointer failure cannot occur.
   where it is used. But `keel audit` lists each `??`, the same as `ignore`.
 - An API that "might not find" a value returns `?T`. Examples: a map lookup, `Find`, a search, and
   a parse that has no error.
-- A value from a foreign function has the type `?T` until the code checks it.
+- A value from Go that can be `nil` has the type `?T` at the foreign-library boundary (§5.4c).
 - When code uses a `?T` incorrectly, the diagnostic hint shows the narrowing pattern above. It does
   not only say "type mismatch".
 
@@ -874,6 +917,7 @@ first. Then the leaves compile in parallel against the library declarations.
 |---|---|
 | Q1 | The final name and file extension. |
 | Q20 | Without `nil`, some types have no zero value (types that hold pointers, interfaces, or functions). What happens to `make([]*T, n)`, a generic `var x T`, and a partial struct literal? |
+| Q21 | Inbound traffic. A leaf that serves HTTP to a `person` (for example, Api serving Customer) needs a network library, but it is not a gateway to an external system. How does Keel declare and enforce an entry point? |
 
 ## Appendix A: Sources
 
