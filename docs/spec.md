@@ -113,9 +113,9 @@ sight. This spec must justify each change from Go and list it in this table:
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
 | `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
-| `remote port` (synchronous methods with `timeout` and transport errors, or topics), `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.4) |
+| `remote port` (synchronous methods with `timeout` and transport errors, or topics), `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.3) |
 | `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `none` | No forgotten or early acknowledgement (§5.5.0) |
-| `max` bounds on variable-size fields of topic messages | The compiler calculates the memory limit of each queue (§5.5.1) |
+| `max` bounds on variable-size fields | A transport can require bounded messages, so the compiler can calculate queue memory (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
@@ -123,7 +123,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
 | Generics use `<T Bound>`, not `[T Bound]` | Familiar from the C family. An unbounded parameter needs no `any` (§6.1) |
-| Declaration files (`system.keel`, `component.keel`, and so on) have their own syntax: `provides X from Y`, `parent.X`, `uses A -> B`, `layers a < b`, `via`, `flag("...")`, wire options (`capacity`, `whenFull`, `ttl`, `deadletters`, `deadletterCapacity`), `outbox` lines, method renames (`{ Pay = Charge }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
+| Declaration files (`system.keel`, `component.keel`, and so on) have their own syntax: `provides X from Y`, `parent.X`, `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), method renames (`{ Pay = Charge }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
 | Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
 | Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert<T>` | Explicit handling of bounds and overflow (§7b, §7c) |
@@ -148,7 +148,7 @@ Keel reserves few words.
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
   `layers`, `provides`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in`, `out`, `topic`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `max`, `guarded`, `acquires`, `idempotent`,
-  `gateway`, `client`, `budget`, and `outbox`.
+  `gateway`, `client`, and `budget`.
 
 ```go
 port := 8080                   // an identifier
@@ -506,15 +506,21 @@ standard library, for example HTTP, JSON, SQL, and cryptography. It ships with t
 Containers are separate processes. Two mechanisms cross from one container to another, and the
 developer chooses one for each boundary:
 
-- **A remote method port**, for a synchronous request and response (§5.5.4).
+- **A remote method port**, for a synchronous request and response (§5.5.3).
 - **A topic**, for asynchronous events. A topic is a publish channel. It is like a Go channel, but
   it works across the process boundary.
+
+The language supplies the **mechanism** of both. A **transport** carries them, and the transport
+owns the operational **policy**: durability, retries, dead letters, capacity, full-queue behavior,
+expiry, tracing, and delivery guarantees (§5.5.1). The compiler type-checks the settings of each
+transport.
 
 A topic has its own type, `topic<T>`. It is not a Go `chan T`, because the two behave differently:
 
 - A send on a Go channel blocks until a subscriber takes the value. Each value has exactly one
   subscriber.
-- A publish on a topic never waits for a subscriber. It waits only when its own outbox is full (§5.5.1). Each message has zero, one, or many subscribers.
+- A publish on a topic never waits for a subscriber. Each message has zero, one, or many
+  subscribers.
 
 One keyword with two behaviors would mislead humans and models trained on Go (R8). A Go `chan`
 keeps its Go behavior for concurrency inside one process.
@@ -532,38 +538,33 @@ remote port Intake {
     Shipped out topic<ShipmentSent>
 }
 
-// In Shop. Each subscriber names its source, and the parent names the transport.
-Worker    { Intake.Placed:     Api.OrderFlow.Placed  via direct }
-Analytics { Ingest.Placed:     Api.OrderFlow.Placed  via direct }   // a second subscriber
-Api       { OrderFlow.Shipped: Worker.Intake.Shipped via direct }
+// In Shop. Each subscriber names its source; the wire names the transport and its settings.
+Worker    { Intake.Placed:     Api.OrderFlow.Placed  via direct{ deadletters: Ops.Alerts } }
+Analytics { Ingest.Placed:     Api.OrderFlow.Placed  via direct{ deadletters: Ops.Alerts } }
+Api       { OrderFlow.Shipped: Worker.Intake.Shipped via direct{ deadletters: Ops.Alerts } }
 ```
 
 **Why publish: it is the loosest coupling possible.** The only job of the publisher is to publish.
 The publisher does not know, and must not care, if a subscriber reads its messages. It does not know
 how many subscribers there are, or when they read.
 
-- **Publish, never wait for a subscriber.** A publish gives the message to a local outbox and
-  returns. The runtime delivers the message from the outbox. Subscribers and the network cannot
-  make a publish fail. Compare a Go channel: an unbuffered send blocks until a subscriber takes the
-  value.
-- **The only wait is a full outbox.** Under the default `block` policy (§5.5.1), a publish waits
-  when its own outbox is full. A full outbox means overload. The runtime reports the depth and the
-  time until full before that point. The publisher still knows nothing about its subscribers: it is
-  coupled to them in time only, and only under overload.
+These rules are part of the language, for every transport:
+
+- **Publish, never wait for a subscriber.** A publish gives the message to the transport and
+  returns. Subscribers cannot make a publish fail. What happens when the transport is full is the
+  policy of the transport.
 - **Zero, one, or many subscribers.** The parent wires topics one at a time, from the subscriber
   side. Each `in` topic is wired exactly once, to one `out` topic of the same message type. An
   `out` topic is never wired by itself: its subscribers are the `in` topics wired to it, zero or
   more. Thus a new subscriber adds one wire, and the wiring of the publisher does not change.
-- **Where the settings go.** The settings of one subscription (the inbox capacity, the `ttl`, and
-  the dead-letter route and size) go on the wire of the subscriber. The settings of the outbox
-  (its capacity and its `whenFull` policy) go on an `outbox` line in the parent, or come from the
-  project default (§5.5.1).
+- **An unread topic causes a warning.** A topic with zero subscribers compiles, with a warning. A
+  publisher can exist before its subscribers, but an unread topic must not go unnoticed.
 - **A topic has no reply.** A reply would bind the publisher to a subscriber. For a request and
-  response, use a remote method port (§5.5.4). If a publisher needs to know what happened later, it
+  response, use a remote method port (§5.5.3). If a publisher needs to know what happened later, it
   subscribes to a separate event that the other side publishes. `Shipped` in the example above is
   such an event.
-- **A read model is an alternative to a synchronous read.** The owner publishes change
-  events. The reader subscribes, keeps a local copy, and answers queries from that copy. This is
+- **A read model is an alternative to a synchronous read.** The owner publishes change events. The
+  reader subscribes, keeps a local copy, and answers queries from that copy. This is
   "event-carried state transfer". Reads can be slightly stale, and each reader stores its own copy.
 
   ```go
@@ -577,68 +578,24 @@ how many subscribers there are, or when they read.
   }
   ```
 
-  A leaf cannot call another container over the network, because only gateways can import network
-  libraries (§5.4b, §5.4c). `keel audit` lists each `external` system with its gateway, so a
-  reviewer can find an `external` that is really a container of the same system.
+- **No raw network calls between containers.** A leaf cannot call another container over the
+  network by hand, because only gateways can import network libraries (§5.4b, §5.4c). `keel audit`
+  lists each `external` system with its gateway, so a reviewer can find an `external` that is
+  really a container of the same system.
 - **Ownership.** Each side owns only its end of each topic. Only message values cross, as copies.
   The two sides share no memory and no references.
 - **`remote` is necessary to cross.** The compiler rejects a wire across containers if the consumer
   did not declare the port `remote`.
 - **Contracts** on message types (struct `invariant`s) are checked when a message is published and
-  again when it is received. If a received message fails its invariant, the runtime sends it to
-  the dead-letter topic with the report; the subscriber does not abort. Message types must be
-  serializable. They cannot contain functions, topics, or pointers into the memory of the
-  publisher.
-- **Dead letters must have a route and a size.** A message that uses all its retries goes to the
-  dead-letter topic of its subscription. The wire of each subscriber must give the dead-letter
-  topic a route and a size:
-
-  ```go
-  Worker { Intake.Placed: Api.OrderFlow.Placed via direct,
-           deadletters: Ops.Alerts, deadletterCapacity: 5_000 }             // fixed at compile time
-  Worker { Intake.Placed: Api.OrderFlow.Placed via direct,
-           deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }  // supplied at startup
-  ```
-
-  If the route or the size is missing, the code does not compile. If a runtime flag supplies the
-  size, the process checks the flag at startup. The process does not start if the flag is missing
-  or not valid. To have no route, write `ignore deadletters, "reason"`. `keel audit` records it,
-  the same as `ignore err`.
-- **The author chooses the delivery guarantee. The language does not.** Each **subscriber** declares
-  the guarantee that it needs on its `in` topic: at-most-once or at-least-once, and ordered or
-  unordered. **The default is at-least-once and unordered.** No message is lost. A message can
-  arrive twice, so subscribers must be idempotent. The compiler derives the durability of the
-  publisher's outbox from the strongest need of any subscriber. Thus the publisher still knows
-  nothing about its subscribers.
-- **A topic wire matches by message type.** An `in` topic can be wired only to an `out` topic of
-  the same message type. The names of the topic fields do not have to match.
-- **An unread topic causes a warning.** A topic with zero subscribers compiles, with a warning. A
-  publisher can exist before its subscribers, but an unread topic must not go unnoticed.
-- **A subscriber abort never reaches the code of the publisher.** If a subscriber aborts while it
-  handles a message, the publisher is not affected. The outbox records the event: the message, the
-  subscriber, and the attempt. The runtime then retries the message and, at the end, sends it to
-  the dead-letter topic, as the delivery guarantee of the topic specifies.
-- **An outbox failure aborts.** The outbox itself can fail: it cannot store a write, or its store
-  is corrupt. Then the publishing task aborts (§7.1). The code of the publisher still never sees an
-  error.
-- **The delivery guarantee sets the durability of the outbox.** The outbox of an at-least-once
-  topic is on local disk, so undelivered messages survive a process restart. The outbox of an
-  at-most-once topic can be in memory, because that guarantee already permits loss.
-- **At-least-once holds only while the delivery mechanism is intact.** The language retries a
-  message until the runtime delivers it or sends it to the dead-letter topic. The language does not
-  promise that the delivery mechanism itself survives, for example after a disk is lost or corrupt.
-  Protection against that is system design, for example persistent brokers or replication. It is
-  outside the scope of the language.
-- **Message tracing is off by default.** Turn it on for one topic or for the whole project. When
-  tracing is on, the runtime gives each message an ID and records each step: published, delivered
-  to a subscriber, aborted, retried, acknowledged, or sent to the dead-letter topic.
-  `keel trace <id>` shows these steps for one message. Retention is bounded, the same as for all
-  other runtime stores (§5.5.1). Developers know their own circumstances. The language does not use
-  their disk and CPU for a scenario that it cannot predict.
-- **Idempotency is declared.** A subscriber on an at-least-once topic must mark its handler
-  `idempotent`. Without the marker, the code does not compile. The compiler cannot prove the claim,
-  but the marker makes a hidden assumption visible. The marker appears in `keel context`, in
-  `keel doc`, and in `keel audit`, where reviewers can check it.
+  again when it is received. Message types must be serializable. They cannot contain functions,
+  topics, or pointers into the memory of the publisher.
+- **A subscriber failure never reaches the code of the publisher.** A handler error, a handler
+  abort, and a received message that fails its invariant all go back to the transport, which
+  applies its policy (§5.5.1).
+- **Idempotency is declared.** A transport states, in its interface, whether it can deliver a
+  message more than once. If it can, a subscriber's handler must be marked `idempotent`. Without
+  the marker, the code does not compile. The compiler cannot prove the claim, but the marker makes
+  a hidden assumption visible. It appears in `keel context`, `keel doc`, and `keel audit`.
 
 #### 5.5.0 Publishing and handling
 
@@ -660,104 +617,62 @@ idempotent handle Shipped(m ShipmentSent) error {
 
 - Each `in` topic of a leaf has exactly one handler. Code cannot iterate over an `in` topic.
 - The runtime runs each message in its own task and supervises that task (§7.1).
-- **The acknowledgement point is the return of the handler:**
+- **The acknowledgement point is the return of the handler.** If the handler returns `none`, the
+  message is acknowledged. If it returns an error or aborts, the message is not acknowledged, and
+  the transport applies its policy: for example, retry and then dead-letter, or discard. Thus code
+  cannot forget to acknowledge a message, and it cannot acknowledge a message too early.
 
-  | Handler outcome | At-least-once topic | At-most-once topic |
-  |---|---|---|
-  | Returns `none` | Acknowledged. | Acknowledged. |
-  | Returns an error | Retried, then sent to the dead-letter topic. | Discarded and counted. |
-  | Aborts | Retried, then sent to the dead-letter topic. | Discarded and counted. |
+#### 5.5.1 Transports
 
-  Thus code cannot forget to acknowledge a message, and it cannot acknowledge a message too early.
-- The runtime runs handlers of an unordered topic concurrently, up to a limit. The limit comes from
-  the wire of the subscriber or from the project default. On an ordered topic, the runtime runs one
-  handler at a time for each ordering key.
+A transport carries topic messages and remote calls between containers. Transports matter only for
+a system with more than one container. Inside one container, leaves use method ports, and nothing
+crosses a network.
 
-#### 5.5.1 Bounded buffers
+**The transport interface.** The language defines one interface. A transport implements it and
+declares:
 
-Decoupling needs buffers. Each buffer must at some time refuse a message or discard one. The wiring
-must state which, so that no runtime queue can grow in memory without a limit.
+- **A typed settings struct.** Each wire passes settings with `via name{ ... }`. The compiler
+  type-checks the settings like any struct literal. A transport can make a field required, for
+  example a dead-letter route or a capacity. A missing required setting is a compile error.
+- **Its guarantees, as constants that the compiler reads.** For example, whether the transport can
+  deliver a message more than once (which makes `idempotent` required), and whether it keeps order.
+- **Its policy.** Durability, retries, dead letters, capacity, full-queue behavior, expiry,
+  tracing, and delivery guarantees belong to the transport, not to the language.
 
-- **Each runtime queue has a capacity.** The runtime queues are the outbox, the retry queue, the
-  subscriber inbox, and the dead-letter topic. A capacity comes from the wire, from the one project
-  default, or from a startup flag (`flag("name")`, checked at startup as in §5.5). If a queue of a
-  remote topic has no capacity from one of these sources, the code does not compile.
-- **The full-queue policy comes from one project default, unless an `outbox` line overrides it.**
-  The default is `block`, which never loses a message. A project can change the default in its
-  config. An `outbox` line can override the default when the message needs a different policy. For each topic, `keel audit`
-  shows if the policy is the project default or an override.
+**The developer chooses.** Each wire names its transport and its settings. The project config can
+set a default transport and default settings. Addresses and credentials never appear in source;
+they come from startup flags or from the deployment config. `keel audit` lists the transport and
+the settings of each wire.
 
-  | `whenFull` | Effect | Typical use |
-  |---|---|---|
-  | `block` | The publisher waits for space. It is coupled to slow subscribers in time only. | Business events: the loss of one is not acceptable |
-  | `dropOldest` / `dropNewest` | The runtime discards a message and counts it. A drop is not a failure, so the message does not go to the dead-letter topic. `keel audit` lists the policy. | Telemetry: old data is acceptable |
-  | `abort` | The task aborts (§7.1). | Waiting is not acceptable and loss is not acceptable |
+**The built-in transport, `direct`.** Keel ships one transport, so that a small system with two
+containers needs no broker. It sends from the publisher straight to each subscriber.
 
-  ```go
-  outbox Api.OrderFlow.Placed { capacity: 10_000, whenFull: block }          // publisher side
-  Worker { Intake.Placed: Api.OrderFlow.Placed via direct, capacity: 5_000, ttl: 24h,
-           deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }  // subscriber side
-
-  outbox Api.Metrics.Samples { capacity: 1_000, whenFull: dropOldest }
-  Obs    { Ingest.Samples: Api.Metrics.Samples via direct, capacity: 1_000, ttl: 5m,
-           deadletters: Ops.Discard, deadletterCapacity: 100 }
-  ```
-
-- **Messages expire.** Each topic has a time to live (`ttl`). The `ttl` comes from the same sources
-  as a capacity. The runtime sends an expired message to the dead-letter topic. Thus a dead
-  subscriber cannot hold memory without a limit.
-- **A full dead-letter topic aborts the subscriber process.** A dead-letter topic belongs to one
-  subscription (§5.5). When it is full, the container process of that subscriber aborts with a
-  report. The publisher is never affected. At-least-once messages stay in the durable outbox of the
-  publisher, so no message is lost, and delivery continues when the subscriber restarts. The
-  dead-letter topic cannot use `block`, because that would stop the pipeline on its own error path.
-  It cannot discard messages, because a discarded dead letter is a silent failure.
-- **Limits are visible before the system reaches them.** For each queue, the runtime reports the
-  depth, the highest depth so far, and an estimate of the time until the queue is full.
-  `keel audit` lists the capacity, the policy, and the `ttl` of each topic. Thus a reviewer can see
-  the memory limit of the whole system in one location.
-- **Message types are bounded.** A capacity counts messages, so it bounds memory only if each
-  message has a maximum size. Each variable-size field of a topic message type declares a maximum:
-
-  ```go
-  type OrderPlaced struct {
-      ID    string max 64
-      Lines []Line max 100
-      Note  string max 4KB
-  }
-  ```
-
-  A field without a maximum is a compile error in a topic message type. The compiler calculates the
-  maximum encoded size of each message type. For each queue, it calculates the memory limit:
-  capacity × maximum message size. `keel audit` shows each limit and the total for the system. A
-  value over a maximum fails the invariant of the message at publish, and the publishing task
-  aborts, as for any contract violation.
-
-#### 5.5.2 Transports
-
-A transport carries topic messages between containers. Transports matter only for a system with
-more than one container. Inside one container, leaves use method ports, and nothing crosses a
-network.
-
-- **One interface.** The language defines one transport interface.
-- **One built-in transport, `direct`.** It sends from the outbox of the publisher to the inbox of
-  each subscriber over the network. Thus a small system with two containers needs no broker.
-- **Other transports are foreign libraries** that implement the interface, for example Kafka,
-  NATS, or SQS.
-- **The developer chooses.** Each wire names its transport with `via`. The project config can set
-  a default transport.
-- **Addresses and credentials never appear in source.** They come from startup flags or from the
-  deployment config.
-- **Where each queue lives:** the outbox and its retries at the publisher; the inbox and the
-  dead-letter topic at the subscriber. For at-least-once, both sides keep their queues on disk.
+- **One queue for each subscriber.** A slow or failing subscriber fills only its own queue. It can
+  never block the publisher for other subscribers.
+- **Settings:** `capacity`, `whenFull` (`block`, `dropOldest`, `dropNewest`; default `block`),
+  `ttl`, `deadletters` (a route; required), and `durable` (default `true`, which keeps queues on
+  disk so that no message is lost across a restart). A value can come from a startup flag:
+  `capacity: flag("orders-cap")`.
+- **Delivery:** at least once, unordered. Thus `idempotent` is required on its handlers.
+- **Bounded memory:** `direct` requires topic message types to be bounded with `max` fields (§6),
+  so that the compiler can calculate the memory limit of each queue: capacity × maximum message
+  size. `keel audit` shows each limit and the total.
+- **Dead letters:** a message that fails all its retries, or expires, goes to the dead-letter
+  route. A drop under `dropOldest` or `dropNewest` is counted, not dead-lettered.
+- **Tracing** is off by default. The setting `trace: true` records each step of each message, and
+  `keel trace <id>` shows them.
 
 ```go
-Worker { Intake.Placed:  Api.OrderFlow.Placed  via direct }
-Obs    { Ingest.Samples: Api.Metrics.Samples   via kafka }
+Worker { Intake.Placed:  Api.OrderFlow.Placed via direct{
+             capacity: 5_000, ttl: 24h, deadletters: Ops.Alerts } }
+Obs    { Ingest.Samples: Api.Metrics.Samples  via kafka{ topic: "samples" } }
 // startup: --transport.direct.peers=worker=10.0.0.7:7000
 ```
 
-#### 5.5.3 Message evolution
+Other transports, for example Kafka, NATS, or SQS, are foreign libraries (§5.4c) that implement the
+interface, each with its own settings and guarantees.
+
+#### 5.5.2 Message evolution
 
 Containers do not deploy at the same moment. Thus two builds of one system run together, and their
 message types can differ. The holistic check (§12.2) sees only one build. So the compiler also
@@ -790,7 +705,7 @@ compares each message type with the version that is already deployed.
 - **Any deploy order works.** Because each change in the lock is compatible in both directions,
   the containers can deploy in any order.
 
-#### 5.5.4 Remote method ports
+#### 5.5.3 Remote method ports
 
 A remote method port is a synchronous request and response between containers. It uses the same
 syntax as a port inside a container. The `remote` marker adds what the network makes true:
@@ -815,7 +730,7 @@ qty := Stock.Level(sku)?        // the caller must handle Unavailable and Timeou
 - **Contracts are checked on both sides.** The caller checks `requires` before it sends. The callee
   checks it again when it receives. The callee checks `ensures` before it replies, and the caller
   checks it again when it receives the reply.
-- **Types must be serializable**, as for topic messages. The schema lock (§5.5.3) also covers the
+- **Types must be serializable**, as for topic messages. The schema lock (§5.5.2) also covers the
   parameter and result types of remote methods, so the same evolution rules apply.
 - **The wire names the transport** with `via`, as for topics. The built-in `direct` transport
   supports request and response.
@@ -1354,7 +1269,7 @@ Compilation has two separate modes. They run in parallel.
 |---|---|---|
 | Purpose | Enforce boundaries. Find errors that need global context. | Compile code fast. |
 | Input | All declaration files, all ports, and all signatures. Bodies only for global analyses. | One leaf directory and the port declarations that the leaf owns. |
-| Finds | All of §5.4 (ports only, wiring, layers, cycles, port compatibility), the topic rules (§5.5 to §5.5.1), near-duplicate code in different leaves (§10), architecture diffs, and the project audit. | Type, error-handling, null, bounds, overflow, and contract errors inside the leaf. |
+| Finds | All of §5.4 (ports only, wiring, layers, cycles, port compatibility), the topic and transport rules (§5.5 to §5.5.3), near-duplicate code in different leaves (§10), architecture diffs, and the project audit. | Type, error-handling, null, bounds, overflow, and contract errors inside the leaf. |
 | Parallelism | One pass over the whole tree. | One job for each leaf. All the jobs run in parallel. |
 
 - **Why a leaf can compile alone.** A leaf declares each port that it requires (§5.3). Thus it
@@ -1403,7 +1318,7 @@ are open question Q22.
 | Bounds checks (§7b) | One compare for each unproved index | A proved index needs no Keel check; on LLVM, no check at all |
 | Contracts (§8) | The cost of each expression, in release builds | A leaf can turn off contracts that are not load-bearing; quantifier cost is listed in the audit |
 | Garbage collection | GC pauses and memory overhead | On the Go backend, Go's GC; the LLVM backend needs Keel's own GC |
-| At-least-once topics (§5.5) | A disk write for each message in the outbox and the inbox | At-most-once topics may use memory; the developer chooses per topic |
+| Durable topics (§5.5.1) | A disk write for each message, on transports that keep queues on disk | The developer chooses the transport and its `durable` setting |
 | Task scopes (§7.1) | A wait at the end of each scope | The same cost as a Go `sync.WaitGroup` |
 | Foreign boundary (§5.4c) | A conversion for each value that crosses | Only at foreign libraries, not at every call |
 
