@@ -842,15 +842,29 @@ syntax.
 half-changed after the state of the task is gone. Keel does what Rust does:
 
 - If a task holds a mutex (or a read-write mutex) when it aborts, the mutex becomes **poisoned**.
-- Each later `Lock()` returns an error, `Poisoned`. The code must handle this error like all other
-  errors (§7):
+- Each later `Lock()` returns an error, `Poisoned`, and does **not** hold the lock. The code must
+  handle this error like all other errors (§7). Because the lock is not held, `mu.Lock()?` can
+  never leave a lock held:
 
   ```go
-  mu.Lock()?                      // propagates Poisoned to the caller
+  mu.Lock()?                      // propagates Poisoned to the caller; the lock is not held
   ```
 
-- A task that repairs or rebuilds the data can call `mu.ClearPoison()`. `keel audit` lists each of
-  these calls.
+- To repair the data, a task calls `mu.LockForRepair()`, which takes the lock even when it is
+  poisoned. The compiler permits `mu.ClearPoison()` only between `LockForRepair()` and `Unlock()`
+  in the same function. Thus no repair runs without the lock. `keel audit` lists each repair.
+
+  ```go
+  mu.LockForRepair()
+  rebuild(&shared)
+  mu.ClearPoison()
+  mu.Unlock()
+  ```
+
+- **Deferred calls run when a task aborts**, in reverse order, as in Go. Thus files and
+  connections close. If a deferred `Unlock()` runs, it releases the lock, but the lock stays
+  poisoned, because the data may still be half-changed. An abort inside a deferred call stops the
+  remaining deferred calls, and the runtime adds it to the report.
 - Limit: poisoning protects only data that a lock guards. A change to shared data without a lock
   is a data race, and a data race is already a bug. The race detector runs in test builds to find
   data races.
