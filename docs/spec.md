@@ -190,10 +190,10 @@ the composite's own parent satisfies it:
 ```go
 // Api serves the public HTTP interface.
 container Api {
-    requires Fulfilment                 // Orders' remote port, passed up to the system (§5.5)
+    requires OrderFlow                  // Orders' remote port, passed up to the system (§5.5)
 
     Billing     { Ledger: LedgerStore.Ledger, Clock: SystemClock.Clock }
-    Orders      { Checkout: Billing.Payments, Fulfilment: parent.Fulfilment }
+    Orders      { Checkout: Billing.Payments, OrderFlow: parent.OrderFlow }
     LedgerStore {}
     SystemClock {}
 }
@@ -219,17 +219,19 @@ system Shop {
     person   Customer "Buys goods through the web store"
     external Stripe   "Card payment processor"
 
-    Api    { Fulfilment: Worker.Intake via queue }   // the only link between containers
-    Worker {}
+    Worker { Intake.Placed:     Api.OrderFlow.Placed  via queue }   // topics are the only
+    Api    { OrderFlow.Shipped: Worker.Intake.Shipped via queue }   // links between containers
 
-    uses Customer -> Api    "places orders over HTTPS"
-    uses Api      -> Stripe "charges cards over HTTPS"
+    uses Customer -> Api "places orders over HTTPS"
+    // Api -> Stripe comes from the gateway declaration (§5.4b).
 }
 ```
 
 Keel does not wire external systems with ports. The language does not control them, and they use
 their own protocols. Instead, one **gateway leaf** in each container talks to each external system
-(§5.4b). The `uses` line records the relationship, so that the relationship appears in diagrams.
+(§5.4b). The compiler draws that
+relationship in diagrams from the gateway declaration. A `uses` line records a relationship that
+no declaration shows, such as a person who uses a container.
 
 ### 5.4 Rules the compiler enforces
 
@@ -239,8 +241,9 @@ their own protocols. Instead, one **gateway leaf** in each container talks to ea
 2. **Code only in leaves.** Composites hold no source files. Leaves hold no child nodes.
 3. **Encapsulation at each level.** Outside its parent, a node does not exist. A composite exposes
    only the ports that it publishes with `provides X from Child`.
-4. **Complete wiring.** Each composite wires each `requires` entry of each direct child exactly
-   once. The wire goes to a port of a sibling or to a `requires` entry of the composite.
+4. **Complete wiring.** Each composite wires each `requires` entry and each `in` topic of each
+   direct child exactly once. The wire goes to a port or a topic of a sibling, or to a `requires`
+   entry of the composite. An `out` topic is never wired by itself (§5.5).
 5. **Complete provision.** A leaf implements each port in its `provides` list. A composite gets
    each port in its `provides` list from a child.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
@@ -343,14 +346,22 @@ One keyword with two behaviors would mislead humans and models trained on Go (R8
 keeps its Go behavior for concurrency inside one process.
 
 ```go
-// In Orders (the consumer declares what it needs):
-remote port Fulfilment {
-    Orders  out topic<OrderPlaced>   // Orders publishes
-    Shipped in  topic<ShipmentSent>  // Orders subscribes
+// In Orders, inside Api. Each side declares its own view of the topics.
+remote port OrderFlow {
+    Placed  out topic<OrderPlaced>    // Orders publishes
+    Shipped in  topic<ShipmentSent>   // Orders subscribes
 }
 
-// In Shop (the parent names the transport):
-Api { Fulfilment: Worker.Intake via queue }
+// In Picking, inside Worker.
+remote port Intake {
+    Placed  in  topic<OrderPlaced>
+    Shipped out topic<ShipmentSent>
+}
+
+// In Shop. Each subscriber names its source, and the parent names the transport.
+Worker    { Intake.Placed:     Api.OrderFlow.Placed  via queue }
+Analytics { Ingest.Placed:     Api.OrderFlow.Placed  via queue }   // a second subscriber
+Api       { OrderFlow.Shipped: Worker.Intake.Shipped via queue }
 ```
 
 **Why publish: it is the loosest coupling possible.** The only job of the publisher is to publish.
@@ -365,8 +376,14 @@ how many subscribers there are, or when they read.
   when its own outbox is full. A full outbox means overload. The runtime reports the depth and the
   time until full before that point. The publisher still knows nothing about its subscribers: it is
   coupled to them in time only, and only under overload.
-- **Zero, one, or many subscribers.** The parent can wire a topic to any number of subscribers,
-  including zero. A change to the subscribers never changes the publisher.
+- **Zero, one, or many subscribers.** The parent wires topics one at a time, from the subscriber
+  side. Each `in` topic is wired exactly once, to one `out` topic of the same message type. An
+  `out` topic is never wired by itself: its subscribers are the `in` topics wired to it, zero or
+  more. Thus a new subscriber adds one wire, and the wiring of the publisher does not change.
+- **Where the settings go.** The settings of one subscription (the inbox capacity, the `ttl`, and
+  the dead-letter route and size) go on the wire of the subscriber. The settings of the outbox
+  (its capacity and its `whenFull` policy) go on an `outbox` line in the parent, or come from the
+  project default (§5.5.1).
 - **No request/response.** A reply would bind the publisher to a subscriber. If a publisher must
   know the result, it subscribes to a separate event that the other side publishes. `Shipped` in
   the example above is such an event.
@@ -378,14 +395,14 @@ how many subscribers there are, or when they read.
   again when it is received. Message types must be serializable. They cannot contain functions,
   topics, or pointers into the memory of the publisher.
 - **Dead letters must have a route and a size.** A message that uses all its retries goes to the
-  dead-letter topic of its topic. The parent that wires the topic must give the dead-letter topic a
-  route and a size:
+  dead-letter topic of its subscription. The wire of each subscriber must give the dead-letter
+  topic a route and a size:
 
   ```go
-  Api { Fulfilment: Worker.Intake via queue,
-        deadletters: Ops.Alerts, deadletterCapacity: 5_000 }             // fixed at compile time
-  Api { Fulfilment: Worker.Intake via queue,
-        deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }  // supplied at startup
+  Worker { Intake.Placed: Api.OrderFlow.Placed via queue,
+           deadletters: Ops.Alerts, deadletterCapacity: 5_000 }             // fixed at compile time
+  Worker { Intake.Placed: Api.OrderFlow.Placed via queue,
+           deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }  // supplied at startup
   ```
 
   If the route or the size is missing, the code does not compile. If a runtime flag supplies the
@@ -433,9 +450,9 @@ must state which, so that no runtime queue can grow in memory without a limit.
   subscriber inbox, and the dead-letter topic. A capacity comes from the wire, from the one project
   default, or from a startup flag (`flag("name")`, checked at startup as in §5.5). If a queue of a
   remote topic has no capacity from one of these sources, the code does not compile.
-- **The full-queue policy comes from one project default, unless a wire overrides it.** The default
-  is `block`, which never loses a message. A project can change the default in its config. A wire
-  can override the default when the message needs a different policy. For each topic, `keel audit`
+- **The full-queue policy comes from one project default, unless an `outbox` line overrides it.**
+  The default is `block`, which never loses a message. A project can change the default in its
+  config. An `outbox` line can override the default when the message needs a different policy. For each topic, `keel audit`
   shows if the policy is the project default or an override.
 
   | `whenFull` | Effect | Typical use |
@@ -445,10 +462,13 @@ must state which, so that no runtime queue can grow in memory without a limit.
   | `abort` | The task aborts (§7.1). | Waiting is not acceptable and loss is not acceptable |
 
   ```go
-  Api { Fulfilment: Worker.Intake via queue, capacity: 10_000, whenFull: block, ttl: 24h,
-        deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }
-  Api { Metrics:    Obs.Ingest    via queue, capacity: 1_000,  whenFull: dropOldest, ttl: 5m,
-        deadletters: Ops.Discard, deadletterCapacity: 100 }
+  outbox Api.OrderFlow.Placed { capacity: 10_000, whenFull: block }          // publisher side
+  Worker { Intake.Placed: Api.OrderFlow.Placed via queue, capacity: 5_000, ttl: 24h,
+           deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }  // subscriber side
+
+  outbox Api.Metrics.Samples { capacity: 1_000, whenFull: dropOldest }
+  Obs    { Ingest.Samples: Api.Metrics.Samples via queue, capacity: 1_000, ttl: 5m,
+           deadletters: Ops.Discard, deadletterCapacity: 100 }
   ```
 
 - **Messages expire.** Each topic has a time to live (`ttl`). The `ttl` comes from the same sources
