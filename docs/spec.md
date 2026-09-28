@@ -67,6 +67,7 @@ use the same terms.
 |---|---|
 | Compiled, GC | Native binaries and a tracing GC. No manual memory management and no borrow checker. |
 | Go ergonomics | Go is the syntax model. Keel changes Go only where Go is weak, for example generics and error enforcement. |
+| Competitive performance | Resource use and speed must be competitive with Go, Java, C++, and Rust. §12.3 states the targets and the costs. |
 | Compiler first | If the compiler can check a rule, the compiler checks it. Each rule that depends on convention, review, or runtime is a candidate to move into the compiler. This is the most direct way to make tasks 2 and 3 of §1.1 shorter. |
 | Rust-grade compiler intelligence | Diagnostics explain *why* and propose fixes. The compiler checks exhaustiveness and finds duplication and error masking. |
 | Imposed structure | One project layout, one formatter, and one location for each kind of thing. |
@@ -271,10 +272,10 @@ the composite's own parent satisfies it:
 ```go
 // Api serves the public HTTP interface.
 container Api {
-    requires OrderFlow                  // Orders' remote port, passed up to the system (§5.5)
+    requires Orders.OrderFlow           // Orders' remote port, passed up by its path (§5.5)
 
     Billing     { Ledger: LedgerStore.Ledger, Clock: SystemClock.Clock }
-    Orders      { Checkout: Billing.Payments { Pay = Charge }, OrderFlow: parent.OrderFlow }
+    Orders      { Checkout: Billing.Payments { Pay = Charge }, OrderFlow: parent.Orders.OrderFlow }
     LedgerStore {}
     SystemClock {}
 }
@@ -301,8 +302,8 @@ system Shop {
     person   Customer "Buys goods through the web store"
     external Stripe   "Card payment processor"
 
-    Worker { Intake.Placed:     Api.OrderFlow.Placed  via queue }   // topics are the only
-    Api    { OrderFlow.Shipped: Worker.Intake.Shipped via queue }   // links between containers
+    Worker { Intake.Placed:     Api.OrderFlow.Placed  via direct }   // topics are the only
+    Api    { OrderFlow.Shipped: Worker.Intake.Shipped via direct }   // links between containers
 
     uses Customer -> Api "places orders over HTTPS"
     // Api -> Stripe comes from the gateway declaration (§5.4b).
@@ -329,8 +330,11 @@ no declaration shows, such as a person who uses a container.
 5. **Complete provision.** A leaf implements each port in its `provides` list. A composite gets
    each port in its `provides` list from a child.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
-7. **Boundary ownership.** A node declares the ports that it provides and the ports that it
-   requires. It cannot name a port that a sibling or any other node declares.
+7. **Boundary ownership.** A leaf declares the ports that it provides and the ports that it
+   requires. The code and the declaration of a leaf never name a port of another node. Only a
+   composite names the ports of its children: in its wires, in `provides X from Child`, and in
+   `requires Child.X`, which passes a child's port up by its path. A composite never declares a
+   second copy of a port.
 8. **Layers.** The `layers` order of the system constrains **source dependencies**: the libraries
    that a leaf imports, and the types in its port signatures. A leaf can use these only from its
    own layer or a lower layer. Layers do not constrain wires. Two wired leaves share no source
@@ -525,9 +529,9 @@ remote port Intake {
 }
 
 // In Shop. Each subscriber names its source, and the parent names the transport.
-Worker    { Intake.Placed:     Api.OrderFlow.Placed  via queue }
-Analytics { Ingest.Placed:     Api.OrderFlow.Placed  via queue }   // a second subscriber
-Api       { OrderFlow.Shipped: Worker.Intake.Shipped via queue }
+Worker    { Intake.Placed:     Api.OrderFlow.Placed  via direct }
+Analytics { Ingest.Placed:     Api.OrderFlow.Placed  via direct }   // a second subscriber
+Api       { OrderFlow.Shipped: Worker.Intake.Shipped via direct }
 ```
 
 **Why publish: it is the loosest coupling possible.** The only job of the publisher is to publish.
@@ -585,9 +589,9 @@ how many subscribers there are, or when they read.
   topic a route and a size:
 
   ```go
-  Worker { Intake.Placed: Api.OrderFlow.Placed via queue,
+  Worker { Intake.Placed: Api.OrderFlow.Placed via direct,
            deadletters: Ops.Alerts, deadletterCapacity: 5_000 }             // fixed at compile time
-  Worker { Intake.Placed: Api.OrderFlow.Placed via queue,
+  Worker { Intake.Placed: Api.OrderFlow.Placed via direct,
            deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }  // supplied at startup
   ```
 
@@ -595,10 +599,14 @@ how many subscribers there are, or when they read.
   size, the process checks the flag at startup. The process does not start if the flag is missing
   or not valid. To have no route, write `ignore deadletters, "reason"`. `keel audit` records it,
   the same as `ignore err`.
-- **The author chooses the delivery guarantee. The language does not.** The language lets the
-  author declare the guarantee for each remote topic: at-most-once or at-least-once, and ordered or
+- **The author chooses the delivery guarantee. The language does not.** Each **subscriber** declares
+  the guarantee that it needs on its `in` topic: at-most-once or at-least-once, and ordered or
   unordered. **The default is at-least-once and unordered.** No message is lost. A message can
-  arrive twice, so subscribers must be idempotent.
+  arrive twice, so subscribers must be idempotent. The compiler derives the durability of the
+  publisher's outbox from the strongest need of any subscriber. Thus the publisher still knows
+  nothing about its subscribers.
+- **A topic wire matches by message type.** An `in` topic can be wired only to an `out` topic of
+  the same message type. The names of the topic fields do not have to match.
 - **An unread topic causes a warning.** A topic with zero subscribers compiles, with a warning. A
   publisher can exist before its subscribers, but an unread topic must not go unnoticed.
 - **A subscriber abort never reaches the code of the publisher.** If a subscriber aborts while it
@@ -682,11 +690,11 @@ must state which, so that no runtime queue can grow in memory without a limit.
 
   ```go
   outbox Api.OrderFlow.Placed { capacity: 10_000, whenFull: block }          // publisher side
-  Worker { Intake.Placed: Api.OrderFlow.Placed via queue, capacity: 5_000, ttl: 24h,
+  Worker { Intake.Placed: Api.OrderFlow.Placed via direct, capacity: 5_000, ttl: 24h,
            deadletters: Ops.Alerts, deadletterCapacity: flag("dlq-size") }  // subscriber side
 
   outbox Api.Metrics.Samples { capacity: 1_000, whenFull: dropOldest }
-  Obs    { Ingest.Samples: Api.Metrics.Samples via queue, capacity: 1_000, ttl: 5m,
+  Obs    { Ingest.Samples: Api.Metrics.Samples via direct, capacity: 1_000, ttl: 5m,
            deadletters: Ops.Discard, deadletterCapacity: 100 }
   ```
 
@@ -720,7 +728,31 @@ must state which, so that no runtime queue can grow in memory without a limit.
   value over a maximum fails the invariant of the message at publish, and the publishing task
   aborts, as for any contract violation.
 
-#### 5.5.2 Message evolution
+#### 5.5.2 Transports
+
+A transport carries topic messages between containers. Transports matter only for a system with
+more than one container. Inside one container, leaves use method ports, and nothing crosses a
+network.
+
+- **One interface.** The language defines one transport interface.
+- **One built-in transport, `direct`.** It sends from the outbox of the publisher to the inbox of
+  each subscriber over the network. Thus a small system with two containers needs no broker.
+- **Other transports are foreign libraries** that implement the interface, for example Kafka,
+  NATS, or SQS.
+- **The developer chooses.** Each wire names its transport with `via`. The project config can set
+  a default transport.
+- **Addresses and credentials never appear in source.** They come from startup flags or from the
+  deployment config.
+- **Where each queue lives:** the outbox and its retries at the publisher; the inbox and the
+  dead-letter topic at the subscriber. For at-least-once, both sides keep their queues on disk.
+
+```go
+Worker { Intake.Placed:  Api.OrderFlow.Placed  via direct }
+Obs    { Ingest.Samples: Api.Metrics.Samples   via kafka }
+// startup: --transport.direct.peers=worker=10.0.0.7:7000
+```
+
+#### 5.5.3 Message evolution
 
 Containers do not deploy at the same moment. Thus two builds of one system run together, and their
 message types can differ. The holistic check (§12.2) sees only one build. So the compiler also
@@ -1315,6 +1347,31 @@ On the Go backend, each leaf becomes one Go package, and the generated wiring be
 the Go toolchain adds its own parallelism. Shared types are in libraries (§5.4a), which compile
 first. Then the leaves compile in parallel against the library declarations.
 
+### 12.3 Performance
+
+Keel must be competitive with Go, Java, C++, and Rust in speed and in resource use.
+
+**How the project measures it.** A benchmark suite runs in CI. It covers CPU-bound work,
+allocation-heavy work, concurrency, and a service with topics. Each benchmark has a target
+relative to Go, Java, C++, and Rust. A change that misses a target fails CI. The numeric targets
+are open question Q22.
+
+**What each safety feature costs, and how Keel reduces the cost:**
+
+| Feature | Runtime cost | Reduction |
+|---|---|---|
+| Overflow checks (§7c) | About one branch for each arithmetic operation | `+%` for deliberate wrapping; the LLVM backend can remove checks that a range proof covers |
+| Bounds checks (§7b) | One compare for each unproved index | A proved index needs no Keel check; on LLVM, no check at all |
+| Contracts (§8) | The cost of each expression, in release builds | A leaf can turn off contracts that are not load-bearing; quantifier cost is listed in the audit |
+| Garbage collection | GC pauses and memory overhead | On the Go backend, Go's GC; the LLVM backend needs Keel's own GC |
+| At-least-once topics (§5.5) | A disk write for each message in the outbox and the inbox | At-most-once topics may use memory; the developer chooses per topic |
+| Task scopes (§7.1) | A wait at the end of each scope | The same cost as a Go `sync.WaitGroup` |
+| Foreign boundary (§5.4c) | A conversion for each value that crosses | Only at foreign libraries, not at every call |
+
+**Backends.** On the Go backend, Keel performs like Go, plus the checks above. To close the gap
+with C++ and Rust, the LLVM backend (§12) can use proofs to remove checks and can control memory
+layout directly.
+
 ## 13. Non-goals (for now)
 
 - Manual memory management and ownership types. The GC principle excludes them.
@@ -1331,6 +1388,7 @@ first. Then the leaves compile in parallel against the library declarations.
 | Q1 | The final name and file extension. |
 | Q20 | Without `nil`, some types have no zero value (types that hold pointers, interfaces, or functions). What happens to `make([]*T, n)`, a generic `var x T`, and a partial struct literal? |
 | Q21 | Inbound traffic. A leaf that serves HTTP to a `person` (for example, Api serving Customer) needs a network library, but it is not a gateway to an external system. How does Keel declare and enforce an entry point? |
+| Q22 | Numeric performance targets for the benchmark suite (§12.3): for each benchmark, the accepted ratio of speed and memory against Go, Java, C++, and Rust. |
 
 ## Appendix A: Sources
 
