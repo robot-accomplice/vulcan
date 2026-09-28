@@ -27,6 +27,40 @@ In all three tasks, predictable structure, architectural legibility, and compile
 They make tasks 2 and 3 shorter, so that the developer can spend more time on task 1 and do it
 faster. Each design decision in this spec serves that goal.
 
+### 1.2 Terms
+
+This spec uses each term below with one meaning only. The compiler, the tools, and the diagnostics
+use the same terms.
+
+| Term | Meaning |
+|---|---|
+| **System** | The whole software product. The root node of the architecture tree. |
+| **Container** | A node that runs as one process. The compiler builds each container into one executable binary. Most systems have one container, so they compile to one binary. (The C4 meaning. It is not a Docker container.) |
+| **Group** | An optional node inside a container that groups leaves, for zoom levels in diagrams. |
+| **Composite** | A system, container, or group. It holds children and wiring, and no code. |
+| **Leaf** | A `component` node: one flat directory of code. |
+| **Library** | A node that holds shared types and reusable code, with no ports, no topics, and no mutable state. It can use an I/O handle but never acquire one. |
+| **Foreign library** | The only kind of library that can import a Go package. It converts values at the boundary. |
+| **Gateway** | The one leaf in a container that talks to a given external system. |
+| **External system** | Software outside the system, such as Stripe. Declared with `external`. |
+| **Person** | A human who uses the system. Declared with `person`. For diagrams. |
+| **Port** | An interface with contracts on the boundary of a node. The node that provides it or requires it declares it. |
+| **Topic** | A publish channel, `topic<T>`. The only link between containers. |
+| **Publisher / subscriber** | The leaf that publishes on an `out` topic / the leaf that handles an `in` topic. |
+| **Handler** | The function, marked `handle`, that processes the messages of one `in` topic. |
+| **Wire** | A line in a composite that connects a required port or an `in` topic to a provider. |
+| **Transport** | The mechanism that carries topic messages between containers, named on a wire with `via`. |
+| **Outbox / inbox** | The runtime queue at the publisher / at the subscriber. |
+| **Dead-letter topic** | Where a subscription sends a message that it cannot handle. |
+| **Acknowledge** | Mark a message as handled. It occurs when its handler returns `none`. |
+| **Task** | A unit of concurrent work, started with `go` inside a `tasks { }` scope. |
+| **Scope** | A `tasks { }` block. It owns the tasks that start in it and waits for them. |
+| **Error** | An ordinary value that reports a failure the code expects and handles. |
+| **Abort** | The stop of a task after a broken invariant: a bug, not an expected failure. It is not an exception. |
+| **Contract** | A `requires`, `ensures`, or `invariant` clause. |
+| **Layer** | A named level (`domain < app < infra`) that constrains source dependencies. |
+| **Audit** | The `keel audit` report of each escape hatch, override, and unproved claim. |
+
 ## 2. Design principles
 
 | Principle | Meaning in Keel |
