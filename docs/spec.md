@@ -255,8 +255,13 @@ no declaration shows, such as a person who uses a container.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
 7. **Boundary ownership.** A node declares the ports that it provides and the ports that it
    requires. It cannot name a port that a sibling or any other node declares.
-8. **Layers.** Port dependencies obey the `layers` order of the system. A lower layer never
-   requires a higher layer.
+8. **Layers.** The `layers` order of the system constrains **source dependencies**: the libraries
+   that a leaf imports, and the types in its port signatures. A leaf can use these only from its
+   own layer or a lower layer. Layers do not constrain wires. Two wired leaves share no source
+   code, because each owns its own ports, so a wire can connect leaves in any layers. Thus an `app`
+   leaf can require a port that an `infra` adapter provides, and an `infra` HTTP handler can
+   require a port that a `domain` leaf provides. But a port in an `app` leaf cannot mention an
+   `infra` type such as `sql.Row`.
 9. **No cycles.** At each level, the dependency graph of the siblings has no cycles.
 10. **Private types.** A type is private to its leaf, unless the type is in a port signature.
 11. **Leaf size budget.** The budget measures what a model reads to work on a leaf: all non-test
