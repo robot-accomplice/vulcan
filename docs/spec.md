@@ -45,7 +45,7 @@ use the same terms.
 | **External system** | Software outside the system, such as Stripe. Declared with `external`. |
 | **Person** | A human who uses the system. Declared with `person`. For diagrams. |
 | **Port** | An interface with contracts on the boundary of a node. The node that provides it or requires it declares it. Inside a container, a port call is an ordinary function call. |
-| **Topic** | A publish channel, `topic<T>`, for asynchronous events between containers. |
+| **Topic** | A publish channel, `topic[T]`, for asynchronous events between containers. |
 | **Remote port** | A port that crosses containers. A remote method port is a synchronous call; a remote topic is an event. |
 | **Publisher / subscriber** | The leaf that publishes on an `out` topic / the leaf that handles an `in` topic. |
 | **Handler** | The function, marked `handle`, that processes the messages of one `in` topic. |
@@ -53,7 +53,7 @@ use the same terms.
 | **Transport** | The mechanism that carries topic messages between containers, named on a wire with `via`. |
 | **Outbox / inbox** | The runtime queue at the publisher / at the subscriber. |
 | **Dead-letter topic** | Where a subscription sends a message that it cannot handle. |
-| **Acknowledge** | Mark a message as handled. It occurs when its handler returns `none`. |
+| **Acknowledge** | Mark a message as handled. It occurs when its handler returns `nil`. |
 | **Task** | A unit of concurrent work, started with `go` inside a `tasks { }` scope. |
 | **Scope** | A `tasks { }` block. It owns the tasks that start in it and waits for them. |
 | **Error** | An ordinary value that reports a failure the code expects and handles. |
@@ -102,8 +102,8 @@ sight. This spec must justify each change from Go and list it in this table:
 | Change from Go | Reason |
 |---|---|
 | `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
-| `(T, error)` is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. `none` means "no error", as it means "no value" for `?T`. | R3, and no zero value on the error path (§7) |
-| No `nil` or `null` value. Optional types `?T`, narrowed by control flow. | No null dereference can occur (§7a) |
+| `(T, error)` keeps Go's spelling (`return v, nil`, `return x, err`) but is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. | R3, and no zero value on the error path (§7) |
+| Only `?T` and `error` can hold `nil` (the Swift model). Optional types `?T` are narrowed by control flow. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
 | A lock that an aborting task holds becomes poisoned. `Lock()` returns an error. | Go has no poisoning (§7.1) |
@@ -112,9 +112,9 @@ sight. This spec must justify each change from Go and list it in this table:
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
-| `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
+| `topic[T]` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
 | `remote port` (synchronous methods with `timeout` and transport errors, or topics), `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.3) |
-| `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `none` | No forgotten or early acknowledgement (§5.5.0) |
+| `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `nil` | No forgotten or early acknowledgement (§5.5.0) |
 | `max` bounds on variable-size fields | A transport can require bounded messages, so the compiler can calculate queue memory (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
@@ -122,13 +122,12 @@ sight. This spec must justify each change from Go and list it in this table:
 | `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
-| Generics use `<T Bound>`, not `[T Bound]` | Familiar from the C family. An unbounded parameter needs no `any` (§6.1) |
 | Declaration files (`system.keel`, `component.keel`, and so on) have their own syntax: `provides X from Y`, `parent.X`, `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), method renames (`{ Pay = Charge }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
 | Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
-| Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert<T>` | Explicit handling of bounds and overflow (§7b, §7c) |
+| Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Explicit handling of bounds and overflow (§7b, §7c) |
 | A narrowing conversion (`int32(x)`) aborts when the value does not fit | Go truncates without a signal (§7c) |
-| A single-value map read `m[k]` is `?V`. `m[k]++`, `m[k] += x`, and `v, ok := m[k]` work as in Go when `V` has a zero value | A missing key is never a silent zero (§7a) |
+| `m.Get(k)` returns `?V`. Other map reads behave as in Go. | Explicit absence when the code wants it (§7a) |
 | A private function can omit its result types; the body alone determines them | Less noise, with no inference across call sites (§6) |
 | `mu.LockForRepair()` and `mu.ClearPoison()` | Repair of poisoned data under the lock (§7.1) |
 | Test files are `*_test.keel` in the leaf directory | Tests next to the code (§9) |
@@ -142,7 +141,7 @@ and gofmt-style formatting.
 Each reserved word breaks Go code that uses it as a name, and models write that code (R8). Thus
 Keel reserves few words.
 
-- **Reserved everywhere:** `none`, `handle`, `pure`, `tasks`, `detach`, `ignore`, `unreachable`.
+- **Reserved everywhere:** `handle`, `pure`, `tasks`, `detach`, `ignore`, `unreachable`.
 - **Contextual:** all other new words. They are keywords only where they start a declaration, or
   inside a declaration file or a contract. Elsewhere they are ordinary identifiers. This applies to
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
@@ -524,7 +523,7 @@ owns the operational **policy**: durability, retries, dead letters, capacity, fu
 expiry, tracing, and delivery guarantees (§5.5.1). The compiler type-checks the settings of each
 transport.
 
-A topic has its own type, `topic<T>`. It is not a Go `chan T`, because the two behave differently:
+A topic has its own type, `topic[T]`. It is not a Go `chan T`, because the two behave differently:
 
 - A send on a Go channel blocks until a subscriber takes the value. Each value has exactly one
   subscriber.
@@ -537,14 +536,14 @@ keeps its Go behavior for concurrency inside one process.
 ```go
 // In Orders, inside Api. Each side declares its own view of the topics.
 remote port OrderFlow {
-    Placed  out topic<OrderPlaced>    // Orders publishes
-    Shipped in  topic<ShipmentSent>   // Orders subscribes
+    Placed  out topic[OrderPlaced]    // Orders publishes
+    Shipped in  topic[ShipmentSent]   // Orders subscribes
 }
 
 // In Picking, inside Worker.
 remote port Intake {
-    Placed  in  topic<OrderPlaced>
-    Shipped out topic<ShipmentSent>
+    Placed  in  topic[OrderPlaced]
+    Shipped out topic[ShipmentSent]
 }
 
 // In Shop. Each subscriber names its source; the wire names the transport and its settings.
@@ -583,7 +582,7 @@ These rules are part of the language, for every transport:
   // Api keeps a read model, and answers GET /stock/42 from it.
   idempotent handle StockChanged(m StockChanged) error {
       stock.Set(m.SKU, m.Qty)
-      return none
+      return nil
   }
   ```
 
@@ -620,13 +619,13 @@ Placed.Publish(OrderPlaced{ID: id, Total: t})
 ```go
 idempotent handle Shipped(m ShipmentSent) error {
     orders.MarkShipped(m.OrderID)?
-    return none          // the message is acknowledged here
+    return nil          // the message is acknowledged here
 }
 ```
 
 - Each `in` topic of a leaf has exactly one handler. Code cannot iterate over an `in` topic.
 - The runtime runs each message in its own task and supervises that task (§7.1).
-- **The acknowledgement point is the return of the handler.** If the handler returns `none`, the
+- **The acknowledgement point is the return of the handler.** If the handler returns `nil`, the
   message is acknowledged. If it returns an error or aborts, the message is not acknowledged, and
   the transport applies its policy: for example, retry and then dead-letter, or discard. Thus code
   cannot forget to acknowledge a message, and it cannot acknowledge a message too early.
@@ -697,8 +696,8 @@ compares each message type with the version that is already deployed.
 
 | Change | Result |
 |---|---|
-| Add a field of type `?T` | Compatible. A message from an older publisher has `none` in the field. |
-| Remove a field of type `?T` | Compatible. An older subscriber reads `none`. |
+| Add a field of type `?T` | Compatible. A message from an older publisher has `nil` in the field. |
+| Remove a field of type `?T` | Compatible. An older subscriber reads `nil`. |
 | Rename a field | Compatible. The wire carries the number, not the name. |
 | Relax an invariant | Compatible. |
 | Add a required field (not `?T`) | Breaking. |
@@ -777,38 +776,24 @@ behavior is. A parent cannot hide logic.
   valid types (R5).
 - **Sum types** (tagged unions), with an exhaustive `switch`. Typed errors and state machines need
   them. They are a deliberate addition to Go.
-- **No nil.** No type has a null value. This includes pointers, interfaces, slices, and maps (§7a).
+- **`nil` only in `?T` and `error`.** A plain type, including a pointer, an interface, a slice, or a
+  map, can never be `nil` (§7a).
 - Methods attach to structs, as in Go. Interfaces are structural, as in Go. Ports are nominal.
 
 ### 6.1 Generics
 
-Generics use angle brackets. A bound follows its parameter, as in a Go parameter list: the name,
-then the type, with no colon.
+Generics use the syntax of Go, unchanged: `[T constraint]`. Go generic code from a model's training
+data compiles as it is.
 
 ```go
-func Max<T Ordered>(xs []T) ?T
-type Cache<K Hashable, V> struct { ... }
-func (c *Cache<K, V>) Get<R>(k K, f func(V) R) ?R   // methods may declare their own type params
+func Max[T cmp.Ordered](xs []T) ?T
+type Cache[K comparable, V any] struct { ... }
+func (c *Cache[K, V]) Get[R any](k K, f func(V) R) ?R   // a generic method, as in Go 1.27
 ```
 
-- A parameter without a bound needs no bound: write `V`, not `V any`.
-- `&` joins two or more bounds: `<T Ordered & Hashable>`.
-- Usually the compiler infers the type arguments. Explicit instantiation is rare.
-- A method on a concrete type can declare its own type parameters, as Go 1.27 now permits. A method
-  of an interface or a port cannot. Dynamic dispatch of a generic method would need to know each
-  instantiation in advance.
-
-**Parsing.** In declarations and in type positions, `<` has only one meaning. In expressions,
-`a < b > (c)` can be two comparisons or a generic call. Keel uses the rule of C#. The rule needs
-lookahead, but it does not need a symbol table:
-
-- If `<...>` parses as a type-argument list, **and** the next token is one of `( ) ] } , ; . {` or
-  the end of the line, then `<...>` is a type-argument list.
-- If not, `<` means "less than".
-
-When `>>` closes nested type arguments, the parser splits it into two `>` tokens, as in C#, Java,
-and C++11. The formatter adds parentheses to each expression that is still ambiguous. Thus humans
-and models never see an ambiguous expression.
+- Usually the compiler infers the type arguments, as in Go.
+- A method on a concrete type can declare its own type parameters, as Go 1.27 permits. A method of
+  an interface or a port cannot, also as in Go.
 
 ## 7. Errors
 
@@ -818,32 +803,36 @@ Recovery occurs only at task boundaries (§7.1).**
 An error is an ordinary value. It moves only through return values. Thus the source shows each path
 that an error can take.
 
-A function that can fail declares the Go shape, `(T, error)`. In Keel this shape is a **sum type**:
-the function returns a value **or** an error, never both. Thus the error path needs no value of
-`T`, and no zero value.
+A function that can fail declares the Go shape, `(T, error)`, and uses Go's spelling. In Keel the
+shape is a **sum type**: the function returns a value **or** an error, never both. Thus the error
+path needs no usable value of `T`, and no zero value.
 
 ```go
 func Charge(c CustomerID, a Money) (Receipt, error) {
-    tok := vault.Lookup(c)?   // on failure, returns the error; no Receipt needed
+    tok, err := vault.Lookup(c)
+    if err != nil {
+        return Receipt{}, err  // failure: the compiler discards the value slot
+    }
     ...
-    return receipt            // success: the value only
+    return r, nil              // success
 }
 
 r, err := Charge(c, a)
-if err != none {
-    return err                // r is not usable here
+if err != nil {
+    return Receipt{}, err      // r is not usable here
 }
-use(r)                        // r is a Receipt here: the check above proved it
+use(r)                         // r is a Receipt here: the check above proved it
 ```
 
-- `return v` returns success. `return err` returns failure. `return v, err` is a compile error,
-  because the result cannot be both.
-- `none` is the value of `error` that means "no error", the same word that means "no value" for
-  `?T` (§7a). It replaces Go's `nil`: write `if err != none`. A function that returns only `error`
-  ends with `return none` on success. `ok` is not reserved, so Go's comma-ok form still works.
-- A shape with more values works the same way: `(A, B, error)` returns `a, b` or `err`.
+- `return v, nil` returns success. `return x, err` with a non-`nil` error returns failure, and the
+  compiler discards `x`, so any expression is accepted there, for example `Receipt{}` or `nil`.
+  The caller can never read it.
+- `nil` is the value of `error` that means "no error", as in Go. It is also the absent value of a
+  `?T` (§7a), and it is nothing else. A function that returns only `error` ends with `return nil`
+  on success.
+- A shape with more values works the same way: `(A, B, error)`.
 - At the call site, `r, err := f()` binds both names. The compiler narrows `r` by control flow, the
-  same as a `?T` (§7a): the code can use `r` only where the flow proves that `err == none`.
+  same as a `?T` (§7a): the code can use `r` only where the flow proves that `err == nil`.
 
 The code **must handle each error explicitly**:
 
@@ -907,7 +896,7 @@ has a destination that the compiler knows.
               go process(it)            // process returns error
           }
       }?                                // waits here; the first Failed error returns
-      return none
+      return nil
   }
   ```
 
@@ -986,17 +975,18 @@ process-level fault in Go programs.
 
 ## 7a. Null safety
 
-Keel has **no null value**. `nil` does not exist. No expression can dereference nothing, so a
-null-pointer failure cannot occur.
+Keel keeps Go's word `nil`, but only two types can hold it: an optional `?T` and `error`. This is
+the model of Swift. A plain `T`, including a pointer, an interface, a slice, or a map, can never be
+`nil`. No expression can dereference nothing, so a null-pointer failure cannot occur.
 
 - Each type has a zero value, as in Go, **or** the code must initialize it before use. The code
   must initialize pointers, interfaces, and function values.
-- Absence is a type, not a value. `?T` means "a `T` or `none`".
+- Absence is a type, not a value. `?T` means "a `T` or `nil`".
 - The code cannot use a `?T` as a `T`. The compiler narrows the type by control flow:
 
   ```go
   u := users.Find(id)        // u is ?User
-  if u == none {
+  if u == nil {
       return NotFound
   }
   send(u.Email)              // u is User here: the check above proved it
@@ -1008,13 +998,13 @@ null-pointer failure cannot occur.
   the value into a local first:
 
   ```go
-  if s.user != none {
+  if s.user != nil {
       notify()
       send(s.user.Email)       // compile error: a field does not narrow
   }
   // fix-it:
   u := s.user
-  if u != none {
+  if u != nil {
       notify()
       send(u.Email)            // u is User here
   }
@@ -1024,16 +1014,19 @@ null-pointer failure cannot occur.
   where it is used. But `keel audit` lists each `??`, the same as `ignore`.
 - An API that "might not find" a value returns `?T`. Examples: `Find`, a search, and a parse that
   has no error.
-- **Maps keep the Go idioms where the value type has a zero value:**
+- **Maps behave as in Go.** `m[k]` gives the zero value when the key is missing, and
+  `v, ok := m[k]` and `m[k]++` work. When the code wants absence to be explicit, `m.Get(k)` returns
+  `?V`:
 
   ```go
-  counts[word]++                 // works: int has a zero value
-  v, ok := counts[word]          // Go comma-ok form: v is 0 when the key is missing
-  u := users[id]                 // a single-value read is ?User: a missing key is never a silent zero
-  if u == none { ... }
+  n := counts[word]              // 0 when the key is missing, as in Go
+  v, ok := counts[word]          // the Go comma-ok form
+  u := users.Get(id)             // ?User
+  if u == nil { ... }
   ```
 
-  For a value type with no zero value (Q20), only the `?V` read exists.
+  For a value type with no zero value (Q20), `m[k]` is a compile error, and the code uses
+  `v, ok := m[k]` with narrowing, or `m.Get(k)`.
 - A value from Go that can be `nil` has the type `?T` at the foreign-library boundary (§5.4c).
 - When code uses a `?T` incorrectly, the diagnostic hint shows the narrowing pattern above. It does
   not only say "type mismatch".
@@ -1065,10 +1058,21 @@ An integer never wraps without a signal.
 |---|---|
 | `+ - *`, unary `-`, narrowing conversion (`int32(x)`) | Abort. |
 | `+% -% *%` | Wraps (two's complement). Use these for hashes, checksums, and other deliberate modular arithmetic. |
-| `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert<T>` | Returns `?T`, which is `none` on overflow. Use these when the code handles the overflow itself. |
+| `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Returns `?T`, which is `nil` on overflow. Use these when the code handles the overflow itself. |
 | Constant expressions | Compile error, as in Go. |
 
 Division by zero aborts, as in Go.
+
+**The compiler catches code that expects Go's wrapping.** Code that looks like deliberate modular
+arithmetic (a hash loop, a multiply combined with shifts, a conversion of a larger value to a
+byte) gets a warning with a fix-it to the wrapping operators. Thus code ported from Go fails at
+compile time, not in production:
+
+```
+h = h*31 + uint32(c)
+  warning K0701: this looks like deliberate wrapping (a hash loop)
+    fix-it: h = h *% 31 +% uint32(c)
+```
 
 ## 8. Contracts
 
@@ -1099,7 +1103,7 @@ that rule, Keel permits three tiers:
 | 3 | Quantifiers over collections: `all x in xs: …` and `some x in xs: …` | `requires all x in xs: !IsNaN(x)` |
 
 ```go
-pure func IsSorted<T Ordered>(xs []T) bool { ... }
+pure func IsSorted[T cmp.Ordered](xs []T) bool { ... }
 
 func Merge(a, b []int) []int
     requires IsSorted(a) && IsSorted(b)
@@ -1349,7 +1353,7 @@ layout directly.
 | # | Question |
 |---|---|
 | Q1 | The final name and file extension. |
-| Q20 | Without `nil`, some types have no zero value (types that hold pointers, interfaces, or functions). What happens to `make([]*T, n)`, a generic `var x T`, and a partial struct literal? |
+| Q20 | Because plain types cannot be `nil`, some types have no zero value (types that hold pointers, interfaces, or functions). What happens to `make([]*T, n)`, a generic `var x T`, and a partial struct literal? |
 | Q21 | Inbound traffic. A leaf that serves HTTP to a `person` (for example, Api serving Customer) needs a network library, but it is not a gateway to an external system. How does Keel declare and enforce an entry point? |
 | Q22 | Numeric performance targets for the benchmark suite (§12.3): for each benchmark, the accepted ratio of speed and memory against Go, Java, C++, and Rust. |
 
