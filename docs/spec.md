@@ -71,6 +71,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
 | A lock that an aborting task holds becomes poisoned. `Lock()` returns an error. | Go has no poisoning (§7.1) |
+| Values that `go` shares must be copies, channels, constants, or `guarded by` a mutex | Prevents data races such as concurrent map writes (§7.1) |
 | `go f()` returns a task handle. Its exit carries the result: `Completed`, `Failed`, or `Aborted`. Discarding the handle of an error-returning task needs `ignore`. | Supervision, and no silent task errors (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
@@ -868,6 +869,38 @@ half-changed after the state of the task is gone. Keel does what Rust does:
 - Limit: poisoning protects only data that a lock guards. A change to shared data without a lock
   is a data race, and a data race is already a bug. The race detector runs in test builds to find
   data races.
+
+**Sharing between tasks.** The compiler rejects the most common data races before they run. When
+`go` captures or passes a value, the value must be one of these:
+
+- a copy (a value type with no references inside it)
+- a `chan`
+- a `const` (§5.4a)
+- a field of a struct that declares it `guarded by` a mutex in the same struct
+
+```go
+type Counts struct {
+    mu   Mutex
+    byID map[string]int guarded by mu
+}
+
+counts := map[string]int{}
+go worker(counts)          // compile error: map shared with a task without a lock
+  // hint: pass a copy, send it on a chan, or guard it with a Mutex
+```
+
+The compiler also checks each access to a `guarded by` field: the function must hold the mutex at
+that point.
+
+**Fault classes.** Not every fault can stay inside one task:
+
+| Class | Faults | Result |
+|---|---|---|
+| Task-level | Contract violations, overflow, bounds, poisoned data, and panics in Go code inside a foreign library | The task aborts. The parent receives `Aborted` (§7.1). On the Go backend, the runtime wraps each task in `recover` to do this. |
+| Process-level | Stack exhaustion, out of memory, deadlock of all tasks | The process exits with a report. The deployment restarts it. No parent receives `Aborted`. |
+
+The rule on sharing between tasks removes concurrent map writes, the most common cause of a
+process-level fault in Go programs.
 
 ## 7a. Null safety
 
