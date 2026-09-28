@@ -164,10 +164,10 @@ port Payments {
         ensures  result.Amount == amount
 }
 
-// In Orders (consumer): what Orders needs, in its own terms.
+// In Orders (consumer): what Orders needs, with its own names and contract.
 // Checkout takes payment for a confirmed order.
 port Checkout {
-    func Charge(customer CustomerID, amount Money) (Receipt, error)
+    func Pay(customer CustomerID, amount Money) (Receipt, error)
         requires amount > 0 && amount < MaxOrder
 }
 ```
@@ -176,7 +176,9 @@ port Checkout {
 these checks:
 
 1. **Signatures.** Each method of the required port must exist on the provided port, with an
-   identical signature. The provided port can have more methods.
+   identical signature. The provided port can have more methods. The wire can rename methods:
+   `Orders { Checkout: Billing.Payments { Pay = Charge } }`. A rename changes only the name; the
+   parameter and result types must still be identical.
 2. **Contracts (substitutability).** For each method:
    - The consumer's `requires` must imply the provider's `requires`. Thus the provider accepts all
      inputs that the consumer can send.
@@ -186,8 +188,10 @@ these checks:
    If the compiler cannot prove an implication, it adds a runtime check at the wire and lists the
    check in `keel audit`.
 
-If two ports do not match, write an adapter. An adapter is an ordinary leaf that requires one port
-and provides the other. Keel has no special adapter construct, because composites hold no code.
+If two ports differ in more than names, write an adapter. An adapter is an ordinary leaf that
+requires one port and provides the other. Keel has no special adapter construct, because
+composites hold no code. The near-duplicate check (§10) ignores port declarations: the two sides
+of a boundary are separate contracts on purpose.
 
 A composite wires its direct children and publishes some of their ports. Sometimes no sibling
 satisfies a child's requirement. Then that requirement becomes a requirement of the composite, and
@@ -199,7 +203,7 @@ container Api {
     requires OrderFlow                  // Orders' remote port, passed up to the system (§5.5)
 
     Billing     { Ledger: LedgerStore.Ledger, Clock: SystemClock.Clock }
-    Orders      { Checkout: Billing.Payments, OrderFlow: parent.OrderFlow }
+    Orders      { Checkout: Billing.Payments { Pay = Charge }, OrderFlow: parent.OrderFlow }
     LedgerStore {}
     SystemClock {}
 }
@@ -212,7 +216,8 @@ container Worker {
 }
 ```
 
-The compiler does the port-compatibility check at `Orders { Checkout: Billing.Payments }`.
+The compiler does the port-compatibility check, with the rename, at
+`Orders { Checkout: Billing.Payments { Pay = Charge } }`.
 
 The system adds the outer ring of C4: the people and the external systems that the system
 interacts with.
