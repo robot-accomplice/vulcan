@@ -1041,7 +1041,7 @@ A contract is a clause on a declaration. It is not a comment.
 | Clause | Attaches to | Meaning |
 |---|---|---|
 | `requires expr` | functions, port methods | Precondition: the obligation of the caller |
-| `ensures expr` | functions, port methods | Postcondition: `result` is the return value |
+| `ensures expr` | functions, port methods | Postcondition. For a function that can fail, it applies only when the function succeeds, and `result` is the success value. With more than one success value, `result.0`, `result.1`, and so on name them. |
 | `invariant expr` | structs | Is true after each exported method returns |
 
 ### 8.1 What a contract can contain
@@ -1058,7 +1058,7 @@ that rule, Keel permits three tiers:
 
 | Tier | Adds | Example |
 |---|---|---|
-| 1 | Comparisons, arithmetic, `&&` `\|\|` `!`, `=>` (implies), field access, `len`, `result`, `old(x)` (the value on entry) | `ensures err == none => acct.Balance == old(acct.Balance) - amt` |
+| 1 | Comparisons, arithmetic, `&&` `\|\|` `!`, `=>` (implies), field access, `len`, `result`, `old(x)` (the value on entry) | `ensures acct.Balance == old(acct.Balance) - amt` |
 | 2 | Calls to functions marked `pure`. The compiler verifies that these functions have no effects. | `requires IsSorted(a) && IsSorted(b)` |
 | 3 | Quantifiers over collections: `all x in xs: …` and `some x in xs: …` | `requires all x in xs: !IsNaN(x)` |
 
