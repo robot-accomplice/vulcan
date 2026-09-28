@@ -66,7 +66,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | Change from Go | Reason |
 |---|---|
 | `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
-| `(T, error)` is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. `ok` replaces `nil` for errors. | R3, and no zero value on the error path (§7) |
+| `(T, error)` is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. `none` means "no error", as it means "no value" for `?T`. | R3, and no zero value on the error path (§7) |
 | No `nil` or `null` value. Optional types `?T`, narrowed by control flow. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
@@ -78,7 +78,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `test` and `fake` blocks | Testability by design (§9) |
 | `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
 | `remote port`, `idempotent` handlers, `via` wiring | Honest communication between containers (§5.5) |
-| `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `ok` | No forgotten or early acknowledgement (§5.5.0) |
+| `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `none` | No forgotten or early acknowledgement (§5.5.0) |
 | `max` bounds on variable-size fields of topic messages | The compiler calculates the memory limit of each queue (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
@@ -494,7 +494,7 @@ how many subscribers there are, or when they read.
   // Api keeps a read model, and answers GET /stock/42 from it.
   idempotent handle StockChanged(m StockChanged) error {
       stock.Set(m.SKU, m.Qty)
-      return ok
+      return none
   }
   ```
 
@@ -571,7 +571,7 @@ Placed.Publish(OrderPlaced{ID: id, Total: t})
 ```go
 idempotent handle Shipped(m ShipmentSent) error {
     orders.MarkShipped(m.OrderID)?
-    return ok          // the message is acknowledged here
+    return none          // the message is acknowledged here
 }
 ```
 
@@ -581,7 +581,7 @@ idempotent handle Shipped(m ShipmentSent) error {
 
   | Handler outcome | At-least-once topic | At-most-once topic |
   |---|---|---|
-  | Returns `ok` | Acknowledged. | Acknowledged. |
+  | Returns `none` | Acknowledged. | Acknowledged. |
   | Returns an error | Retried, then sent to the dead-letter topic. | Discarded and counted. |
   | Aborts | Retried, then sent to the dead-letter topic. | Discarded and counted. |
 
@@ -763,7 +763,7 @@ func Charge(c CustomerID, a Money) (Receipt, error) {
 }
 
 r, err := Charge(c, a)
-if err != ok {
+if err != none {
     return err                // r is not usable here
 }
 use(r)                        // r is a Receipt here: the check above proved it
@@ -771,11 +771,12 @@ use(r)                        // r is a Receipt here: the check above proved it
 
 - `return v` returns success. `return err` returns failure. `return v, err` is a compile error,
   because the result cannot be both.
-- `ok` is the value of `error` that means "no error". It replaces Go's `err == nil`. A function
-  that returns only `error` ends with `return ok` on success.
+- `none` is the value of `error` that means "no error", the same word that means "no value" for
+  `?T` (§7a). It replaces Go's `nil`: write `if err != none`. A function that returns only `error`
+  ends with `return none` on success. `ok` is not reserved, so Go's comma-ok form still works.
 - A shape with more values works the same way: `(A, B, error)` returns `a, b` or `err`.
 - At the call site, `r, err := f()` binds both names. The compiler narrows `r` by control flow, the
-  same as a `?T` (§7a): the code can use `r` only where the flow proves that `err == ok`.
+  same as a `?T` (§7a): the code can use `r` only where the flow proves that `err == none`.
 
 The code **must handle each error explicitly**:
 
@@ -839,7 +840,7 @@ has a destination that the compiler knows.
               go process(it)            // process returns error
           }
       }?                                // waits here; the first Failed error returns
-      return ok
+      return none
   }
   ```
 
@@ -954,8 +955,18 @@ null-pointer failure cannot occur.
 
 - `x ?? fallback` gives an explicit default. Keel permits it, because the code states the default
   where it is used. But `keel audit` lists each `??`, the same as `ignore`.
-- An API that "might not find" a value returns `?T`. Examples: a map lookup, `Find`, a search, and
-  a parse that has no error.
+- An API that "might not find" a value returns `?T`. Examples: `Find`, a search, and a parse that
+  has no error.
+- **Maps keep the Go idioms where the value type has a zero value:**
+
+  ```go
+  counts[word]++                 // works: int has a zero value
+  v, ok := counts[word]          // Go comma-ok form: v is 0 when the key is missing
+  u := users[id]                 // a single-value read is ?User: a missing key is never a silent zero
+  if u == none { ... }
+  ```
+
+  For a value type with no zero value (Q20), only the `?V` read exists.
 - A value from Go that can be `nil` has the type `?T` at the foreign-library boundary (§5.4c).
 - When code uses a `?T` incorrectly, the diagnostic hint shows the narrowing pattern above. It does
   not only say "type mismatch".
@@ -1016,7 +1027,7 @@ that rule, Keel permits three tiers:
 
 | Tier | Adds | Example |
 |---|---|---|
-| 1 | Comparisons, arithmetic, `&&` `\|\|` `!`, `=>` (implies), field access, `len`, `result`, `old(x)` (the value on entry) | `ensures err == ok => acct.Balance == old(acct.Balance) - amt` |
+| 1 | Comparisons, arithmetic, `&&` `\|\|` `!`, `=>` (implies), field access, `len`, `result`, `old(x)` (the value on entry) | `ensures err == none => acct.Balance == old(acct.Balance) - amt` |
 | 2 | Calls to functions marked `pure`. The compiler verifies that these functions have no effects. | `requires IsSorted(a) && IsSorted(b)` |
 | 3 | Quantifiers over collections: `all x in xs: …` and `any x in xs: …` | `requires all x in xs: !IsNaN(x)` |
 
