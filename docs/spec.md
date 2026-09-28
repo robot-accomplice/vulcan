@@ -82,6 +82,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
+| `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
 | Generics use `<T Bound>`, not `[T Bound]` | Familiar from the C family. An unbounded parameter needs no `any` (§6.1) |
@@ -288,7 +289,22 @@ import "lib/money"
 Rules:
 
 1. A library has **no ports, no topics, and no mutable package-level state**. It is only code. It
-   cannot hold state, so it cannot couple the leaves that import it.
+   cannot hold state, so it cannot couple the leaves that import it. The compiler enforces this
+   rule as follows:
+   - A library cannot declare a package-level `var`.
+   - A library can declare a package-level `const` of any type, including arrays, maps, structs,
+     and slices. A `const` is **deeply immutable**: the compiler proves that no code can change it,
+     or get a mutable reference to it or to any value inside it.
+   - A `pure` function (§8.1) can compute a `const` once, at startup.
+
+   ```go
+   // lib/crc
+   const table = buildTable()                       // pure function, runs once
+   const names = map[Status]string{Paid: "paid"}
+
+   var cache = map[string]int{}                     // compile error in a library
+   names[Paid] = "x"                                // compile error: names is const
+   ```
 2. **A library enables I/O. It does not decide on I/O.** A library can read, write, query, or
    send through a handle that its caller gives it. A library cannot *acquire* a handle: it cannot
    open a file, dial the network, open a database, or create a client. A call from a library to an
