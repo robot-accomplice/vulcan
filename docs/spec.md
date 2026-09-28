@@ -186,6 +186,11 @@ nothing about the nodes on the other side.**
 A provider does not know which nodes use it. A consumer does not know which node serves it. Only
 the parent that wires the two nodes together knows both of them.
 
+**Inside a leaf, each required port is a package-level name**, the name of the port itself. Code
+calls it like a Go package: `Checkout.Pay(c, amt)`. The wiring binds the name at startup, and the
+binding cannot change after that. A test binds fakes to the same names (§9). A leaf appears once in
+the tree; reuse of code goes through libraries (§5.4a).
+
 ```go
 // In Billing (provider): what Billing offers.
 // Payments charges a customer's stored payment method.
@@ -813,7 +818,7 @@ The code **must handle each error explicitly**:
 
 - If the code uses the value of a call and does not handle the error of the call, the code does
   not compile.
-- Postfix `?` returns the error to the caller: `r := billing.Charge(c, amt)?`. If the call
+- Postfix `?` returns the error to the caller: `r := Checkout.Pay(c, amt)?`. If the call
   succeeds, `?` gives its value. If the call fails, `?` returns the error from the enclosing
   function, which must also return `error`. It does nothing more. It does not unwind, catch, or
   jump. Keel uses `?` and not a `try` keyword, so that humans and models do not read it as a
@@ -1095,8 +1100,27 @@ How reviewers audit contracts:
 - `test` blocks are next to the code that they test, in `*_test.keel` files in the leaf directory.
 - The design makes each leaf testable in isolation: its only dependencies are the ports in its
   `requires` list.
-- A `fake` block implements a port for tests. The compiler can generate a default fake from the
-  port.
+- A `fake` block implements a port for tests. Each fake, written or generated, must meet the
+  contract of its port.
+- The compiler generates a default fake only when it can build values that meet each `ensures`:
+  a port with no `ensures`, or with simple equalities that it can solve, such as
+  `result.Amount == amount`. Otherwise it reports which clause prevents it, and the developer
+  writes the fake.
+
+  ```
+  K0520: cannot generate a fake for Sorter.Merge
+    clause: ensures IsSorted(result)
+    hint: write fake Sorter { ... }
+  ```
+
+- A `test` block binds fakes to the required ports of the leaf with a `wire` clause:
+
+  ```go
+  test "pays for an order" {
+      wire { Checkout: fake CheckoutOK }
+      ...
+  }
+  ```
 - `keel test Billing` builds and runs the tests of one leaf. It does not build the rest of the
   system.
 
