@@ -538,7 +538,7 @@ must state which, so that no runtime queue can grow in memory without a limit.
   | `whenFull` | Effect | Typical use |
   |---|---|---|
   | `block` | The publisher waits for space. It is coupled to slow subscribers in time only. | Business events: the loss of one is not acceptable |
-  | `dropOldest` / `dropNewest` | The runtime discards a message, counts it, and sends it to the dead-letter topic. `keel audit` lists the policy. | Telemetry: old data is acceptable |
+  | `dropOldest` / `dropNewest` | The runtime discards a message and counts it. A drop is not a failure, so the message does not go to the dead-letter topic. `keel audit` lists the policy. | Telemetry: old data is acceptable |
   | `abort` | The task aborts (§7.1). | Waiting is not acceptable and loss is not acceptable |
 
   ```go
@@ -554,9 +554,12 @@ must state which, so that no runtime queue can grow in memory without a limit.
 - **Messages expire.** Each topic has a time to live (`ttl`). The `ttl` comes from the same sources
   as a capacity. The runtime sends an expired message to the dead-letter topic. Thus a dead
   subscriber cannot hold memory without a limit.
-- **A full dead-letter topic aborts.** It cannot use `block`, because that would stop the pipeline
-  on its own error path. It cannot discard messages, because a discarded dead letter is a silent
-  failure. Thus a full dead-letter topic causes a loud failure.
+- **A full dead-letter topic aborts the subscriber process.** A dead-letter topic belongs to one
+  subscription (§5.5). When it is full, the container process of that subscriber aborts with a
+  report. The publisher is never affected. At-least-once messages stay in the durable outbox of the
+  publisher, so no message is lost, and delivery continues when the subscriber restarts. The
+  dead-letter topic cannot use `block`, because that would stop the pipeline on its own error path.
+  It cannot discard messages, because a discarded dead letter is a silent failure.
 - **Limits are visible before the system reaches them.** For each queue, the runtime reports the
   depth, the highest depth so far, and an estimate of the time until the queue is full.
   `keel audit` lists the capacity, the policy, and the `ttl` of each topic. Thus a reviewer can see
