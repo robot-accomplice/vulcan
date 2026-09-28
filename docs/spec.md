@@ -44,7 +44,7 @@ use the same terms.
 | **Gateway** | The one leaf in a container that talks to a given external system. |
 | **External system** | Software outside the system, such as Stripe. Declared with `external`. |
 | **Person** | A human who uses the system. Declared with `person`. For diagrams. |
-| **Port** | An interface with contracts on the boundary of a node. The node that provides it or requires it declares it. Inside a container, a port call is an ordinary function call. |
+| **Port** | An interface with contracts, declared once by the leaf that requires it. A provider satisfies it with an ordinary type, named at the wire. Inside a container, a port call is an ordinary function call. |
 | **Topic** | A publish channel, `topic[T]`, for asynchronous events between containers. |
 | **Remote port** | A port that crosses containers. A remote method port is a synchronous call; a remote topic is an event. |
 | **Publisher / subscriber** | The leaf that publishes on an `out` topic / the leaf that handles an `in` topic. |
@@ -121,7 +121,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
-| Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), method renames (`{ Pay = Charge }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
+| Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
 | Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
 | Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Explicit handling of bounds and overflow (§7b, §7c) |
@@ -143,7 +143,7 @@ Keel reserves few words.
 - **Contextual:** all other new words. They are keywords only where they start a declaration, or
   inside a declaration file or a contract. Elsewhere they are ordinary identifiers. This applies to
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
-  `layers`, `provides`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in`, `out`, `topic`,
+  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in`, `out`, `topic`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `max`, `guarded`, `acquires`, `idempotent`,
   `gateway`, `client`, and `budget`.
 
@@ -192,7 +192,7 @@ has no directory of its own declarations and no code: it is a section of the arc
   the leaves in each, the layers, the people, the external systems, and **every wire**.
 - **Each leaf is a directory** with one `component.keel` and its source files. `component.keel`
   declares the **boundary** of the leaf: its layer, and the full declaration of each port that it
-  provides and requires.
+  requires.
 - **Directories mirror the tree**: `api/orders/`, `worker/fulfilment/picking/`. The compiler checks
   that the directories and `system.keel` agree.
 - Libraries are in `lib/`.
@@ -202,27 +202,11 @@ and code next to its boundary.
 
 ### 5.3 Declarations
 
-**A leaf declares its boundary** in `component.keel`: its layer, and the ports that it provides and
-requires, with their methods and contracts.
+**A port is declared once, by the leaf that requires it.** This is the Go idiom: the consumer
+defines the interface where it uses it. A leaf declares its boundary in `component.keel`: its
+layer, and each port that it requires, with its methods and contracts.
 
 ```go
-// api/billing/component.keel
-// Billing charges customers and records the charge in the ledger.
-component Billing {
-    layer app
-
-    // Payments charges a customer's stored payment method.
-    provides port Payments {
-        // Charge moves amount from the customer to the merchant.
-        func Charge(customer CustomerID, amount Money) (Receipt, error)
-            requires amount > 0
-            ensures  result.Amount == amount
-    }
-
-    requires port Ledger { ... }
-    requires port Clock  { ... }
-}
-
 // api/orders/component.keel
 component Orders {
     layer app
@@ -231,17 +215,27 @@ component Orders {
     requires port Checkout {
         func Pay(customer CustomerID, amount Money) (Receipt, error)
             requires amount > 0 && amount < MaxOrder
+            ensures  result.Amount == amount
     }
 }
 ```
 
-**Each leaf owns the ports on its own boundary. It knows nothing about the leaves on the other
-side.**
+**A provider satisfies a port with an ordinary type.** It needs no keyword and no declaration: any
+exported type of a leaf whose method set matches the port can satisfy it, as with a Go interface.
+The provider never names its consumers.
 
-- The provider declares each port that it provides: "what I offer".
-- The consumer declares each port that it requires: "what I need". This is the hexagonal style.
+```go
+// api/billing/payer.keel (ordinary code)
+// Payer charges a customer's stored payment method.
+type Payer struct { ... }
 
-A provider does not know which leaves use it. A consumer does not know which leaf serves it. Only
+func (p *Payer) Pay(customer CustomerID, amount Money) (Receipt, error) { ... }
+```
+
+If two consumers need different methods with the same name, the provider exports two types, for
+example `Payer` and `SubscriptionPayer`, as in ordinary Go.
+
+A consumer does not know which leaf serves it. A provider does not know which leaves use it. Only
 `system.keel` knows both.
 
 **Inside a leaf, each required port is a package-level name**, the name of the port itself. Code
@@ -258,9 +252,9 @@ instrumentation of the contract**: the port signature, its `requires` and `ensur
 record of the boundary in diagrams and in the audit. Topics and transports (§5.5) exist only for
 separate processes.
 
-**The architecture file wires the leaves.** Inside a container section, a wire names leaves by
-name. A wire between containers names each leaf by its path: `Container/Leaf`, or
-`Container/Group/Leaf`.
+**The architecture file wires the leaves.** A wire connects a required port to a providing type.
+Inside a container section, a wire names leaves by name. A wire between containers names each leaf
+by its path: `Container/Leaf`, or `Container/Group/Leaf`.
 
 ```go
 // system.keel
@@ -274,9 +268,9 @@ system Shop {
     container Api {
         Billing, Orders, LedgerStore, SystemClock, StripeGateway
 
-        Orders.Checkout: Billing.Payments { Pay = Charge }
-        Billing.Ledger:  LedgerStore.Ledger
-        Billing.Clock:   SystemClock.Clock
+        Orders.Checkout: Billing.Payer
+        Billing.Ledger:  LedgerStore.Store
+        Billing.Clock:   SystemClock.Wall
     }
 
     container Worker {
@@ -292,26 +286,22 @@ system Shop {
 }
 ```
 
-**Port compatibility.** At each wire from a required port to a provided port, the compiler does
-these checks:
+The wire names an exported type or an exported constructor with no parameters, for example
+`Billing.NewPayer`. The provider needs no parameters, because it reaches its own dependencies
+through its own required ports.
 
-1. **Signatures.** Each method of the required port must exist on the provided port, with an
-   identical signature. The provided port can have more methods. The wire can rename methods:
-   `Orders.Checkout: Billing.Payments { Pay = Charge }`. A rename changes only the name; the
-   parameter and result types must still be identical.
-2. **Contracts (substitutability).** For each method:
-   - The consumer's `requires` must imply the provider's `requires`. Thus the provider accepts all
-     inputs that the consumer can send.
-   - The provider's `ensures` must imply the consumer's `ensures`. Thus the provider promises at
-     least what the consumer relies on.
+**Checks at each wire.**
 
-   If the compiler cannot prove an implication, it adds a runtime check at the wire and lists the
-   check in `keel audit`.
+1. **Method set.** The providing type must have each method of the port, with an identical
+   signature. It can have more methods.
+2. **One contract.** The contract of the port applies at every call through the port: the compiler
+   checks `requires` before the call and `ensures` after it. If the providing method also declares
+   its own contract, the compiler checks that the port's `requires` implies the method's `requires`,
+   and that the method's `ensures` implies the port's `ensures`. If it cannot prove an implication,
+   it adds a runtime check at the wire and lists it in `keel audit`.
 
-If two ports differ in more than names, write an adapter. An adapter is an ordinary leaf that
-requires one port and provides the other. Keel has no special adapter construct. The near-duplicate
-check (§10) ignores port declarations: the two sides of a boundary are separate contracts on
-purpose.
+If no type has the right methods, write an adapter: an ordinary leaf with a type that satisfies the
+port, and that calls another port. Keel has no special adapter construct.
 
 Keel does not wire external systems with ports. The language does not control them, and they use
 their own protocols. Instead, one **gateway leaf** in each container talks to each external system
@@ -330,11 +320,11 @@ line records a relationship that no declaration shows, such as a person who uses
    adds no boundary.
 4. **Complete wiring.** `system.keel` wires each required port and each `in` topic of each leaf
    exactly once. An `out` topic is never wired by itself (§5.5).
-5. **Complete provision.** A leaf implements each port that it provides.
+5. **Satisfied ports.** Each wire names a providing type whose method set matches the port.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
-7. **Boundary ownership.** A leaf declares the ports that it provides and requires, in its own
-   `component.keel`. The code and the boundary of a leaf never name a port of another leaf. Only
-   `system.keel` names the ports of two leaves together, in a wire.
+7. **Boundary ownership.** A leaf declares each port that it requires, once, in its own
+   `component.keel`. The code and the boundary of a leaf never name another leaf. Only
+   `system.keel` names two leaves together, in a wire.
 8. **Layers.** The `layers` order of the system constrains **source dependencies**: the libraries
    that a leaf imports, and the types in its port signatures. A leaf can use these only from its
    own layer or a lower layer. Layers do not constrain wires. Two wired leaves share no source
@@ -343,7 +333,8 @@ line records a relationship that no declaration shows, such as a person who uses
    require a port that a `domain` leaf provides. But a port in an `app` leaf cannot mention an
    `infra` type such as `sql.Row`.
 9. **No cycles.** The graph of wires between the leaves of one container has no cycles.
-10. **Private types.** A type is private to its leaf, unless the type is in a port signature.
+10. **Private types.** A type is private to its leaf. Only `system.keel` can name an exported type
+    of a leaf, in a wire. A type in a port signature must come from a library (§5.4a).
 11. **Leaf size budget.** The budget measures what a model reads to work on a leaf: all non-test
     source of the leaf plus its `keel context` output, in tokens. Each project sets one
     `context_budget` value in its config. A leaf over the budget is a compile error. The hint tells
@@ -419,21 +410,24 @@ declarations only (§12.2).
 ### 5.4b Gateways to external systems
 
 A **gateway leaf** is the only leaf that talks to an external system. It turns the protocol of the
-external system into a normal Keel port. Other leaves require that port, and they contain no
-network code.
+external system into an ordinary type that satisfies a port. Other leaves require that port, and
+they contain no network code.
 
 ```go
 // api/stripegw/component.keel
 // StripeGateway charges cards through Stripe.
 component StripeGateway {
-    gateway  for Stripe
-    provides CardNetwork
+    gateway for Stripe
 }
+// api/stripegw/cards.keel: type Cards, with a Charge method that calls Stripe
 
 // api/billing/component.keel
 component Billing {
-    requires CardNetwork     // no network code in Billing
+    requires port CardNetwork { func Charge(...) (CardReceipt, error) }   // no network code
 }
+
+// system.keel
+Billing.CardNetwork: StripeGateway.Cards
 ```
 
 Rules:
