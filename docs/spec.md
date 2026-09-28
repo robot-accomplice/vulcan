@@ -106,7 +106,6 @@ sight. This spec must justify each change from Go and list it in this table:
 | Only `?T` and `error` can hold `nil` (the Swift model). Optional types `?T` are narrowed by control flow. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
-| A lock that an aborting task holds becomes poisoned. `Lock()` returns an error. | Go has no poisoning (§7.1) |
 | Values that `go` shares must be copies, channels, constants, or `guarded by` a mutex | Prevents data races such as concurrent map writes (§7.1) |
 | `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. A task exit is `Completed`, `Failed`, or `Aborted`. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
@@ -129,7 +128,6 @@ sight. This spec must justify each change from Go and list it in this table:
 | A narrowing conversion (`int32(x)`) aborts when the value does not fit | Go truncates without a signal (§7c) |
 | `m.Get(k)` returns `?V`. Other map reads behave as in Go. | Explicit absence when the code wants it (§7a) |
 | A private function can omit its result types; the body alone determines them | Less noise, with no inference across call sites (§6) |
-| `mu.LockForRepair()` and `mu.ClearPoison()` | Repair of poisoned data under the lock (§7.1) |
 | Test files are `*_test.keel` in the leaf directory | Tests next to the code (§9) |
 
 All other syntax follows Go, unless a later section says otherwise. This includes `:=`, `func`,
@@ -501,7 +499,7 @@ foreign library StripeClient {
    (§5.4a, rule 2). The standard library ships with these marks. `keel audit` lists each
    acquiring function, so that a reviewer can check the marks of third-party foreign libraries.
 5. Go code inside the boundary can break Keel guarantees. It can start unsupervised goroutines, use
-   locks that do not become poisoned, and hold global state. `keel audit` lists each foreign
+   locks outside Keel's rules, and hold global state. `keel audit` lists each foreign
    library and these limits, so that a reviewer can see where the guarantees stop.
 
 **The standard library.** The Keel standard library is a set of foreign libraries over the Go
@@ -860,8 +858,18 @@ syntax. Keel adds **structured concurrency**: each task has an owner in the sour
 has a destination that the compiler knows.
 
 - **A task starts inside a `tasks { }` scope.** A `go` statement outside a scope is a compile
-  error. At the end of the scope, the function waits for all the tasks that started in it. A
-  handle cannot leave its scope.
+  error. The diagnostic has an automatic fix-it that wraps the code in a scope, or offers `detach`
+  for a background task:
+
+  ```
+  go process(it)
+    error K0801: go outside a tasks scope
+      fix-it: tasks { go process(it) }?
+      or:     detach process(it), "reason"
+  ```
+
+  At the end of the scope, the function waits for all the tasks that started in it. A handle
+  cannot leave its scope.
 - The runtime discards the state of an aborted task. Its exit goes to the scope that owns it.
 - The exit of a task is a sum type, typed from the result of the function: `Completed` (with the
   value, if any), `Failed` (with the error, if the function returns one), or `Aborted` (with the
@@ -910,36 +918,17 @@ has a destination that the compiler knows.
 - The runtime records each abort report as an RCA trail: the task, the owning scope, the
   invariant, the source position, and the values.
 
-**Poisoned locks.** Tasks share memory, as in Go. An abort during an update can leave shared data
-half-changed after the state of the task is gone. Keel does what Rust does:
-
-- If a task holds a mutex (or a read-write mutex) when it aborts, the mutex becomes **poisoned**.
-- Each later `Lock()` returns an error, `Poisoned`, and does **not** hold the lock. The code must
-  handle this error like all other errors (§7). Because the lock is not held, `mu.Lock()?` can
-  never leave a lock held:
-
-  ```go
-  mu.Lock()?                      // propagates Poisoned to the caller; the lock is not held
-  ```
-
-- To repair the data, a task calls `mu.LockForRepair()`, which takes the lock even when it is
-  poisoned. The compiler permits `mu.ClearPoison()` only between `LockForRepair()` and `Unlock()`
-  in the same function. Thus no repair runs without the lock. `keel audit` lists each repair.
-
-  ```go
-  mu.LockForRepair()
-  rebuild(&shared)
-  mu.ClearPoison()
-  mu.Unlock()
-  ```
+**Aborts under a lock.** Locks behave exactly as in Go: `mu.Lock()` and `mu.Unlock()`, with no
+error. An abort during an update can leave shared data half-changed. Thus, if a task aborts while
+it holds a lock, the abort is **process-level**: the process stops with a report, and the
+deployment restarts it. No other task can see the half-changed data.
 
 - **Deferred calls run when a task aborts**, in reverse order, as in Go. Thus files and
-  connections close. If a deferred `Unlock()` runs, it releases the lock, but the lock stays
-  poisoned, because the data may still be half-changed. An abort inside a deferred call stops the
-  remaining deferred calls, and the runtime adds it to the report.
-- Limit: poisoning protects only data that a lock guards. A change to shared data without a lock
-  is a data race, and a data race is already a bug. The race detector runs in test builds to find
-  data races.
+  connections close. An abort inside a deferred call stops the remaining deferred calls, and the
+  runtime adds it to the report.
+- Limit: this protects only data that a lock guards. A change to shared data without a lock is a
+  data race, and a data race is already a bug. The sharing rules below and the race detector in
+  test builds find data races.
 
 **Sharing between tasks.** The compiler rejects the most common data races before they run. When
 `go` captures or passes a value, the value must be one of these:
@@ -967,8 +956,8 @@ that point.
 
 | Class | Faults | Result |
 |---|---|---|
-| Task-level | Contract violations, overflow, bounds, poisoned data, and panics in Go code inside a foreign library | The task aborts. The parent receives `Aborted` (§7.1). On the Go backend, the runtime wraps each task in `recover` to do this. |
-| Process-level | Stack exhaustion, out of memory, deadlock of all tasks | The process exits with a report. The deployment restarts it. No parent receives `Aborted`. |
+| Task-level | Contract violations, overflow, bounds, and panics in Go code inside a foreign library, when the task holds no lock | The task aborts. The parent receives `Aborted` (§7.1). On the Go backend, the runtime wraps each task in `recover` to do this. |
+| Process-level | Any abort while the task holds a lock; stack exhaustion; out of memory; deadlock of all tasks | The process exits with a report. The deployment restarts it. No parent receives `Aborted`. |
 
 The rule on sharing between tasks removes concurrent map writes, the most common cause of a
 process-level fault in Go programs.
