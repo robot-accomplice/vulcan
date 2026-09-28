@@ -93,7 +93,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert<T>` | Explicit handling of bounds and overflow (§7b, §7c) |
 | A narrowing conversion (`int32(x)`) aborts when the value does not fit | Go truncates without a signal (§7c) |
 | A single-value map read `m[k]` is `?V`. `m[k]++`, `m[k] += x`, and `v, ok := m[k]` work as in Go when `V` has a zero value | A missing key is never a silent zero (§7a) |
-| A private function can omit parameter and result types when the body alone determines them | Less noise, with no inference across call sites (§6) |
+| A private function can omit its result types; the body alone determines them | Less noise, with no inference across call sites (§6) |
 | `mu.LockForRepair()` and `mu.ClearPoison()` | Repair of poisoned data under the lock (§7.1) |
 | Test files are `*_test.keel` in the leaf directory | Tests next to the code (§9) |
 
@@ -731,14 +731,16 @@ behavior is. A parent cannot hide logic.
 - **Inferred where possible.** The compiler infers the types of local variables, closures, and
   generic instantiations. Port signatures and exported functions are explicit, because humans
   review them as contracts.
-- **A private signature can omit types only when inference is safe.** A private function is a
-  function that is not exported and is not in a port. It can omit parameter types or return types
-  only when all these conditions are true:
-  1. The compiler infers the type from the **body of the function only**, never from its call
-     sites. Thus a change to a caller can never change the type of a function.
-  2. The body gives **exactly one** type. If a field access or a method call fits more than one
-     type, the compiler reports an error. The error has a fix-it that adds the annotation.
-  3. The function is not recursive. A recursive function must annotate its return type.
+- **A private function can omit its result types, never its parameter types.** A private function
+  is a function that is not exported and is not in a port. The compiler infers its result types
+  from the **body only**, never from its call sites. Parameters always have declared types, so the
+  inference depends only on them: a change to a caller, or a new unrelated type, can never change
+  or break the inferred type. A recursive function must declare its result types.
+
+  ```go
+  func area(s Rect) { return s.W * s.H }   // result int is inferred
+  func area(s) { ... }                      // compile error: a parameter needs a type
+  ```
 
   The tools always show the full inferred signature: in `keel context`, in `keel doc`, on hover,
   and in diffs. Thus a model or a reviewer never has to find a type by hand.
@@ -1047,7 +1049,7 @@ A contract is a clause on a declaration. It is not a comment.
 |---|---|---|
 | `requires expr` | functions, port methods | Precondition: the obligation of the caller |
 | `ensures expr` | functions, port methods | Postcondition. For a function that can fail, it applies only when the function succeeds, and `result` is the success value. With more than one success value, `result.0`, `result.1`, and so on name them. |
-| `invariant expr` | structs | Is true after each exported method returns |
+| `invariant expr` | structs | Is true after construction and after the outermost exported method call returns (§8.2) |
 
 ### 8.1 What a contract can contain
 
@@ -1077,6 +1079,34 @@ func Merge(a, b []int) []int
 
 A runtime check of a quantifier costs O(n). `keel audit` lists each quantifier that release builds
 still check. A leaf can turn these checks off.
+
+### 8.2 Struct invariants
+
+An invariant protects a struct only if no code can go around it. Thus:
+
+- **Only methods write fields.** The fields of a struct with an invariant are read-only outside
+  its own methods. A write from anywhere else is a compile error.
+- **Construction is checked.** A struct literal is checked where the code creates it. If the
+  compiler can prove the violation, it is a compile error; if not, the check runs at runtime.
+- **The zero value must satisfy the invariant.** If it does not, the type has no zero value
+  (see Q20).
+- **Outer calls only.** The invariant is checked when the outermost exported method call on the
+  value returns. A nested call on the same value, for example `Transfer` that calls `Withdraw`, is
+  not checked on its return. Thus a method can pass through a temporarily broken state. This is
+  the rule of Eiffel.
+
+```go
+type Account struct { Balance int }
+    invariant Balance >= 0
+
+a := Account{Balance: -5}   // checked here
+a.Balance = -1              // compile error: write outside a method
+
+func (a *Account) Transfer(to *Account, x int) {
+    a.Withdraw(x)           // nested call: no check on its return
+    to.Deposit(x)
+}                           // checked here
+```
 
 How the compiler checks contracts:
 
