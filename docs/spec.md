@@ -44,7 +44,7 @@ use the same terms.
 | **Gateway** | The one leaf in a container that talks to a given external system. |
 | **External system** | Software outside the system, such as Stripe. Declared with `external`. |
 | **Person** | A human who uses the system. Declared with `person`. For diagrams. |
-| **Port** | An interface with contracts on the boundary of a node. The node that provides it or requires it declares it. |
+| **Port** | An interface with contracts on the boundary of a node. The node that provides it or requires it declares it. Inside a container, a port call is an ordinary function call. |
 | **Topic** | A publish channel, `topic<T>`, for asynchronous events between containers. |
 | **Remote port** | A port that crosses containers. A remote method port is a synchronous call; a remote topic is an event. |
 | **Publisher / subscriber** | The leaf that publishes on an `out` topic / the leaf that handles an `in` topic. |
@@ -226,6 +226,15 @@ the parent that wires the two nodes together knows both of them.
 calls it like a Go package: `Checkout.Pay(c, amt)`. The wiring binds the name at startup, and the
 binding cannot change after that. A test binds fakes to the same names (§9). A leaf appears once in
 the tree; reuse of code goes through libraries (§5.4a).
+
+**A port call is an ordinary function call.** Keel does not invent a new way for components to
+communicate. Inside one container, a port call runs on the caller's own task, usually the same
+thread, with no queue, no copy to bytes, and no hidden goroutine. Arguments pass by value or by
+reference, exactly as in Go. Because the wiring is fixed at compile time, the compiler can compile
+each port call to a direct call. What Keel adds at the boundary is **enforcement and
+instrumentation of the contract**: the port signature, its `requires` and `ensures`, and the
+record of the boundary in diagrams and in the audit. Topics and transports (§5.5) exist only for
+separate processes.
 
 ```go
 // In Billing (provider): what Billing offers.
