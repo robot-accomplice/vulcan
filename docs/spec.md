@@ -81,6 +81,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `max` bounds on variable-size fields of topic messages | The compiler calculates the memory limit of each queue (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
+| Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
 | Generics use `<T Bound>`, not `[T Bound]` | Familiar from the C family. An unbounded parameter needs no `any` (§6.1) |
@@ -288,11 +289,27 @@ Rules:
 
 1. A library has **no ports, no topics, and no mutable package-level state**. It is only code. It
    cannot hold state, so it cannot couple the leaves that import it.
-2. A library can import other libraries. It cannot import leaves or composites. Library imports
+2. **A library enables I/O. It does not decide on I/O.** A library can read, write, query, or
+   send through a handle that its caller gives it. A library cannot *acquire* a handle: it cannot
+   open a file, dial the network, open a database, or create a client. A call from a library to an
+   acquiring function (§5.4c) is a compile error. Thus each I/O decision is in a leaf, where the
+   diagram and the reviewer see it.
+
+   ```go
+   // lib/csvutil: allowed. The caller chose the file.
+   func Parse(r Reader) ([]Row, error)
+
+   // lib/orderlogic: compile error. The library chose to open a database.
+   func Reprice(id OrderID) error {
+       db := sql.Open(config.DSN)?
+       ...
+   }
+   ```
+3. A library can import other libraries. It cannot import leaves or composites. Library imports
    have no cycles and obey `layers`.
-3. A leaf can import a library in the same layer or a lower layer.
-4. The leaf size budget (rule 11) also applies to libraries.
-5. `keel diagram` shows libraries as shared dependencies. `keel audit` lists the leaves that use
+4. A leaf can import a library in the same layer or a lower layer.
+5. The leaf size budget (rule 11) also applies to libraries.
+6. `keel diagram` shows libraries as shared dependencies. `keel audit` lists the leaves that use
    each library.
 
 Libraries compile before the leaves that import them. Leaves compile against the library
@@ -369,7 +386,11 @@ foreign library StripeClient {
    enforced through Go dependencies too.
 3. The Keel side of a foreign library has no mutable package-level state, the same as any library
    (§5.4a).
-4. Go code inside the boundary can break Keel guarantees. It can start unsupervised goroutines, use
+4. A foreign library marks each function that acquires an I/O handle with `acquires`, for example
+   `acquires func Open(path string) (File, error)`. Only leaves can call an acquiring function
+   (§5.4a, rule 2). The standard library ships with these marks. `keel audit` lists each
+   acquiring function, so that a reviewer can check the marks of third-party foreign libraries.
+5. Go code inside the boundary can break Keel guarantees. It can start unsupervised goroutines, use
    locks that do not become poisoned, and hold global state. `keel audit` lists each foreign
    library and these limits, so that a reviewer can see where the guarantees stop.
 
