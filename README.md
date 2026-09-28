@@ -1,12 +1,16 @@
 # Keel
 
-*Working name, to be replaced.*
+*Working name. It will change.*
 
-A compiled, garbage-collected language for software that humans and LLMs build together.
-Go-shaped syntax; architecture (C4 systems, containers, components, ports) as compiler-enforced
-language constructs; contracts, error handling and null safety that are explicit and auditable;
-tooling that teaches the model how to use it.
+Keel is a compiled, garbage-collected language. Humans and LLMs use it to build software together.
+
+- The syntax is close to Go.
+- Architecture is part of the language: C4 systems, containers, components, and ports. The compiler
+  enforces it.
+- Contracts, error handling, and null safety are explicit, and reviewers can audit them.
+- The tools teach the model how to use the language.
 
 **Status:** specification draft. Nothing is implemented.
 
-- [Specification](docs/spec.md): design, the research behind it (§3, Appendix A), and open questions (§14).
+- [Specification](docs/spec.md): the design, the research behind it (§3 and Appendix A), and the
+  open questions (§14).
