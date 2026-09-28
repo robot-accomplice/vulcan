@@ -957,8 +957,23 @@ How reviewers audit contracts:
 
 In addition to type checks, the compiler reports these problems as diagnostics with fix-its:
 
-- **Near-duplicate code** in the project (R2). The diagnostic points to the existing function to
-  reuse.
+- **Near-duplicate code** in the project (R2). The fix depends on where the duplicates are:
+  - Inside one leaf: the diagnostic points to the existing function to reuse.
+  - In different leaves: a leaf cannot call another leaf's function (§5.4, rule 1). So the fix-it
+    is **extract to library**. The compiler moves the function, and the private types that it
+    needs, into a new or existing library, and updates both leaves to import it.
+  - If the move is impossible, the diagnostic says why. For example, the function calls an
+    `acquires` function (§5.4a, rule 2) or uses a port. The hint then suggests how to extract only
+    the pure part.
+
+  ```
+  warning K0412: validateAddress in Orders and Shipping are 94% similar
+    fix-it: extract to lib/address (moves validateAddress, type Address)
+
+  warning K0412: syncStock in Api and Worker are 91% similar
+    cannot extract: syncStock calls acquires func sql.Open
+    hint: extract the pure part (diffStock) to a library
+  ```
 - **Error masking** patterns (R3).
 - **Architecture violations** (§5.4). The diagnostic gives the exact dependency edge that broke the
   rule.
