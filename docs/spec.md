@@ -934,6 +934,24 @@ null-pointer failure cannot occur.
   send(u.Email)              // u is User here: the check above proved it
   ```
 
+- **Only a stable local narrows.** Narrowing applies to a local variable that no code assigns
+  between the check and the use, and that no closure or task captures. A field, a pointer target,
+  or shared data does not narrow, because a call or another task can change it. The fix-it copies
+  the value into a local first:
+
+  ```go
+  if s.user != none {
+      notify()
+      send(s.user.Email)       // compile error: a field does not narrow
+  }
+  // fix-it:
+  u := s.user
+  if u != none {
+      notify()
+      send(u.Email)            // u is User here
+  }
+  ```
+
 - `x ?? fallback` gives an explicit default. Keel permits it, because the code states the default
   where it is used. But `keel audit` lists each `??`, the same as `ignore`.
 - An API that "might not find" a value returns `?T`. Examples: a map lookup, `Find`, a search, and
@@ -947,12 +965,16 @@ null-pointer failure cannot occur.
 The compiler tries to prove that each index `xs[i]` is in range. A proof comes from one of these:
 
 - the loop: `for i := range xs`
-- an earlier check, narrowed by control flow: `if i < len(xs) { ... xs[i] ... }`
-- a contract: `requires i < len(xs)`
+- an earlier check of both bounds, narrowed by control flow:
+  `if 0 <= i && i < len(xs) { ... xs[i] ... }`
+- a contract: `requires 0 <= i && i < len(xs)`
+
+A proof needs both bounds, because `int` is signed. Narrowing follows the stable-local rule of §7a:
+`i` and `xs` must be stable locals between the check and the use.
 
 | Outcome | Result |
 |---|---|
-| The index is proved in range | The compiler emits no runtime check. |
+| The index is proved in range | No Keel runtime check. On the LLVM backend, the check is removed. On the Go backend, Go still emits its own check; the proof gives the compile-time guarantee only. |
 | The index is proved out of range | Compile error. |
 | The compiler cannot decide | **Warning.** The hint shows the three proof patterns above and `xs.At(i)`, which returns `?T`. The runtime checks the index, and `keel audit` lists it. |
 | The index is out of range at runtime | Abort, as in Go. Only a supervising parent task observes it (§7.1). |
