@@ -13,6 +13,20 @@ model cannot see the architecture. It invents APIs, it duplicates code instead o
 masks errors. The human cannot review what the model wrote. Keel puts that structure in the
 language. Then the compiler can see the structure, enforce it, draw it, and teach it.
 
+### 1.1 Premise
+
+The author presupposes that, in AI-augmented development, a developer spends most of the time on
+three tasks:
+
+1. The developer tells the model the requirements.
+2. The developer reads the code that the model produced.
+3. The developer validates the model's interpretation and implementation of the requirements, and
+   corrects them.
+
+In all three tasks, predictable structure, architectural legibility, and compiler guard rails help.
+They make tasks 2 and 3 shorter, so that the developer can spend more time on task 1 and do it
+faster. Each design decision in this spec serves that goal.
+
 ## 2. Design principles
 
 | Principle | Meaning in Keel |
