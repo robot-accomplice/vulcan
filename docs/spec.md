@@ -1258,6 +1258,12 @@ editors and agents.
 - The concurrency model follows Go (tasks like goroutines, and channels), unless a later decision
   changes it.
 
+- **Build output is the developer's decision.** A system with one container compiles to one binary.
+  For a system with more than one container, the project config chooses the output. The compiler
+  supports both forms:
+  - one binary for the system, with one mode for each container (`shop api`, `shop worker`)
+  - one binary for each container (`shop-api`, `shop-worker`)
+
 ### 12.1 Compiler implementation
 
 - **The compiler is written in Go, and later self-hosted in Keel.** The semantics of Keel are close
