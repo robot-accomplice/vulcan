@@ -257,10 +257,12 @@ no declaration shows, such as a person who uses a container.
    requires a higher layer.
 9. **No cycles.** At each level, the dependency graph of the siblings has no cycles.
 10. **Private types.** A type is private to its leaf, unless the type is in a port signature.
-11. **Leaf size budget (warning).** Each project sets one `context_budget` value in its config. If
-    the `keel context` output of a leaf is larger than this budget, the compiler gives a warning.
-    The hint in the warning tells where to split the leaf. Thus each unit stays small enough for a
-    model to hold completely.
+11. **Leaf size budget.** The budget measures what a model reads to work on a leaf: all non-test
+    source of the leaf plus its `keel context` output, in tokens. Each project sets one
+    `context_budget` value in its config. A leaf over the budget is a compile error. The hint tells
+    where to split the leaf. A leaf can raise its own limit with a reason:
+    `budget 12k, "generated parser tables"`. `keel audit` lists each override. Thus each unit stays
+    small enough for a model to hold completely.
 
 ### 5.4a Libraries
 
