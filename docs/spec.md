@@ -472,6 +472,24 @@ how many subscribers there are, or when they read.
 - **No request/response.** A reply would bind the publisher to a subscriber. If a publisher must
   know the result, it subscribes to a separate event that the other side publishes. `Shipped` in
   the example above is such an event.
+- **To read data that another container owns, keep a read model.** The owner publishes change
+  events. The reader subscribes, keeps a local copy, and answers queries from that copy. This is
+  "event-carried state transfer". Reads can be slightly stale, and each reader stores its own copy.
+
+  ```go
+  // Worker owns stock and publishes each change.
+  StockChanged.Publish(StockChanged{SKU: s, Qty: q})
+
+  // Api keeps a read model, and answers GET /stock/42 from it.
+  idempotent handle StockChanged(m StockChanged) error {
+      stock.Set(m.SKU, m.Qty)
+      return ok
+  }
+  ```
+
+  A leaf cannot call another container over the network, because only gateways can import network
+  libraries (§5.4b, §5.4c). `keel audit` lists each `external` system with its gateway, so a
+  reviewer can find an `external` that is really a container of the same system.
 - **Ownership.** Each side owns only its end of each topic. Only message values cross, as copies.
   The two sides share no memory and no references.
 - **`remote` is necessary to cross.** The compiler rejects a wire across containers if the consumer
