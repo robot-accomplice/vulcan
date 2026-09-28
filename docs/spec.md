@@ -74,7 +74,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
-| `topic<T>` publish channels between containers | A publish never blocks and has zero or more subscribers. A `chan` is different (§5.5) |
+| `topic<T>` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
 | `remote port`, `idempotent` handlers, `via` wiring | Honest communication between containers (§5.5) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
@@ -337,7 +337,7 @@ A topic has its own type, `topic<T>`. It is not a Go `chan T`, because the two b
 
 - A send on a Go channel blocks until a subscriber takes the value. Each value has exactly one
   subscriber.
-- A publish on a topic never blocks. Each message has zero, one, or many subscribers.
+- A publish on a topic never waits for a subscriber. It waits only when its own outbox is full (§5.5.1). Each message has zero, one, or many subscribers.
 
 One keyword with two behaviors would mislead humans and models trained on Go (R8). A Go `chan`
 keeps its Go behavior for concurrency inside one process.
@@ -357,10 +357,14 @@ Api { Fulfilment: Worker.Intake via queue }
 The publisher does not know, and must not care, if a subscriber reads its messages. It does not know
 how many subscribers there are, or when they read.
 
-- **Publish, never wait.** A publish on a remote topic never blocks. Subscribers and the network
-  cannot make it fail. The publish gives the message to a local outbox, and the runtime delivers the
-  message from the outbox. Compare a Go channel: an unbuffered send blocks until a subscriber takes
-  the value.
+- **Publish, never wait for a subscriber.** A publish gives the message to a local outbox and
+  returns. The runtime delivers the message from the outbox. Subscribers and the network cannot
+  make a publish fail. Compare a Go channel: an unbuffered send blocks until a subscriber takes the
+  value.
+- **The only wait is a full outbox.** Under the default `block` policy (§5.5.1), a publish waits
+  when its own outbox is full. A full outbox means overload. The runtime reports the depth and the
+  time until full before that point. The publisher still knows nothing about its subscribers: it is
+  coupled to them in time only, and only under overload.
 - **Zero, one, or many subscribers.** The parent can wire a topic to any number of subscribers,
   including zero. A change to the subscribers never changes the publisher.
 - **No request/response.** A reply would bind the publisher to a subscriber. If a publisher must
