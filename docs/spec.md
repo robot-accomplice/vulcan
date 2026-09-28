@@ -435,8 +435,10 @@ how many subscribers there are, or when they read.
 - **`remote` is necessary to cross.** The compiler rejects a wire across containers if the consumer
   did not declare the port `remote`.
 - **Contracts** on message types (struct `invariant`s) are checked when a message is published and
-  again when it is received. Message types must be serializable. They cannot contain functions,
-  topics, or pointers into the memory of the publisher.
+  again when it is received. If a received message fails its invariant, the runtime sends it to
+  the dead-letter topic with the report; the subscriber does not abort. Message types must be
+  serializable. They cannot contain functions, topics, or pointers into the memory of the
+  publisher.
 - **Dead letters must have a route and a size.** A message that uses all its retries goes to the
   dead-letter topic of its subscription. The wire of each subscriber must give the dead-letter
   topic a route and a size:
@@ -524,6 +526,39 @@ must state which, so that no runtime queue can grow in memory without a limit.
   depth, the highest depth so far, and an estimate of the time until the queue is full.
   `keel audit` lists the capacity, the policy, and the `ttl` of each topic. Thus a reviewer can see
   the memory limit of the whole system in one location.
+
+#### 5.5.2 Message evolution
+
+Containers do not deploy at the same moment. Thus two builds of one system run together, and their
+message types can differ. The holistic check (§12.2) sees only one build. So the compiler also
+compares each message type with the version that is already deployed.
+
+- **The compiler owns the wire format.** It serializes each message in a binary format. Each field
+  has a number, and the wire carries the number, not the name. A field number is never used again.
+- **A lock file records each message schema.** `topics.lock`, in the system directory, lists each
+  topic message type with its field numbers, field types, and invariants. The compiler generates
+  the file, and the project commits it.
+- **`keel check` compares the current types with the lock.** A compatible change passes, and the
+  compiler updates the lock. A breaking change is a compile error.
+
+| Change | Result |
+|---|---|
+| Add a field of type `?T` | Compatible. A message from an older publisher has `none` in the field. |
+| Remove a field of type `?T` | Compatible. An older subscriber reads `none`. |
+| Rename a field | Compatible. The wire carries the number, not the name. |
+| Relax an invariant | Compatible. |
+| Add a required field (not `?T`) | Breaking. |
+| Remove a required field | Breaking. |
+| Change the type of a field | Breaking. |
+| Tighten an invariant | Breaking. |
+
+- **A breaking change needs a new message type.** For example, `OrderPlacedV2`. During the
+  migration, the publisher publishes both types. When no subscriber reads the old type, the
+  project removes it.
+- **A subscriber ignores unknown fields.** Thus an older subscriber can read a message from a
+  newer publisher.
+- **Any deploy order works.** Because each change in the lock is compatible in both directions,
+  the containers can deploy in any order.
 
 ### 5.6 Diagrams
 
