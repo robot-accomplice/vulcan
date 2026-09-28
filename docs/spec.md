@@ -47,7 +47,7 @@ Deviations must be justified in this spec and listed here:
 
 | Deviation from Go | Why |
 |---|---|
-| `system`, `container`, `group`, `component`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
+| `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
 | Unhandled errors are compile errors; postfix `?` propagation | R3 (§7) |
 | No `nil`/`null` value; optional types `?T` with flow narrowing | No null dereferences, ever (§7a) |
 | No exceptions of any kind; no `try`/`catch`/`throw`/`recover()` | Errors are values; aborts are handled only by supervising tasks (§7, §7.1) |
@@ -90,13 +90,15 @@ system Shop                         C4 System    — plus the people and externa
 | `container` | groups and components | no |
 | `group` | groups and components | no |
 | `component` | source files and tests | yes — and no child nodes |
+| `library` | shared types and reusable code | yes — but no ports, topics, or mutable state (§5.4a) |
 
 ### 5.2 Layout
 
 The directory tree mirrors the architecture tree. Each node is a directory holding exactly one
-declaration file named for its kind: `system.keel`, `container.keel`, `group.keel`, or
-`component.keel`. A composite directory contains no source files; a leaf directory contains no child
-nodes. There is one place to look for everything.
+declaration file named for its kind: `system.keel`, `container.keel`, `group.keel`,
+`component.keel`, or `library.keel`. A composite directory contains no source files; a leaf or
+library directory contains no child nodes. Libraries live under the system's `lib/` directory.
+There is one place to look for everything.
 
 ### 5.3 Declarations
 
@@ -200,7 +202,7 @@ relationship so it appears in diagrams.
 ### 5.4 Rules the compiler enforces
 
 1. **Ports only.** Code in a leaf may use another node **only** through a port listed in its
-   `requires`. Any other cross-node reference is a compile error.
+   `requires`, or by importing a library (§5.4a). Any other cross-node reference is a compile error.
 2. **Code only in leaves.** Composites hold no source files; leaves hold no child nodes.
 3. **Encapsulation at every level.** Outside its parent, a node does not exist. A composite exposes
    only the ports it publishes with `provides X from Child`.
@@ -217,6 +219,39 @@ relationship so it appears in diagrams.
 11. **Leaf size budget (warning).** A leaf whose `keel context` output exceeds the project's
    `context_budget` (one value in project config) gets a warning whose hint suggests where to split
    it. This keeps every unit small enough for a model to hold whole.
+
+### 5.4a Libraries
+
+Types shared across a wire — `Money` in a port signature on both sides — must be the *same* type,
+so they cannot belong to either leaf. They live in a **library**: a node that holds shared types
+and reusable code but takes no part in the running architecture.
+
+```go
+// lib/money/library.keel
+// Money represents amounts in minor currency units.
+library Money {
+    layer domain
+}
+```
+
+```go
+// api/billing/billing.keel
+import "lib/money"
+```
+
+Rules:
+
+1. A library has **no ports, no topics, and no mutable package-level state**. It is code, not a
+   participant: it cannot hold state that couples the leaves that import it.
+2. A library may import other libraries, never components or composites. Library imports are
+   acyclic and respect `layers`.
+3. Any leaf may import a library in the same or a lower layer.
+4. The leaf size budget (rule 11) applies to libraries too.
+5. `keel diagram` shows libraries as shared dependencies, and `keel audit` lists which leaves use
+   each one.
+
+Libraries compile before the leaves that import them, and leaves compile against library
+declarations only (§12.2).
 
 ### 5.5 Crossing containers
 
@@ -578,6 +613,7 @@ Tooling assumes one of its users is an LLM (R8):
 | `keel doc` / `keel diagram` | Docs and C4 diagrams at every level — context, container, component, code — generated from source (§5.6). |
 | `keel audit` / `keel archdiff` | Contract and architecture audit (§8, §10). |
 | `keel fmt` | The one formatter. |
+| `keel check` / `keel build` | Holistic boundary check; parallel per-component build (§12.2). |
 
 All commands have `--json` output. An LSP server and an MCP server expose the same capabilities to
 editors and agents.
@@ -605,6 +641,40 @@ editors and agents.
   X", "ports of node Y", "context pack for Z") rather than a batch pipeline, so the LSP and the
   tooling in §11 answer after each edit by recomputing only what changed. Go has no equivalent of
   Rust's `salsa`, so this engine is built in-house.
+
+### 12.2 Compilation modes
+
+Compilation has two separate modes that run in parallel with each other.
+
+| | **Holistic check** (`keel check`) | **Per-component build** (`keel build`) |
+|---|---|---|
+| Purpose | Enforce boundaries; find errors that need global context | Compile code fast |
+| Input | Every declaration file, every port, every signature; bodies only for global analyses | One leaf directory plus the port declarations it owns |
+| Finds | All of §5.4 (ports-only, wiring, layers, cycles, port compatibility), topic rules (§5.5–5.5.1), near-duplicate code across leaves (§10), architecture diffs, the project-wide audit | Type, error-handling, null, bounds, overflow, and contract errors inside the leaf |
+| Parallelism | One pass over the whole tree | One job per leaf, all leaves in parallel |
+
+- **Why per-leaf compilation is possible.** A leaf declares every port it requires (§5.3), so it
+  compiles against its own declarations — never against another leaf's code. A change inside one
+  leaf rebuilds that leaf only.
+- **Both must pass before linking.** A binary is produced only when the holistic check passes and
+  every leaf has compiled. Neither mode trusts the other's results implicitly.
+- **Both run on every build.** `keel build` starts the holistic check alongside the per-leaf jobs;
+  the holistic check reads mostly declarations, so it is fast and rarely the slowest job.
+- **Caching.** Each leaf's result is cached, keyed by a hash of its directory contents and the
+  declarations it depends on. The holistic check is incremental through the query engine (§12.1).
+
+**Why this is feasible.** Go already compiles packages in parallel against dependencies' export
+data (declarations only). Keel removes the usual obstacles by design:
+
+- Consumer-owned ports (§5.3): a leaf compiles against its own declarations, not providers' code.
+- Body-only inference (§6): no type is inferred from another leaf's call sites.
+- The leaf size budget (§5.4 rule 11) bounds the largest job, and so the critical path.
+- Global body analyses use per-leaf output: each leaf job emits normalized function fingerprints,
+  and the holistic check compares fingerprints for near-duplicates without re-reading bodies.
+
+On the Go backend each leaf becomes one Go package and the generated wiring becomes `main`, so Go's
+toolchain adds its own parallelism. Shared types live in libraries (§5.4a), which compile first;
+leaves then compile in parallel against library declarations.
 
 ## 13. Non-goals (for now)
 
