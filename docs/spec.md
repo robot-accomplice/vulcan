@@ -72,7 +72,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
 | A lock that an aborting task holds becomes poisoned. `Lock()` returns an error. | Go has no poisoning (§7.1) |
 | Values that `go` shares must be copies, channels, constants, or `guarded by` a mutex | Prevents data races such as concurrent map writes (§7.1) |
-| `go f()` returns a task handle. Its exit carries the result: `Completed`, `Failed`, or `Aborted`. Discarding the handle of an error-returning task needs `ignore`. | Supervision, and no silent task errors (§7.1) |
+| `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. A task exit is `Completed`, `Failed`, or `Aborted`. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
@@ -799,45 +799,59 @@ The code **must handle each error explicitly**:
 ### 7.1 Supervision
 
 Recovery occurs only at **task boundaries**. This is the "let it crash" model of Erlang, in Go
-syntax.
+syntax. Keel adds **structured concurrency**: each task has an owner in the source, so each abort
+has a destination that the compiler knows.
 
-- The runtime discards the state of an aborted task. The **parent** of the task, which is the task
-  that started it, receives the abort as an ordinary value. The parent then decides the next step:
-  restart the task, fail the request, or report the abort.
-- When a task starts, it returns a handle. The exit of the task is a sum type, typed from the
-  result of the function: `Completed` (with the value, if any), `Failed` (with the error, if the
-  function returns one), or `Aborted` (with the report). The parent uses a `switch` on it:
+- **A task starts inside a `tasks { }` scope.** A `go` statement outside a scope is a compile
+  error. At the end of the scope, the function waits for all the tasks that started in it. A
+  handle cannot leave its scope.
+- The runtime discards the state of an aborted task. Its exit goes to the scope that owns it.
+- The exit of a task is a sum type, typed from the result of the function: `Completed` (with the
+  value, if any), `Failed` (with the error, if the function returns one), or `Aborted` (with the
+  report). Code in the scope can observe an exit with a `switch`:
 
   ```go
-  t := go serve(req)
-  switch exit := <-t.Exit {
-  case Completed:
-      ...
-  case Failed:
-      log.Error(exit.Err)
-  case Aborted:
-      log.Report(exit.Report)   // the diagnostic: which invariant, where, with what values
-      respond(req, Unavailable)
+  tasks {
+      t := go price(order)
+      switch exit := <-t.Exit {
+      case Completed:
+          ...
+      case Failed:
+          log.Error(exit.Err)
+      case Aborted:
+          log.Report(exit.Report)   // the diagnostic: which invariant, where, with what values
+      }
   }
   ```
 
-- **A task's error cannot be discarded silently.** If the function returns an error, discarding
-  its handle is a compile error, the same as discarding an error (§7). To discard on purpose,
-  write `ignore go f(), "reason"`, which `keel audit` lists. A function with no error result can
-  start with `go f()` and no handle.
+- **No error and no abort is silent.** At the end of the scope, the compiler and the runtime
+  handle each exit that the code did not observe:
+  - An unobserved `Failed` exit becomes the error of the scope. A `tasks { }` scope that can
+    produce an error is an expression of type `error`, and the code must handle it like any error
+    (§7), for example with `tasks { ... }?`.
+  - An unobserved `Aborted` exit aborts the function that contains the scope, at the end of the
+    scope. Its own owner then receives it. The rule is deterministic: it does not depend on the GC.
 
   ```go
-  go saveOrder(o)                        // compile error: the error result is discarded
-  ignore go warmCache(), "best effort"   // allowed, and audited
-  go tick()                              // allowed: tick returns nothing
+  func handleBatch(items []Item) error {
+      tasks {
+          for _, it := range items {
+              go process(it)            // process returns error
+          }
+      }?                                // waits here; the first Failed error returns
+      return ok
+  }
   ```
 
-- **No abort is silent.** Sometimes a parent does not observe the exit of a child, for example
-  after `go f()` discards the handle. Then an abort of the child goes to the parent, then to the
-  parent of the parent, and up to `main`. At `main`, the process stops with the report.
-  Supervision is optional. A loud stop is the default.
-- The runtime records each abort report as an RCA trail: the task, the parent, the invariant, the
-  source position, and the values.
+- **To ignore an error on purpose**, write `ignore go f(), "reason"`. `keel audit` lists it.
+- **A long-lived background task** uses `detach f(), "reason"` in place of a scope. The process
+  supervisor owns it. An abort of a detached task stops the process with the report. `keel audit`
+  lists each `detach`.
+- **Implicit scopes.** The body of `main`, each topic handler (§5.5.0), and each request at an
+  entry point (Q21) run in their own scope. For a request, an abort ends that request with an error
+  response and a report. The process keeps running. Thus one bad request cannot stop a server.
+- The runtime records each abort report as an RCA trail: the task, the owning scope, the
+  invariant, the source position, and the values.
 
 **Poisoned locks.** Tasks share memory, as in Go. An abort during an update can leave shared data
 half-changed after the state of the task is gone. Keel does what Rust does:
