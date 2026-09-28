@@ -71,7 +71,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
 | A lock that an aborting task holds becomes poisoned. `Lock()` returns an error. | Go has no poisoning (§7.1) |
-| `go f()` returns a task handle. The parent can observe the task's exit. | Supervision (§7.1) |
+| `go f()` returns a task handle. Its exit carries the result: `Completed`, `Failed`, or `Aborted`. Discarding the handle of an error-returning task needs `ignore`. | Supervision, and no silent task errors (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
@@ -803,18 +803,32 @@ syntax.
 - The runtime discards the state of an aborted task. The **parent** of the task, which is the task
   that started it, receives the abort as an ordinary value. The parent then decides the next step:
   restart the task, fail the request, or report the abort.
-- When a task starts, it returns a handle. The exit of the task is a sum type. The parent uses a
-  `switch` on it:
+- When a task starts, it returns a handle. The exit of the task is a sum type, typed from the
+  result of the function: `Completed` (with the value, if any), `Failed` (with the error, if the
+  function returns one), or `Aborted` (with the report). The parent uses a `switch` on it:
 
   ```go
-  t := go handle(req)
+  t := go serve(req)
   switch exit := <-t.Exit {
   case Completed:
       ...
+  case Failed:
+      log.Error(exit.Err)
   case Aborted:
       log.Report(exit.Report)   // the diagnostic: which invariant, where, with what values
       respond(req, Unavailable)
   }
+  ```
+
+- **A task's error cannot be discarded silently.** If the function returns an error, discarding
+  its handle is a compile error, the same as discarding an error (§7). To discard on purpose,
+  write `ignore go f(), "reason"`, which `keel audit` lists. A function with no error result can
+  start with `go f()` and no handle.
+
+  ```go
+  go saveOrder(o)                        // compile error: the error result is discarded
+  ignore go warmCache(), "best effort"   // allowed, and audited
+  go tick()                              // allowed: tick returns nothing
   ```
 
 - **No abort is silent.** Sometimes a parent does not observe the exit of a child, for example
