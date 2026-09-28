@@ -87,10 +87,41 @@ sight. This spec must justify each change from Go and list it in this table:
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
 | Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
 | Generics use `<T Bound>`, not `[T Bound]` | Familiar from the C family. An unbounded parameter needs no `any` (§6.1) |
+| Declaration files (`system.keel`, `component.keel`, and so on) have their own syntax: `provides X from Y`, `parent.X`, `uses A -> B`, `layers a < b`, `via`, `flag("...")`, wire options (`capacity`, `whenFull`, `ttl`, `deadletters`, `deadletterCapacity`), `outbox` lines, method renames (`{ Pay = Charge }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
+| Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
+| `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
+| Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert<T>` | Explicit handling of bounds and overflow (§7b, §7c) |
+| A narrowing conversion (`int32(x)`) aborts when the value does not fit | Go truncates without a signal (§7c) |
+| A single-value map read `m[k]` is `?V`. `m[k]++`, `m[k] += x`, and `v, ok := m[k]` work as in Go when `V` has a zero value | A missing key is never a silent zero (§7a) |
+| A private function can omit parameter and result types when the body alone determines them | Less noise, with no inference across call sites (§6) |
+| `mu.LockForRepair()` and `mu.ClearPoison()` | Repair of poisoned data under the lock (§7.1) |
+| Test files are `*_test.keel` in the leaf directory | Tests next to the code (§9) |
 
 All other syntax follows Go, unless a later section says otherwise. This includes `:=`, `func`,
 structs, methods with receivers, `for`, `switch`, slices, maps, `defer`, packages as directories,
 and gofmt-style formatting.
+
+### 4.1 Keywords
+
+Each reserved word breaks Go code that uses it as a name, and models write that code (R8). Thus
+Keel reserves few words.
+
+- **Reserved everywhere:** `none`, `handle`, `pure`, `tasks`, `detach`, `ignore`, `unreachable`.
+- **Contextual:** all other new words. They are keywords only where they start a declaration, or
+  inside a declaration file or a contract. Elsewhere they are ordinary identifiers. This applies to
+  `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
+  `layers`, `provides`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in`, `out`, `topic`,
+  `test`, `fake`, `result`, `old`, `all`, `some`, `max`, `guarded`, `acquires`, `idempotent`,
+  `gateway`, `client`, `budget`, and `outbox`.
+
+```go
+port := 8080                   // an identifier
+func read(in io.Reader)        // an identifier
+
+port Payments { ... }          // a keyword: it starts a declaration
+```
+
+`keel guide` prints both lists.
 
 ## 5. Architecture model
 
@@ -1029,7 +1060,7 @@ that rule, Keel permits three tiers:
 |---|---|---|
 | 1 | Comparisons, arithmetic, `&&` `\|\|` `!`, `=>` (implies), field access, `len`, `result`, `old(x)` (the value on entry) | `ensures err == none => acct.Balance == old(acct.Balance) - amt` |
 | 2 | Calls to functions marked `pure`. The compiler verifies that these functions have no effects. | `requires IsSorted(a) && IsSorted(b)` |
-| 3 | Quantifiers over collections: `all x in xs: …` and `any x in xs: …` | `requires all x in xs: !IsNaN(x)` |
+| 3 | Quantifiers over collections: `all x in xs: …` and `some x in xs: …` | `requires all x in xs: !IsNaN(x)` |
 
 ```go
 pure func IsSorted<T Ordered>(xs []T) bool { ... }
