@@ -148,7 +148,7 @@ Keel reserves few words.
   `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in` (in quantifiers only), `publishes`,
   `subscribes`, `topic`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `limit`, `guarded`, `handle`, `pure`, `tasks`, `detach`,
-  `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `publishes`, `subscribes`, `acquires`, `idempotent`,
+  `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `secret`, `publishes`, `subscribes`, `acquires`, `idempotent`,
   `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, `wire`, and
   `flag`.
 
