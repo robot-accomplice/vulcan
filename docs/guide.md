@@ -21,7 +21,8 @@ transports/kafka/           a transport
   at startup, and it never acquires a resource (`os.Open`, `sql.Open`, a client): only leaves do.
 - Every code file is a Go file: `package orders`, imports, code. Import a library by its Go path
   (`import "shop/lib/money"`) and use its package name (`money.Money`).
-- Go packages are imported as in Go. A package that depends on `net` or `os/exec` can be imported
+- Go packages are imported as in Go. A package that depends on `net`, `os/exec`, or `database/sql`
+  can be imported
   only by a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf (`entry for Customer`).
 - `main` is generated. A leaf's code runs only from a handler, a port that it provides, an entry
   leaf's server, or `startup func(ctx context.Context) error`. A container with no subscription,
@@ -118,7 +119,7 @@ idempotent handle Shipped(m ShipmentSent) error {
 
 ## 5. Tests
 
-Tests are Go tests in `*_test.keel`. A fake is any type that satisfies the port.
+Tests are Go tests in `*_test.keel`. The runtime package is `import "keel.dev/keel"`. A fake is any type that satisfies the port.
 
 ```go
 type CheckoutOK struct{}
