@@ -112,7 +112,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
-| `topic[T]` publish channels between containers | A publish never waits for a subscriber and has zero or more subscribers. A `chan` is different (§5.5) |
+| `topic[T]` publish channels between containers | A publish does not wait for a subscriber to read, and a message has zero or more subscribers. A `chan` is different (§5.5) |
 | `remote port` (synchronous methods with `timeout` and transport errors, or topics), `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.3) |
 | `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `nil` | No forgotten or early acknowledgement (§5.5.0) |
 | `max` bounds on variable-size fields | A transport can require bounded messages, so the compiler can calculate queue memory (§5.5.1) |
@@ -231,6 +231,8 @@ The provider never names its consumers.
 // Payer charges a customer's stored payment method.
 type Payer struct { ... }
 
+func NewPayer() *Payer { return &Payer{} }
+
 func (p *Payer) Pay(customer CustomerID, amount Money) (Receipt, error) { ... }
 ```
 
@@ -270,7 +272,7 @@ system Shop {
     container Api {
         Billing, Orders, LedgerStore, SystemClock, StripeGateway
 
-        Orders.Checkout: Billing.Payer
+        Orders.Checkout: Billing.NewPayer
         Billing.Ledger:  LedgerStore.Store
         Billing.Clock:   SystemClock.Wall
     }
@@ -289,7 +291,9 @@ system Shop {
 ```
 
 The wire names an exported type or an exported constructor with no parameters, for example
-`Billing.NewPayer`. The provider needs no parameters, because it reaches its own dependencies
+`Billing.NewPayer`, which returns `*Payer`. A wire follows Go's method-set rules: `Pay` has a
+pointer receiver, so only `*Payer` satisfies the port, and the wire names a constructor that returns
+one. The provider needs no parameters, because it reaches its own dependencies
 through its own required ports.
 
 **Checks at each wire.**
@@ -514,8 +518,8 @@ A topic has its own type, `topic[T]`. It is not a Go `chan T`, because the two b
 
 - A send on a Go channel blocks until a subscriber takes the value. Each value has exactly one
   subscriber.
-- A publish on a topic never waits for a subscriber. Each message has zero, one, or many
-  subscribers.
+- A publish on a topic does not wait for a subscriber to read the message. Each message has zero,
+  one, or many subscribers.
 
 One keyword with two behaviors would mislead humans and models trained on Go (R8). A Go `chan`
 keeps its Go behavior for concurrency inside one process.
@@ -545,9 +549,11 @@ how many subscribers there are, or when they read.
 
 These rules are part of the language, for every transport:
 
-- **Publish, never wait for a subscriber.** A publish gives the message to the transport and
-  returns. Subscribers cannot make a publish fail. What happens when the transport is full is the
-  policy of the transport.
+- **Publish, do not wait for a reader.** A publish gives the message to the transport and returns.
+  Subscribers cannot make a publish fail. What happens when a queue is full is the policy of the
+  transport. **Under the default `block` policy of `direct`, a publish waits when a subscriber's
+  queue is full, so a slow subscriber can slow the publisher.** A developer who wants the publisher
+  never to wait chooses a drop policy for that wire.
 - **Zero, one, or many subscribers.** `system.keel` wires topics one at a time, from the
   subscriber side. Each `in` topic is wired exactly once, to one `out` topic of the same message type. An
   `out` topic is never wired by itself: its subscribers are the `in` topics wired to it, zero or
