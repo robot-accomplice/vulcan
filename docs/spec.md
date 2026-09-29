@@ -35,7 +35,7 @@ use the same terms.
 | Term | Meaning |
 |---|---|
 | **System** | The whole software product. The root node of the architecture tree. |
-| **Container** | A node that runs as one process. The compiler builds each container into one executable binary. Most systems have one container, so they compile to one binary. (The C4 meaning. It is not a Docker container.) |
+| **Container** | A node that runs as one process. Most systems have one container, so they compile to one binary. For more containers, the project chooses one binary with a mode per container, or one binary per container (§12). (The C4 meaning. It is not a Docker container.) |
 | **Group** | An optional node inside a container that groups leaves, for zoom levels in diagrams. |
 | **Composite** | A system, container, or group. A section of `system.keel`, with no code. |
 | **Leaf** | A `component` node: one flat directory of code. |
@@ -46,17 +46,17 @@ use the same terms.
 | **Person** | A human who uses the system. Declared with `person`. For diagrams. |
 | **Port** | An interface with contracts, declared once by the leaf that requires it. A provider satisfies it with an ordinary type, named at the wire. Inside a container, a port call is an ordinary function call. |
 | **Topic** | A publish channel, `topic[T]`, for asynchronous events between containers. |
-| **Remote port** | A port that crosses containers. A remote method port is a synchronous call; a remote topic is an event. |
+| **Remote port** | A method port that crosses containers, declared `needs remote port`: a synchronous call. Events between containers use topics, which are not ports. |
 | **Publisher / subscriber** | A leaf that declares `publishes X topic[T]` / a leaf that declares `subscribes X topic[T]` and handles it. |
 | **Handler** | The function, marked `handle`, that processes the messages of one subscribed topic. |
 | **Wire** | A line in `system.keel` that connects a required port or a subscribed topic to a provider. |
-| **Transport** | The mechanism that carries topic messages and remote calls between containers, named on a wire with `via`. |
+| **Transport** | A node kind that carries topic messages and remote calls between containers, named on a wire with `via`. With foreign libraries, the only kind of node that can import Go. |
 | **Dead-letter topic** | Where a subscription sends a message that it cannot handle. |
 | **Acknowledge** | Mark a message as handled. It occurs when its handler returns `nil`. |
 | **Task** | A unit of concurrent work, started with `go` inside a `tasks { }` scope. |
 | **Scope** | A `tasks { }` block. It owns the tasks that start in it and waits for them. |
 | **Error** | An ordinary value that reports a failure the code expects and handles. |
-| **Abort** | The stop of a task after a broken invariant: a bug, not an expected failure. It is not an exception. |
+| **Abort** | The stop of a task after a broken invariant (a bug) or an environment failure that the code cannot handle, such as a full disk under a publish. It is not an exception. |
 | **Contract** | A `requires`, `ensures`, or `invariant` clause. |
 | **Layer** | A named level (`domain < app < infra`) that constrains source dependencies. |
 | **Audit** | The `keel audit` report of each escape hatch, override, and unproved claim. |
@@ -66,7 +66,7 @@ use the same terms.
 | Principle | Meaning in Keel |
 |---|---|
 | Compiled, GC | Native binaries and a tracing GC. No manual memory management and no borrow checker. |
-| Go ergonomics | Go is the syntax model. Keel changes Go only where Go is weak, for example generics and error enforcement. |
+| Go ergonomics | Go is the syntax model. Keel changes Go only where Go is weak, for example error enforcement and nil safety. |
 | Competitive performance | Resource use and speed must be competitive with Go, Java, C++, and Rust. §12.3 states the targets and the costs. |
 | Compiler first | If the compiler can check a rule, the compiler checks it. Each rule that depends on convention, review, or runtime is a candidate to move into the compiler. This is the most direct way to make tasks 2 and 3 of §1.1 shorter. |
 | Rust-grade compiler intelligence | Diagnostics explain *why* and propose fixes. The compiler checks exhaustiveness and finds duplication and error masking. |
@@ -85,13 +85,13 @@ each failure. Appendix A lists the sources.
 | # | Observed failure | Keel's answer | Section |
 |---|---|---|---|
 | R1 | Agents get lost in large codebases. Quality drops as the context grows. | Leaves are small, self-contained units with explicit ports. `keel context` emits a minimal context pack. | §5, §11 |
-| R2 | Duplication is up 81%. Reuse (cross-file calls) is down 35%. | The compiler finds near-duplicate code. Ports and wires in one file make the available capabilities easy to find. | §10 |
+| R2 | Duplication is up 81%. Reuse (cross-file calls) is down 35%. | The compiler finds near-duplicate code. Ports in each `component.keel` and all wires in `system.keel` make the available capabilities easy to find. | §10 |
 | R3 | Error-masking constructs are up 47%. | The code must handle each error explicitly. A silent discard is a compile error. | §7 |
 | R4 | Models invent packages (about 20% of the time) and APIs. | The compiler serves an exact symbol index that tools can query. There are no implicit imports. | §11 |
 | R5 | About 94% of compile errors in typed languages are type errors. | Strong static types, and inference that works on incomplete programs, so tools can guide generation by type. | §6 |
 | R6 | AI code is harder to review. It "looks right but isn't". | Contracts in the code that reviewers can audit, and diffs at the architecture level. | §8, §10 |
 | R7 | Developers feel faster than they measure. | Fast verification: incremental builds and per-leaf tests. | §9 |
-| R8 | A new language has no training data, so LLM quality drops steeply. | Syntax close to Go, so the model can use what it knows. A spec small enough for a prompt. Tools that instruct the model. | §4, §11 |
+| R8 | A new language has no training data, so LLM quality drops steeply. | Syntax close to Go, so the model can use what it knows. A primer (`keel guide`) small enough for a prompt; the full spec is reference. Tools that instruct the model. | §4, §11 |
 
 ## 4. Syntax
 
@@ -103,10 +103,10 @@ sight. This spec must justify each change from Go and list it in this table:
 | `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
 | `(T, error)` keeps Go's spelling (`return v, nil`, `return x, err`) but is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. | R3, and the value is never usable on the error path (§7) |
 | `partial` functions return a value and an error together, as in Go | No data lost at Go boundaries such as `io.Reader` (§7) |
-| `nil` and zero values as in Go, but each use that can panic on `nil` (dereference, interface call, map write) needs a compile-time proof. `?T` for optional non-pointer values. | No null dereference can occur (§7a) |
+| `nil` and zero values as in Go, but each use that can panic on `nil` (a dereference, an interface method call, a function-value call, a map write, a channel close) needs a compile-time proof. Parameters and receivers are non-`nil` at entry; `nonnil` marks Go results and fields. `?T` for optional values of any type. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Signed integer overflow aborts; unsigned arithmetic wraps as in Go. `+% -% *%` wrap signed values on purpose. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
-| `guarded by` on struct fields, checked by the compiler | Fewer data races, with no ownership system (§7.1) |
+| `guarded by` on struct fields and `holds` on helpers, checked by the compiler | Fewer data races, with no ownership system (§7.1) |
 | `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. `t := go f()` is an expression that returns a task value; `t.Wait()` returns the sealed exit `Completed`, `Failed`, or `Aborted`. A `sync.Mutex` records its owner task. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
@@ -116,7 +116,10 @@ sight. This spec must justify each change from Go and list it in this table:
 | `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `nil` | No forgotten or early acknowledgement (§5.5.0) |
 | `limit` bounds on variable-size fields | A transport can require bounded messages, so the compiler can calculate queue memory (§5.5.1) |
 | `gateway for` and `entry for` leaves; only they call `acquires network` functions | Enforced network access (§5.4b, §5.4c) |
-| `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
+| `foreign library` and `transport` nodes are the only importers of Go packages; `acquires`, `acquires network`, and `nonnil` marks at the boundary | Keel guarantees hold outside a guarded boundary (§5.4c) |
+| `entry for` leaves serve inbound traffic; `startup` functions; `main` is generated | Architecture as a first-class construct (§5.4b, §7.1) |
+| `secret` types | Redacted in runtime records (§7.1) |
+| Duration and size literals: `200ms`, `24h`, `4KB` | Readable settings and bounds (§5.5.1, §6) |
 | Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
 | `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
@@ -145,12 +148,11 @@ Keel reserves few words.
   declaration file or a contract, or after a field type (`guarded by`, `limit`). Elsewhere they are
   ordinary identifiers. This applies to
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
-  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in` (in quantifiers only), `publishes`,
-  `subscribes`, `topic`,
+  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in` (in quantifiers only), `topic`,
+  `transport`, `nonnil`, `nocancel`, `config`, `startup`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `limit`, `guarded`, `handle`, `pure`, `tasks`, `detach`,
   `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `secret`, `publishes`, `subscribes`, `acquires`, `idempotent`,
-  `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, `wire`, and
-  `flag`.
+  `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, and `flag`.
 
 ```go
 port := 8080                   // an identifier
@@ -196,8 +198,8 @@ has no directory of its own declarations and no code: it is a section of the arc
 - **`system.keel`**, at the root, is the architecture file. It declares the containers and groups,
   the leaves in each, the layers, the people, the external systems, and **every wire**.
 - **Each leaf is a directory** with one `component.keel` and its source files. `component.keel`
-  declares the **boundary** of the leaf: its layer, and the full declaration of each port that it
-  requires.
+  declares the **boundary** of the leaf: its layer, each port that it needs, each topic that it
+  publishes or subscribes to, and its `gateway for`, `entry for`, and `budget` lines.
 - **Directories mirror containers and leaves**: `api/orders/`, `worker/picking/`. Groups are only
   labels in `system.keel`, so they are not directories and not part of any path. The compiler checks
   that the directories and `system.keel` agree.
@@ -278,16 +280,18 @@ system Shop {
     external Stripe   "Card payment processor"
 
     container Api {
-        Billing, Orders, LedgerStore, SystemClock, StripeGateway, Metrics
+        Web, Billing, Orders, LedgerStore, SystemClock, StripeGateway, Metrics
 
         Orders.Checkout: Billing.NewPayer
         Billing.Ledger:  LedgerStore.Store
-        Billing.CardNetwork: StripeGateway.Cards
+        Web.Checkout:    Billing.NewPayer
+        Billing.CardNetwork: StripeGateway.NewCards{ apiKey: flag("stripe-key") }
         Billing.Clock:   SystemClock.Wall
     }
 
     container Worker {
         Alerts                           // subscribes DeadPlaced and DeadShipped (DeadLetter topics)
+        Inventory
         group Fulfilment { Picking, Shipping }
     }
 
@@ -298,9 +302,11 @@ system Shop {
     // Between containers: topics and remote method ports only (§5.5).
     Worker/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
     Api/Orders.Shipped: Worker/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
+    Analytics/Ingest.Placed:  Api/Orders.Placed  via direct{ deadletters: Worker/Alerts.DeadPlaced }
+    Analytics/Ingest.Samples: Api/Metrics.Samples via kafka{ topic: "samples" }
+    Api/Orders.Stock: Worker/Inventory.NewLevels via direct{}
 
-    uses Customer -> Api "places orders over HTTPS"
-    // Api -> Stripe comes from the gateway declaration (§5.4b).
+    // Customer -> Api comes from the entry leaf Web; Api -> Stripe from the gateway (§5.4b).
 }
 ```
 
@@ -311,7 +317,8 @@ returns `*Payer`. A wire follows Go's method-set rules: `Pay` has a pointer rece
 - **Dependencies** come through the provider's own required ports, so a constructor needs no
   parameters for them.
 - **Configuration** comes through one optional settings struct, filled at the wire from literals or
-  startup flags, as for transports: `StripeGateway.NewCards{ apiKey: flag("stripe-key") }`.
+  startup flags, as for transports: `StripeGateway.NewCards{ apiKey: flag("stripe-key") }`, which fills the exported settings struct
+  of `NewCards`.
 - **A constructor can fail.** It can return `(T, error)`. A failure stops the process at startup
   with a report.
 - **One instance for each wired constructor, in each process.** Two wires to the same constructor
@@ -332,13 +339,14 @@ port, and that calls another port. Keel has no special adapter construct.
 
 Keel does not wire external systems with ports. The language does not control them, and they use
 their own protocols. Instead, one **gateway leaf** in each container talks to each external system
-(§5.4b). The compiler draws that relationship in diagrams from the gateway declaration. A `uses`
-line records a relationship that no declaration shows, such as a person who uses a container.
+(§5.4b). The compiler draws each relationship with a person or an external system from the entry
+and gateway declarations. A `uses` line is needed only for a relationship that no declaration
+shows.
 
 ### 5.4 Rules the compiler enforces
 
 1. **Ports only.** Code in a leaf can use another leaf **only** through a port that the leaf
-   requires, or through an imported library (§5.4a). Any other reference to another leaf is a
+   needs, a topic that it publishes or subscribes to, or an imported library (§5.4a). Any other reference to another leaf is a
    compile error.
 2. **Code only in leaves and libraries.** `system.keel` holds no code. A leaf directory holds no
    child leaves.
@@ -346,7 +354,8 @@ line records a relationship that no declaration shows, such as a person who uses
    `needs remote port` (§5.5). A method port inside one container must not be `remote`, and a
    topic cannot connect two leaves of one container (§5.3: calls inside a container are ordinary). A group is only a label for diagrams: it
    adds no boundary.
-4. **Complete wiring.** `system.keel` wires each required port and each subscribed topic of each leaf
+4. **Complete wiring.** A `deadletters:` setting wires a `DeadLetter[T]` topic, and rule 3 does not
+   apply to it. Otherwise, `system.keel` wires each required port and each subscribed topic of each leaf
    exactly once. An published topic is never wired by itself (§5.5).
 5. **Satisfied ports.** Each wire names a providing type whose method set matches the port.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
@@ -370,7 +379,8 @@ line records a relationship that no declaration shows, such as a person who uses
     non-test source, in non-blank, non-comment lines. It does not depend on any other leaf, so a
     change elsewhere can never push a leaf over its budget. `keel context` reports the full context
     size as information. Each project sets one
-    `context_budget` value in its config. A leaf over the budget is a compile error. The hint tells
+    `context_budget` value in the `config { }` section of `system.keel`, the one location for
+    project settings. A leaf over the budget is a compile error. The hint tells
     where to split the leaf. A leaf can raise its own limit with a reason:
     `budget 12k, "generated parser tables"`. `keel audit` lists each override. Thus each unit stays
     small enough for a model to hold completely.
@@ -400,7 +410,9 @@ Rules:
 1. A library has **no ports, no topics, and no mutable package-level state**. It is only code. It
    cannot hold state, so it cannot couple the leaves that import it. The compiler enforces this
    rule as follows:
-   - A library cannot declare a package-level `var`.
+   - A library cannot declare a package-level `var`. A `const` slice or map can only be passed to
+     `pure` functions, which cannot change it. The standard library marks functions such as
+     `errors.New` and `sort.SearchInts` as `pure`.
    - A library can declare a package-level `const` of any type, including arrays, maps, structs,
      and slices. A `const` is **deeply immutable**: the compiler proves that no code can change it,
      or get a mutable reference to it or to any value inside it.
@@ -409,6 +421,7 @@ Rules:
    ```go
    // lib/crc
    const table = buildTable()                       // pure function, runs once
+   const ErrNotFound = errors.New("not found")      // errors.New is pure
    const names = map[Status]string{Paid: "paid"}
 
    var cache = map[string]int{}                     // compile error in a library
@@ -522,11 +535,13 @@ foreign library StripeClient {
 | a value that can be `nil` | the same value; the proof rules of §7a apply, unless the foreign library marks it `nonnil` |
 | a Go `error` | a Keel error |
 | a panic | an abort of the calling task (§7.1) |
+| a Keel function passed to Go as a callback (for example an `http.Handler`) | runs in a wrapper that applies Keel's abort rules before any Go frame sees the panic, so Go code such as `net/http` cannot recover a Keel abort |
+| a pointer to a struct with an invariant, after Go code has used it (for example `json.Unmarshal`) | re-checked against its invariant when it returns to Keel |
 | an integer | an integer; Keel arithmetic on it follows §7c |
 
 **Rules:**
 
-1. Only a foreign library can import a Go package. Leaves, gateways, and other libraries import the
+1. Only a foreign library or a transport (§5.5.1) can import a Go package. Leaves, gateways, and other libraries import the
    foreign library, never Go directly.
 2. **Network access.** A foreign library marks each function that opens a network connection or
    listens on one with `acquires network`, for example `acquires network func Dial(...)`. **Only
@@ -714,8 +729,7 @@ the settings of each wire.
 **The built-in transport, `direct`.** Keel ships one transport, so that a small system with two
 containers needs no broker. It sends from the publisher straight to each subscriber.
 
-- **One queue for each subscriber.** A slow or failing subscriber fills only its own queue. It can
-  never block the publisher for other subscribers.
+- **One queue for each subscriber.** A slow or failing subscriber fills only its own queue.
 - **Settings:** `capacity`, `whenFull` (`block`, `dropOldest`, `dropNewest`; default `block`),
   `ttl`, `retries` (default 5, with exponential backoff), `deadletters` (a route; required), and
   `durable` (default `true`, which keeps queues on
@@ -743,11 +757,13 @@ Analytics/Ingest.Samples: Api/Metrics.Samples via kafka{ topic: "samples" }
 // startup: --transport.direct.peers=worker=10.0.0.7:7000
 ```
 
-Other transports, for example Kafka, NATS, or SQS, are **transport libraries**: a separate kind,
-declared `transport library Kafka { go "..." }`. A transport library is part of the runtime, not of
-the architecture. Thus it is exempt from the library rules (§5.4a, §5.4c): it can acquire
-network handles, hold connections, and keep queues. No leaf or library can import it; only a `via`
-in `system.keel` can name it. `keel audit` lists each transport library.
+Other transports, for example Kafka, NATS, or SQS, are **transports**: a node kind of their own, not
+a library. A transport is declared `transport kafka { go "..." }` and named in lower case at the
+wire (`via kafka{ ... }`). It is part of the runtime, not of the architecture, and it is the second
+kind of node that can import Go packages. It is exempt from the library rules (§5.4a, §5.4c): it
+can acquire network resources, hold connections, and keep queues. No leaf or library can import it;
+only a `via` in `system.keel` can name it. It implements the transport interface: `Publish`,
+`Subscribe`, and `Call`, each with its typed settings. `keel audit` lists each transport.
 
 #### 5.5.2 Message evolution
 
@@ -860,7 +876,8 @@ level shows where all behavior is. A container or a group cannot hide logic.
   valid types (R5).
 - **Sum types are sealed interfaces.** A `sealed interface` lists its variants, and only those
   types implement it. Code matches a sum with Go's own type switch, and the compiler checks that
-  the switch handles each variant. Typed errors, task exits, and state machines use this one form.
+  the switch handles each variant, and also `case nil` unless the value is proved non-`nil` (§7a).
+  Typed errors, task exits, and state machines use this one form.
 
   ```go
   type PayError sealed interface { Declined | Expired }
@@ -1039,7 +1056,10 @@ has a destination that the compiler knows.
 - **A long-lived background task** uses `detach f(), "reason"` in place of a scope. The process
   supervisor owns it. An abort of a detached task stops the process with the report. `keel audit`
   lists each `detach`.
-- **Implicit scopes contain aborts only.** The body of `main`, each topic handler (§5.5.0), and each
+- **Where code starts.** The compiler generates `main` from `system.keel`; code never writes it. A
+  leaf can declare one `startup func() error`. The generated `main` runs each startup function as
+  a supervised task, for example to start the server of an entry leaf.
+- **Implicit scopes contain aborts only.** Each startup function, each topic handler (§5.5.0), and each
   request that an entry leaf serves (§5.4b) run in their own scope. For a request, an abort ends that request
   with an error response and a report, and the process keeps running. Thus one bad request cannot
   stop a server. An implicit scope does **not** permit a bare `go`: that is still error K0801. Thus
@@ -1276,7 +1296,8 @@ func Merge(a, b []int) []int
 ```
 
 A runtime check of a quantifier costs O(n). `keel audit` lists each quantifier that release builds
-still check. A leaf can turn these checks off.
+still check. A leaf can turn these checks off with `contracts off, "reason"` in its
+`component.keel`.
 
 ### 8.2 Struct invariants
 
@@ -1328,8 +1349,8 @@ How reviewers audit contracts:
 ## 9. Testing
 
 - `test` blocks are next to the code that they test, in `*_test.keel` files in the leaf directory.
-- The design makes each leaf testable in isolation: its only dependencies are the ports in its
-  `requires` list.
+- The design makes each leaf testable in isolation: its only dependencies are the ports that it
+  `needs` and the topics that it subscribes to.
 - A fake is declared in a test file with one form: `fake CheckoutOK for Checkout { ... }`. Each
   fake, written or generated, must meet the contract of its port.
 - In a test, port names are bound for each test separately. Tests that run in parallel have
@@ -1342,7 +1363,7 @@ How reviewers audit contracts:
   ```
   K0520: cannot generate a fake for Sorter.Merge
     clause: ensures IsSorted(result)
-    hint: write fake Sorter { ... }
+    hint: write fake SorterOK for Sorter { ... }
   ```
 
 - A `test` block binds fakes to the required ports of the leaf with a `bind` clause:
@@ -1373,7 +1394,7 @@ In addition to type checks, the compiler reports these problems as diagnostics w
   warning K0412: validateAddress in Orders and Shipping are 94% similar
     fix-it: extract to lib/address (moves validateAddress, type Address)
 
-  warning K0412: syncStock in Api and Worker are 91% similar
+  warning K0412: syncStock in Api/Stock and Worker/Inventory are 91% similar
     cannot extract: syncStock calls acquires func sql.Open
     hint: extract the pure part (diffStock) to a library
   ```
@@ -1431,6 +1452,11 @@ editors and agents.
   supports both forms:
   - one binary for the system, with one mode for each container (`shop api`, `shop worker`)
   - one binary for each container (`shop-api`, `shop-worker`)
+
+- **Task identity.** Owned mutexes (§7.1) and per-test port bindings (§9) need to know the current
+  task. Go exposes no goroutine identity, so the Go backend uses a small patch of Go's runtime that
+  exposes the goroutine ID to Keel's runtime. §12.3 lists the cost. Keel code passed to Go as a
+  callback keeps its identity, because the patch is in the runtime, not in function signatures.
 
 ### 12.1 Compiler implementation
 
@@ -1505,7 +1531,7 @@ target fails CI.
 | Task scopes (§7.1) | A wait at the end of each scope | The same cost as a Go `sync.WaitGroup` |
 | Foreign boundary (§5.4c) | A conversion for each value that crosses | Only at foreign libraries, not at every call |
 | Port calls (§5.3) | An interface dispatch and the port's `requires` and `ensures` at each call | Contracts that are not load-bearing can be turned off; the LLVM backend can make the call direct |
-| Mutex owner (§7.1) | One store of the owner task at each `Lock` and a compare at each `Unlock` | None; it is always on |
+| Mutex owner (§7.1) | A read of the goroutine ID and a store at each `Lock`; a compare at each `Unlock` | None; it is always on. It needs the patched Go runtime (§12) |
 | Tasks (§7.1, §5.5.0) | A `recover` frame and an exit value for each task, and one task for each message | The same order of cost as a goroutine |
 | Optionals (§7a) | `?T` of a non-pointer type holds a flag next to the value | None; pointers use their own `nil` |
 
@@ -1519,7 +1545,7 @@ layout directly.
 - Inheritance and class hierarchies. The "OO light" principle excludes them.
 - Macros and metaprogramming. Each macro makes code harder to navigate and harder for a model to
   predict.
-- A system of effects or capabilities (architecture option C). It is deferred, because it
+- A general system of effects or capabilities. It is deferred, because it
   conflicts with Go ergonomics. Examine it again when components and ports are proven.
 
 ## 14. Open questions
