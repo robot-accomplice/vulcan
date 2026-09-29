@@ -105,7 +105,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `(T, error)` keeps Go's spelling (`return v, nil`, `return x, err`) but is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. | R3, and no zero value on the error path (§7) |
 | Only `?T` and `error` can hold `nil` (the Swift model). Optional types `?T` are narrowed by control flow. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
-| Integer overflow aborts. `+% -% *%` wrap on purpose. | Go wraps without a signal (§7c) |
+| Signed integer overflow aborts; unsigned arithmetic wraps as in Go. `+% -% *%` wrap signed values on purpose. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
 | Values that `go` shares must be copies, channels, constants, or `guarded by` a mutex | Prevents data races such as concurrent map writes (§7.1) |
 | `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. A task exit is `Completed`, `Failed`, or `Aborted`. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
@@ -125,7 +125,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
 | Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Explicit handling of bounds and overflow (§7b, §7c) |
-| A narrowing conversion (`int32(x)`) aborts when the value does not fit | Go truncates without a signal (§7c) |
+| A conversion to a signed type (`int32(x)`) aborts when the value does not fit; conversions to unsigned types truncate as in Go | Go truncates without a signal (§7c) |
 | `m.Get(k)` returns `?V`. Other map reads behave as in Go. | Explicit absence when the code wants it (§7a) |
 | A private function can omit its result types; the body alone determines them | Less noise, with no inference across call sites (§6) |
 | Test files are `*_test.keel` in the leaf directory | Tests next to the code (§9) |
@@ -1028,26 +1028,34 @@ A proof needs both bounds, because `int` is signed. Narrowing follows the stable
 
 ## 7c. Integer overflow
 
-An integer never wraps without a signal.
+**Unsigned integers behave as in Go. Signed integers abort on overflow.**
+
+Almost all deliberate wrapping in Go code (hashes, checksums, binary encoders, random number
+generators) uses unsigned types. Signed overflow is almost always a bug; C makes it undefined
+behavior for this reason. Thus Keel keeps Go's behavior where code relies on it, and adds safety
+where an overflow is a bug.
 
 | Operation | On overflow |
 |---|---|
-| `+ - *`, unary `-`, narrowing conversion (`int32(x)`) | Abort. |
-| `+% -% *%` | Wraps (two's complement). Use these for hashes, checksums, and other deliberate modular arithmetic. |
+| `+ - *` and unary `-` on an unsigned type (`uint8` to `uint64`, `byte`, `uintptr`) | Wraps, as in Go. |
+| A conversion to an unsigned type (`byte(x)`, `uint32(x)`) | Truncates, as in Go. |
+| `+ - *` and unary `-` on a signed type (`int`, `int8` to `int64`) | Abort. |
+| A conversion to a signed type (`int32(x)`) that does not fit | Abort. |
+| `+% -% *%` on a signed type | Wraps (two's complement), for deliberate signed wrapping. |
 | `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Returns `?T`, which is `nil` on overflow. Use these when the code handles the overflow itself. |
 | Constant expressions | Compile error, as in Go. |
 
 Division by zero aborts, as in Go.
 
-**The compiler catches code that expects Go's wrapping.** Code that looks like deliberate modular
-arithmetic (a hash loop, a multiply combined with shifts, a conversion of a larger value to a
-byte) gets a warning with a fix-it to the wrapping operators. Thus code ported from Go fails at
-compile time, not in production:
+**One case still differs from Go:** signed arithmetic that wraps on purpose, for example a hash
+that uses `int`. The compiler warns where signed code looks like deliberate wrapping, and offers the
+wrapping operators. The warning cannot find every case, so this difference is listed in the
+changes from Go (§4).
 
 ```
-h = h*31 + uint32(c)
-  warning K0701: this looks like deliberate wrapping (a hash loop)
-    fix-it: h = h *% 31 +% uint32(c)
+h = h*31 + int(c)          // h is int
+  warning K0701: signed arithmetic that looks like deliberate wrapping
+    fix-it: h = h *% 31 +% int(c), or use an unsigned type
 ```
 
 ## 8. Contracts
@@ -1303,7 +1311,7 @@ are open question Q22.
 
 | Feature | Runtime cost | Reduction |
 |---|---|---|
-| Overflow checks (§7c) | About one branch for each arithmetic operation | `+%` for deliberate wrapping; the LLVM backend can remove checks that a range proof covers |
+| Overflow checks (§7c) | About one branch for each signed arithmetic operation; unsigned arithmetic has no check | `+%` for deliberate wrapping; the LLVM backend can remove checks that a range proof covers |
 | Bounds checks (§7b) | One compare for each unproved index | A proved index needs no Keel check; on LLVM, no check at all |
 | Contracts (§8) | The cost of each expression, in release builds | A leaf can turn off contracts that are not load-bearing; quantifier cost is listed in the audit |
 | Garbage collection | GC pauses and memory overhead | On the Go backend, Go's GC; the LLVM backend needs Keel's own GC |
