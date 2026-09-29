@@ -499,11 +499,11 @@ foreign library StripeClient {
 
 | From Go | To Keel |
 |---|---|
-| a value that can be `nil` | the same value, unproved: the proof rules of §7a apply, unless the foreign library marks it `nonnil`. A wrong `nonnil` mark is the one way a `nil` can pass the proof, so `keel audit` lists each mark in a third-party foreign library |
+| a value that can be `nil` | the same value, unproved: the proof rules of §7a apply, unless the foreign library marks it `nonnil`. A wrong `nonnil` mark, or a `nil` argument from Go, can pass the proof, so `keel audit` lists each third-party mark and each Keel function that Go can call |
 | a `nil` passed from Keel into Go | allowed, as in Go: the Go function's own contract decides |
 | a Go `error` | a Keel error |
 | a panic | an abort of the calling task (§7.1) |
-| a Keel function passed to Go as a callback | an ordinary Go function. Its parameters get no entry proof (§7a), so its body checks them. An abort in it behaves as a Go panic in the Go frames: Go code can recover it, as `net/http` does for a handler. Keel's rules apply again when the abort unwinds into Keel frames. |
+| a Keel function passed to Go as a callback | an ordinary Go function. Its parameters keep their entry proof; calls from Go are trusted and audited (§7a). An abort in it behaves as a Go panic in the Go frames: Go code can recover it, as `net/http` does for a handler. Keel's rules apply again when the abort unwinds into Keel frames. |
 | a pointer to a struct with an invariant, after Go code has used it (for example `json.Unmarshal`) | re-checked against its invariant when it returns to Keel |
 | an integer | an integer; Keel arithmetic on it follows §7c |
 
@@ -1114,11 +1114,11 @@ case, so it needs no proof either.
 
 **What proves a value is not `nil`:**
 
-- **a parameter or a receiver of pointer, interface, function, or channel type** of a function that
-  Keel code calls directly. Each is non-`nil` at entry, and each call site must prove the arguments
-  that it passes (the NilAway model). A function that is used as a value (passed, stored, or
-  returned, for example as a callback to Go) gets no entry proof, because the compiler cannot see
-  its callers; its body checks its parameters. Converting a pointer to an interface type also needs a non-`nil` proof of the pointer,
+- **a parameter or a receiver of pointer, interface, function, or channel type.** Each is
+  non-`nil` at entry, in every Keel function. Each Keel call site must prove the arguments that it
+  passes (the NilAway model). A call from Go (a callback, or a method that Go calls through an
+  interface) is trusted, the same way a `nonnil` mark is trusted; `keel audit` lists each Keel
+  function that Go can call. Converting a pointer to an interface type also needs a non-`nil` proof of the pointer,
   so a `nil` pointer can never hide inside a non-`nil` interface. Slice, map, and `error`
   parameters accept `nil`, as in Go, because their safe uses need
   no proof. A parameter that accepts `nil` declares `?T`, for
