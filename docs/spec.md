@@ -251,8 +251,9 @@ the tree; reuse of code goes through libraries (§5.4a).
 **A port call is an ordinary function call.** Keel does not invent a new way for components to
 communicate. Inside one container, a port call runs on the caller's own task, usually the same
 thread, with no queue, no copy to bytes, and no hidden goroutine. Arguments pass by value or by
-reference, exactly as in Go. Because the wiring is fixed at compile time, the compiler can compile
-each port call to a direct call. What Keel adds at the boundary is **enforcement and
+reference, exactly as in Go. On the Go backend, a port call is a Go interface call: one dynamic
+dispatch, because each leaf compiles alone against its own port declaration (§12.2). The LLVM
+backend can use the fixed wiring to make it a direct call. What Keel adds at the boundary is **enforcement and
 instrumentation of the contract**: the port signature, its `requires` and `ensures`, and the
 record of the boundary in diagrams and in the audit. Topics and transports (§5.5) exist only for
 separate processes.
@@ -479,7 +480,7 @@ foreign library StripeClient {
 
 | From Go | To Keel |
 |---|---|
-| a value that can be `nil` | `?T` |
+| a value that can be `nil` | `?T`, unless the foreign library marks it `nonnil` |
 | a Go `error` | a Keel error |
 | a panic | an abort of the calling task (§7.1) |
 | an integer | an integer; Keel arithmetic on it follows §7c |
@@ -500,7 +501,11 @@ foreign library StripeClient {
    acquiring function, so that a reviewer can check the marks of third-party foreign libraries.
 5. Go code inside the boundary can break Keel guarantees. It can start unsupervised goroutines, use
    locks outside Keel's rules, and hold global state. `keel audit` lists each foreign
-   library and these limits, so that a reviewer can see where the guarantees stop.
+. A foreign library marks each Go result that is never `nil` with `nonnil`, for example
+   `nonnil func (r *Request) URL() *url.URL`. A `nonnil` result is a plain `T`, so Go code such as
+   `r.URL.Query().Get("id")` works unchanged. If a `nonnil` result is `nil` at runtime, the boundary
+   aborts. The standard library wrappers ship with these marks. `keel audit` lists each `nonnil`
+   mark in a third-party foreign library, so that a reviewer can check it.
 
 **The standard library.** The Keel standard library is a set of foreign libraries over the Go
 standard library, for example HTTP, JSON, SQL, and cryptography. It ships with the compiler.
@@ -876,8 +881,12 @@ use(r)                         // r is a Receipt here: the check above proved it
 
 The code **must handle each error explicitly**:
 
-- If the code uses the value of a call and does not handle the error of the call, the code does
-  not compile.
+- **An unused `error` result is a compile error**, whether or not the code uses the other results.
+  `defer f.Close()`, `json.NewEncoder(w).Encode(v)`, and `v, _ := strconv.Atoi(s)` all need either
+  handling or `ignore err, "reason"`; the fix-it inserts the `ignore`. A short list of calls whose
+  errors are conventionally ignored (for example `fmt.Println` and writes to `strings.Builder`) is
+  exempt; `keel guide` prints the list. `Publish` returns nothing: subscribers cannot make a publish
+  fail, and if the transport itself cannot accept the message, the publishing task aborts.
 - Postfix `?` returns the error to the caller: `r := Checkout.Pay(c, amt)?`. If the call
   succeeds, `?` gives its value. If the call fails, `?` returns the error from the enclosing
   function, which must also return `error`. It does nothing more. It does not unwind, catch, or
@@ -931,6 +940,10 @@ has a destination that the compiler knows.
   }
   ```
 
+- **A failure cancels the scope.** A scope gives each of its tasks a `context.Context`, with Go's
+  meaning. When a task in the scope fails or aborts, the scope cancels that context, so the other
+  tasks can stop early (the semantics of Go's `errgroup`). A remote call passes its timeout and
+  cancellation to the callee as a context deadline.
 - **No error and no abort is silent.** At the end of the scope, the compiler and the runtime
   handle each exit that the code did not observe:
   - An unobserved `Failed` exit becomes the error of the scope. A `tasks { }` scope that can
