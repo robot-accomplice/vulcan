@@ -103,10 +103,11 @@ sight. This spec must justify each change from Go and list it in this table:
 |---|---|
 | `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
 | `(T, error)` keeps Go's spelling (`return v, nil`, `return x, err`) but is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. | R3, and no zero value on the error path (§7) |
+| `partial` functions return a value and an error together, as in Go | No data lost at Go boundaries such as `io.Reader` (§7) |
 | Only `?T` and `error` can hold `nil` (the Swift model). Optional types `?T` are narrowed by control flow. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Signed integer overflow aborts; unsigned arithmetic wraps as in Go. `+% -% *%` wrap signed values on purpose. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
-| Values that `go` shares must be copies, channels, constants, or `guarded by` a mutex | Prevents data races such as concurrent map writes (§7.1) |
+| `guarded by` on struct fields, checked by the compiler | Fewer data races, with no ownership system (§7.1) |
 | `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. A task exit is `Completed`, `Failed`, or `Aborted`. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
@@ -145,7 +146,8 @@ Keel reserves few words.
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
   `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in`, `out`, `topic`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `max`, `guarded`, `acquires`, `idempotent`,
-  `gateway`, `client`, and `budget`.
+  `gateway`, `client`, `budget`, `partial`, `person`, `external`, `by`, `of`, `timeout`, `wire`, and
+  `flag`.
 
 ```go
 port := 8080                   // an identifier
@@ -609,7 +611,9 @@ idempotent handle Shipped(m ShipmentSent) error {
 ```
 
 - Each `in` topic of a leaf has exactly one handler. Code cannot iterate over an `in` topic.
-- The runtime runs each message in its own task and supervises that task (§7.1).
+- The runtime runs each message in its own supervised task (§7.1). By default, it runs the handler
+  of one `in` topic for one message at a time. A wire setting, for example
+  `via direct{ concurrency: 8 }`, allows more; shared state then needs a lock.
 - **The acknowledgement point is the return of the handler.** If the handler returns `nil`, the
   message is acknowledged. If it returns an error or aborts, the message is not acknowledged, and
   the transport applies its policy: for example, retry and then dead-letter, or discard. Thus code
@@ -816,6 +820,21 @@ use(r)                         // r is a Receipt here: the check above proved it
   `?T` (§7a), and it is nothing else. A function that returns only `error` ends with `return nil`
   on success.
 - A shape with more values works the same way: `(A, B, error)`.
+- **`partial` keeps Go's shape where both results matter.** Some functions return a value and an
+  error together, for example `io.Reader`, which can return `(512, io.EOF)` for the last chunk. Such
+  a function declares `partial`, and its caller can read the value even when `err != nil`, exactly
+  as in Go:
+
+  ```go
+  func Read(p []byte) (n int, err error) partial
+
+  n, err := r.Read(buf)
+  process(buf[:n])           // allowed: Read is partial
+  if err == io.EOF { ... }
+  ```
+
+  Foreign libraries mark each Go function that works this way; the standard library wrappers ship
+  marked (§5.4c).
 - At the call site, `r, err := f()` binds both names. The compiler narrows `r` by control flow, the
   same as a `?T` (§7a): the code can use `r` only where the flow proves that `err == nil`.
 
@@ -899,9 +918,12 @@ has a destination that the compiler knows.
 - **A long-lived background task** uses `detach f(), "reason"` in place of a scope. The process
   supervisor owns it. An abort of a detached task stops the process with the report. `keel audit`
   lists each `detach`.
-- **Implicit scopes.** The body of `main`, each topic handler (§5.5.0), and each request at an
-  entry point (Q21) run in their own scope. For a request, an abort ends that request with an error
-  response and a report. The process keeps running. Thus one bad request cannot stop a server.
+- **Implicit scopes contain aborts only.** The body of `main`, each topic handler (§5.5.0), and each
+  request at an entry point (Q21) run in their own scope. For a request, an abort ends that request
+  with an error response and a report, and the process keeps running. Thus one bad request cannot
+  stop a server. An implicit scope does **not** permit a bare `go`: that is still error K0801. Thus
+  a `go` in a handler never makes the response wait without a visible `tasks` scope. Use `detach`
+  or a topic for work that must outlive the request.
 - The runtime records each abort report as an RCA trail: the task, the owning scope, the
   invariant, the source position, and the values.
 
@@ -917,27 +939,23 @@ deployment restarts it. No other task can see the half-changed data.
   data race, and a data race is already a bug. The sharing rules below and the race detector in
   test builds find data races.
 
-**Sharing between tasks.** The compiler rejects the most common data races before they run. When
-`go` captures or passes a value, the value must be one of these:
+**Data races.** Keel does not prevent all data races; neither does Go. Preventing all of them
+needs an ownership system, which would be a large break from Go. Keel gives three tools:
 
-- a copy (a value type with no references inside it)
-- a `chan`
-- a `const` (§5.4a)
-- a field of a struct that declares it `guarded by` a mutex in the same struct
+- **`guarded by`** is an optional annotation on a struct field. The compiler checks that each
+  access to the field holds the named mutex.
 
-```go
-type Counts struct {
-    mu   Mutex
-    byID map[string]int guarded by mu
-}
+  ```go
+  type Cache struct {
+      mu sync.Mutex
+      m  map[string]int guarded by mu   // each access must hold mu
+  }
+  ```
 
-counts := map[string]int{}
-go worker(counts)          // compile error: map shared with a task without a lock
-  // hint: pass a copy, send it on a chan, or guard it with a Mutex
-```
-
-The compiler also checks each access to a `guarded by` field: the function must hold the mutex at
-that point.
+- **One handler at a time by default.** The runtime runs the handlers of one `in` topic one message
+  at a time, so state that only one handler touches needs no lock (§5.5.0). A wire setting opts into
+  concurrency.
+- **The race detector** runs in test builds.
 
 **Fault classes.** Not every fault can stay inside one task:
 
@@ -945,9 +963,6 @@ that point.
 |---|---|---|
 | Task-level | Contract violations, overflow, bounds, and panics in Go code inside a foreign library, when the task holds no lock | The task aborts. The parent receives `Aborted` (§7.1). On the Go backend, the runtime wraps each task in `recover` to do this. |
 | Process-level | Any abort while the task holds a lock; stack exhaustion; out of memory; deadlock of all tasks | The process exits with a report. The deployment restarts it. No parent receives `Aborted`. |
-
-The rule on sharing between tasks removes concurrent map writes, the most common cause of a
-process-level fault in Go programs.
 
 ## 7a. Null safety
 
