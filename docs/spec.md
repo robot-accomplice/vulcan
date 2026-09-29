@@ -27,6 +27,21 @@ In all three tasks, predictable structure, architectural legibility, and compile
 They make tasks 2 and 3 shorter, so that the developer can spend more time on task 1 and do it
 faster. Each design decision in this spec serves that goal.
 
+**How Keel makes validation shorter.** Two experiments with a model writing and reviewing code in
+Go and in Keel (2026-09-29) showed where the gain is, and where it is not:
+
+- **Keel takes the architecture rules out of review.** A rule that the compiler enforces (which
+  leaf may use which, where the network and databases are reached, what a port promises) no longer
+  has to be checked by a person on every change, and no later change can quietly break it. In Go
+  the same rules hold only while each writer chooses to follow them.
+- **Keel rejects rule-breaking changes before review.** A change that breaks an enforced rule does
+  not build, so a model that iterates against the compiler fixes it before a person sees it.
+- **Keel does not make a thorough reviewer read less code, and it does not reduce defects in
+  logic that no rule covers.** Order-state logic, races, and design choices still need review.
+
+Thus the gain is a smaller and more reliable review: a reviewer checks the logic and trusts the
+compiler for the architecture.
+
 ### 1.2 Terms
 
 This spec uses each term below with one meaning only. The compiler, the tools, and the diagnostics
@@ -490,8 +505,10 @@ The compiler rejects network access in any other leaf (§5.4c, rule 2), so the r
 Keel code is Go code, so a leaf or a library imports Go packages directly, as Go does. Two
 architecture rules apply to these imports:
 
-1. **Network access is decided per package.** A Go package whose dependencies include `net` or
-   `os/exec` is a **network package**. **Only gateway leaves and entry leaves can import a network
+1. **Network access is decided per package.** A Go package whose dependencies include `net`,
+   `os/exec`, or `database/sql` is a **network package**. (`database/sql` is included because it
+   opens a connection through any driver that another package has registered, and it does not
+   depend on `net` itself.) **Only gateway leaves and entry leaves can import a network
    package.** This is the one rule for network access; other sections refer to it. It covers every
    path to the network in the imported code, including `http.DefaultClient`, and a database driver
    that dials a server. An embedded database driver (for example SQLite) does not import `net`, so
@@ -807,9 +824,18 @@ body, except contracts (§8).
 What Keel adds is around the code, not in it: the architecture (§5), contracts (§8), tests (§9),
 and the tools (§10, §11).
 
-**Checks on Go code are warnings.** The tools report common Go faults as warnings with fix-its:
-an unhandled error, error masking, a possible `nil` dereference, a signed integer overflow risk,
-and a shared field without a lock. A warning never stops a build. `keel audit` lists them.
+**Checks on Go code are warnings.** The tools report common Go faults as warnings with fix-its. A
+warning never stops a build, and `keel audit` lists them. The warnings are the ones that Go's own
+analysis tools define, with their definitions:
+
+- an unhandled error: an `error` result that the code discards (as `errcheck` reports)
+- error masking: a branch that receives an error and neither returns it, logs it, nor wraps it
+- a possible `nil` dereference (as `nilaway` reports)
+- a shared field accessed without a lock (as the race detector reports in tests)
+
+**The runtime package.** Code imports the runtime package as `keel.dev/keel`, which provides
+`keel.DeadLetter`, `keel.Bind`, and `keel.Published`. `keel check` needs `go.sum`, as `go build`
+does, to resolve the Go dependencies that the network rule reads.
 
 **Where code starts.** The compiler generates `main` from `system.keel`; code never writes it. A
 leaf can declare one `startup func(ctx context.Context) error`. The generated `main` runs all
