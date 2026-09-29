@@ -106,7 +106,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Signed integer overflow aborts; unsigned arithmetic wraps as in Go. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
 | `guarded by` on struct fields and `holds` on helpers, checked by the compiler | Fewer data races, with no ownership system (§7.1) |
-| `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. `t := go f()` is an expression that returns a task value; `t.Wait()` returns the sealed exit `Completed`, `Failed`, or `Aborted`. A `sync.Mutex` records its owner task. | Each error and abort has a known destination (§7.1) |
+| `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. `t := go f()` is an expression that returns a task value; `t.Wait()` returns the sealed exit `Completed`, `Failed`, or `Aborted`. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
@@ -118,7 +118,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `foreign library` and `transport` nodes are the only importers of Go packages; `acquires`, `acquires network`, and `nonnil` marks at the boundary | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | `entry for` leaves serve inbound traffic; `startup` functions; `main` is generated | Architecture as a first-class construct (§5.4b, §7.1) |
 | Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
-| `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
+| A library's package-level `var` is set once, at startup, and never assigned again | “No mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` | Explicit discards that the audit lists (§7) |
 | Sum types are `sealed interface` declarations, matched with Go's type switch, which must be exhaustive | Typed errors, task exits, and state machines (§6) |
 | Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `via`, `flag("...")`, transport settings (`via name{ ... }`), `gateway for`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
@@ -143,7 +143,7 @@ Keel reserves few words.
   ordinary identifiers. This applies to
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`,
   `requires`, `ensures`, `invariant`, `uses`, `via`, `topic`,
-  `transport`, `nonnil`, `nocancel`, `config`, `startup`,
+  `transport`, `nonnil`, `config`, `startup`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `limit`, `guarded`, `handle`, `pure`, `tasks`, `detach`,
   `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `publishes`, `subscribes`, `acquires`, `idempotent`,
   `gateway`, `partial`, `sealed`, `person`, `external`, `by`, `timeout`, and `flag`.
@@ -388,22 +388,17 @@ Rules:
 1. A library has **no ports, no topics, and no mutable package-level state**. It is only code. It
    cannot hold state, so it cannot couple the leaves that import it. The compiler enforces this
    rule as follows:
-   - A library cannot declare a package-level `var`. A `const` slice or map can only be passed to
-     `pure` functions, which cannot change it. The standard library marks functions such as
-     `errors.New` and `sort.SearchInts` as `pure`.
-   - A library can declare a package-level `const` of any type, including arrays, maps, structs,
-     and slices. A `const` is **deeply immutable**: the compiler proves that no code can change it,
-     or get a mutable reference to it or to any value inside it.
-   - A `pure` function (§8.1) can compute a `const` once, at startup.
+   - A package-level `var` in a library is set once, at startup, and never assigned again. The
+     compiler rejects each later assignment. It does not track changes through a reference, such
+     as a write into a map that a `var` holds; the audit lists each library `var` of a map, slice,
+     or pointer type, so that a reviewer can check it.
 
    ```go
    // lib/crc
-   const table = buildTable()                       // pure function, runs once
-   const ErrNotFound = errors.New("not found")      // errors.New is pure
-   const names = map[Status]string{Paid: "paid"}
+   var table = buildTable()                         // set once, at startup
+   var ErrNotFound = errors.New("not found")
 
-   var cache = map[string]int{}                     // compile error in a library
-   names[Paid] = "x"                                // compile error: names is const
+   table = nil                                      // compile error: assigned after startup
    ```
 2. **A library enables I/O. It does not decide on I/O.** A library can read, write, query, or
    send through a resource that its caller gives it. A library cannot *acquire* a resource: it cannot
@@ -988,8 +983,8 @@ has a destination that the compiler knows.
 
 - **A failure cancels the scope, by default.** A scope can name a `context.Context`:
   `tasks ctx { go process(ctx, it) }`. When a task in the scope fails or aborts, the scope cancels
-  `ctx`, so the other tasks can stop early (the semantics of Go's `errgroup.WithContext`). A scope
-  that must not cancel on failure writes `tasks ctx nocancel { ... }`. A remote method whose first
+  `ctx`, so the other tasks can stop early (the semantics of Go's `errgroup.WithContext`). A task whose
+  failure must not cancel the others handles its own error and returns `nil`. A remote method whose first
   parameter is a `context.Context` passes the caller's deadline and cancellation to the callee.
 - **No error and no abort is silent.** At the end of the scope, the compiler and the runtime
   handle each exit that the code did not observe:
@@ -1028,18 +1023,16 @@ has a destination that the compiler knows.
   invariant, the source position, and the values. For a value that must not appear in
   records, the standard library type `secret.String` prints as `[secret]`.
 
-**Aborts under a lock.** Locks use Go's API: `mu.Lock()` and `mu.Unlock()`, with no error. Keel
-adds one thing: a mutex records the task that locked it, and an unlock from another task aborts. Go
-permits a cross-task unlock, but it is rare and hard to review, and without an owner "the task holds
-a lock" has no meaning.
+**Aborts under a lock.** Locks behave exactly as in Go: `mu.Lock()` and `mu.Unlock()`, with no
+error and no owner. An abort during an update can leave shared data half-changed. Thus, when the
+compiler can see that a lock is held at an abort point (the `Lock` in the same function, or a
+helper marked `holds`), it makes that abort **process-level**: the deferred calls run, as in Go,
+and then the process stops with a report. The deployment restarts it. When the compiler cannot see
+a held lock, the task aborts as usual.
 
-An abort during an update can leave shared data half-changed. Thus, if a task aborts while it holds
-a lock, the abort is **process-level**: the process stops at once, **before any deferred call
-runs**, with a report. The deployment restarts it. No other task can see the half-changed data.
-
-- **Deferred calls run when a task that holds no lock aborts**, in reverse order, as in Go. Thus files and
-  connections close. An abort inside a deferred call stops the remaining deferred calls, and the
-  runtime adds it to the report.
+- **Deferred calls run when a task aborts**, in reverse order, as in Go. Thus files and connections
+  close. An abort inside a deferred call stops the remaining deferred calls, and the runtime adds it
+  to the report.
 - Limit: this protects only data that a lock guards. A change to shared data without a lock is a
   data race, and a data race is already a bug. The data-race tools below help find them.
 
@@ -1201,10 +1194,8 @@ change its behavior. These are the deliberate exceptions, each listed in §4:
 
 1. Signed arithmetic that overflows aborts; Go wraps. The compiler warns (K0701) where signed code
    looks like deliberate wrapping, but the warning cannot find every case.
-2. An unlock from another task aborts; Go permits it (§7.1).
-3. An abort while a task holds a lock stops the process before any deferred call runs; Go runs
-   deferred calls during a panic (§7.1).
-4. Thus a signed overflow while a lock is held stops the process, not only the task.
+2. An abort where the compiler can see a held lock stops the process, not only the task (§7.1).
+   Thus a signed overflow under a visible lock stops the process.
 
 ```
 h = h*31 + int(c)          // h is int
@@ -1303,8 +1294,8 @@ How reviewers audit contracts:
   `needs` and the topics that it subscribes to.
 - A fake is declared in a test file with one form: `fake CheckoutOK for Checkout { ... }`. Each
   fake, written or generated, must meet the contract of its port.
-- In a test, port names are bound for each test separately. Tests that run in parallel have
-  separate bindings, so they never share a fake.
+- In a test, port names are bound for each test separately. Tests that run in parallel run in
+  separate processes, so they never share a fake.
 - `keel fake <Port>` writes the skeleton of a fake, with one method for each method of the port.
   The developer fills in the bodies.
 - A `test` block binds fakes to the required ports of the leaf with a `bind` clause:
@@ -1394,11 +1385,6 @@ editors and agents.
   - one binary for the system, with one mode for each container (`shop api`, `shop worker`)
   - one binary for each container (`shop-api`, `shop-worker`)
 
-- **Task identity.** Owned mutexes (§7.1) and per-test port bindings (§9) need to know the current
-  task. Go exposes no goroutine identity, so the Go backend uses a small patch of Go's runtime that
-  exposes the goroutine ID to Keel's runtime. §12.3 lists the cost. Keel code passed to Go as a
-  callback keeps its identity, because the patch is in the runtime, not in function signatures.
-
 ### 12.1 Compiler implementation
 
 - **The compiler is written in Go, and later self-hosted in Keel.** The semantics of Keel are close
@@ -1470,7 +1456,6 @@ target fails CI.
 | Task scopes (§7.1) | A wait at the end of each scope | The same cost as a Go `sync.WaitGroup` |
 | Foreign boundary (§5.4c) | A conversion for each value that crosses | Only at foreign libraries, not at every call |
 | Port calls (§5.3) | An interface dispatch and the port's `requires` and `ensures` at each call | The compiler removes checks that it proves; the LLVM backend can make the call direct |
-| Mutex owner (§7.1) | A read of the goroutine ID and a store at each `Lock`; a compare at each `Unlock` | None; it is always on. It needs the patched Go runtime (§12) |
 | Tasks (§7.1, §5.5.0) | A `recover` frame and an exit value for each task, and one task for each message | The same order of cost as a goroutine |
 | Optionals (§7a) | `?T` of a non-pointer type holds a flag next to the value | None; pointers use their own `nil` |
 
