@@ -47,9 +47,9 @@ use the same terms.
 | **Port** | An interface with contracts, declared once by the leaf that requires it. A provider satisfies it with an ordinary type, named at the wire. Inside a container, a port call is an ordinary function call. |
 | **Topic** | A publish channel, `topic[T]`, for asynchronous events between containers. |
 | **Remote port** | A port that crosses containers. A remote method port is a synchronous call; a remote topic is an event. |
-| **Publisher / subscriber** | The leaf that publishes on an `out` topic / the leaf that handles an `in` topic. |
-| **Handler** | The function, marked `handle`, that processes the messages of one `in` topic. |
-| **Wire** | A line in `system.keel` that connects a required port or an `in` topic to a provider. |
+| **Publisher / subscriber** | A leaf that declares `publishes X topic[T]` / a leaf that declares `subscribes X topic[T]` and handles it. |
+| **Handler** | The function, marked `handle`, that processes the messages of one subscribed topic. |
+| **Wire** | A line in `system.keel` that connects a required port or a subscribed topic to a provider. |
 | **Transport** | The mechanism that carries topic messages between containers, named on a wire with `via`. |
 | **Outbox / inbox** | The runtime queue at the publisher / at the subscriber. |
 | **Dead-letter topic** | Where a subscription sends a message that it cannot handle. |
@@ -113,7 +113,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
 | `topic[T]` publish channels between containers | A publish does not wait for a subscriber to read, and a message has zero or more subscribers. A `chan` is different (§5.5) |
-| `remote port` (synchronous methods with `timeout` and transport errors, or topics), `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.3) |
+| `requires remote port` (synchronous methods with `timeout` and transport errors), `publishes` and `subscribes` topics, `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.3) |
 | `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `nil` | No forgotten or early acknowledgement (§5.5.0) |
 | `max` bounds on variable-size fields | A transport can require bounded messages, so the compiler can calculate queue memory (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
@@ -144,7 +144,8 @@ Keel reserves few words.
 - **Contextual:** all other new words. They are keywords only where they start a declaration, or
   inside a declaration file or a contract. Elsewhere they are ordinary identifiers. This applies to
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
-  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in`, `out`, `topic`,
+  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in` (in quantifiers only), `publishes`,
+  `subscribes`, `topic`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `max`, `guarded`, `acquires`, `idempotent`,
   `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, `wire`, and
   `flag`.
@@ -270,7 +271,7 @@ system Shop {
     external Stripe   "Card payment processor"
 
     container Api {
-        Billing, Orders, LedgerStore, SystemClock, StripeGateway
+        Billing, Orders, LedgerStore, SystemClock, StripeGateway, Metrics
 
         Orders.Checkout: Billing.NewPayer
         Billing.Ledger:  LedgerStore.Store
@@ -278,12 +279,17 @@ system Shop {
     }
 
     container Worker {
+        Alerts                           // subscribes DeadPlaced and DeadShipped (DeadLetter topics)
         group Fulfilment { Picking, Shipping }
     }
 
-    // Between containers: remote ports only (§5.5).
-    Worker/Fulfilment/Picking.Intake.Placed: Api/Orders.OrderFlow.Placed via direct{ deadletters: Ops.Alerts }
-    Api/Orders.OrderFlow.Shipped: Worker/Fulfilment/Picking.Intake.Shipped via direct{ deadletters: Ops.Alerts }
+    container Analytics {
+        Ingest
+    }
+
+    // Between containers: topics and remote method ports only (§5.5).
+    Worker/Fulfilment/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
+    Api/Orders.Shipped: Worker/Fulfilment/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
 
     uses Customer -> Api "places orders over HTTPS"
     // Api -> Stripe comes from the gateway declaration (§5.4b).
@@ -321,11 +327,12 @@ line records a relationship that no declaration shows, such as a person who uses
    compile error.
 2. **Code only in leaves and libraries.** `system.keel` holds no code. A leaf directory holds no
    child leaves.
-3. **Container boundaries.** A wire between leaves in different containers must use a `remote`
-   port (§5.5). A wire inside one container must not. A group is only a label for diagrams: it
+3. **Container boundaries.** A wire between leaves in different containers must be a topic or a
+   `requires remote port` (§5.5). A method port inside one container must not be `remote`, and a
+   topic cannot connect two leaves of one container (§5.3: calls inside a container are ordinary). A group is only a label for diagrams: it
    adds no boundary.
-4. **Complete wiring.** `system.keel` wires each required port and each `in` topic of each leaf
-   exactly once. An `out` topic is never wired by itself (§5.5).
+4. **Complete wiring.** `system.keel` wires each required port and each subscribed topic of each leaf
+   exactly once. An published topic is never wired by itself (§5.5).
 5. **Satisfied ports.** Each wire names a providing type whose method set matches the port.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
 7. **Boundary ownership.** A leaf declares each port that it requires, once, in its own
@@ -525,22 +532,22 @@ One keyword with two behaviors would mislead humans and models trained on Go (R8
 keeps its Go behavior for concurrency inside one process.
 
 ```go
-// In Orders, inside Api. Each side declares its own view of the topics.
-remote port OrderFlow {
-    Placed  out topic[OrderPlaced]    // Orders publishes
-    Shipped in  topic[ShipmentSent]   // Orders subscribes
+// api/orders/component.keel. Topics are boundary entries, not ports.
+component Orders {
+    publishes  Placed  topic[OrderPlaced]
+    subscribes Shipped topic[ShipmentSent]
 }
 
-// In Picking, inside Worker.
-remote port Intake {
-    Placed  in  topic[OrderPlaced]
-    Shipped out topic[ShipmentSent]
+// worker/fulfilment/picking/component.keel
+component Picking {
+    subscribes Placed  topic[OrderPlaced]
+    publishes  Shipped topic[ShipmentSent]
 }
 
 // In system.keel. Each subscriber names its source; the wire names the transport and settings.
-Worker/Fulfilment/Picking.Intake.Placed: Api/Orders.OrderFlow.Placed via direct{ deadletters: Ops.Alerts }
-Analytics/Ingest.Feed.Placed:            Api/Orders.OrderFlow.Placed via direct{ deadletters: Ops.Alerts }
-Api/Orders.OrderFlow.Shipped: Worker/Fulfilment/Picking.Intake.Shipped via direct{ deadletters: Ops.Alerts }
+Worker/Fulfilment/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
+Analytics/Ingest.Placed:           Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
+Api/Orders.Shipped: Worker/Fulfilment/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
 ```
 
 **Why publish: it is the loosest coupling possible.** The only job of the publisher is to publish.
@@ -555,8 +562,8 @@ These rules are part of the language, for every transport:
   queue is full, so a slow subscriber can slow the publisher.** A developer who wants the publisher
   never to wait chooses a drop policy for that wire.
 - **Zero, one, or many subscribers.** `system.keel` wires topics one at a time, from the
-  subscriber side. Each `in` topic is wired exactly once, to one `out` topic of the same message type. An
-  `out` topic is never wired by itself: its subscribers are the `in` topics wired to it, zero or
+  subscriber side. Each subscribed topic is wired exactly once, to one published topic of the same message type. An
+  published topic is never wired by itself: its subscribers are the subscribed topics wired to it, zero or
   more. Thus a new subscriber adds one wire, and the wiring of the publisher does not change.
 - **An unread topic causes a warning.** A topic with zero subscribers compiles, with a warning. A
   publisher can exist before its subscribers, but an unread topic must not go unnoticed.
@@ -570,10 +577,10 @@ These rules are part of the language, for every transport:
 
   ```go
   // Worker owns stock and publishes each change.
-  StockChanged.Publish(StockChanged{SKU: s, Qty: q})
+  Stock.Publish(StockChanged{SKU: s, Qty: q})      // topic Stock carries StockChanged
 
   // Api keeps a read model, and answers GET /stock/42 from it.
-  idempotent handle StockChanged(m StockChanged) error {
+  idempotent handle Stock(m StockChanged) error {
       stock.Set(m.SKU, m.Qty)
       return nil
   }
@@ -585,8 +592,8 @@ These rules are part of the language, for every transport:
   really a container of the same system.
 - **Ownership.** Each side owns only its end of each topic. Only message values cross, as copies.
   The two sides share no memory and no references.
-- **`remote` is necessary to cross.** The compiler rejects a wire across containers if the consumer
-  did not declare the port `remote`.
+- **Only topics and remote method ports cross.** The compiler rejects a wire across containers for
+  a method port that is not declared `requires remote port`.
 - **Contracts** on message types (struct `invariant`s) are checked when a message is published and
   again when it is received. Message types must be serializable. They cannot contain functions,
   topics, or pointers into the memory of the publisher.
@@ -600,14 +607,14 @@ These rules are part of the language, for every transport:
 
 #### 5.5.0 Publishing and handling
 
-**Publish** is a method on an `out` topic. It is not Go's `<-`, because a topic does not behave
+**Publish** is a method on a published topic. It is not Go's `<-`, because a topic does not behave
 like a `chan`:
 
 ```go
 Placed.Publish(OrderPlaced{ID: id, Total: t})
 ```
 
-**A handler** is a function bound to one `in` topic with `handle`:
+**A handler** is a function bound to one subscribed topic with `handle`:
 
 ```go
 idempotent handle Shipped(m ShipmentSent) error {
@@ -616,10 +623,13 @@ idempotent handle Shipped(m ShipmentSent) error {
 }
 ```
 
-- Each `in` topic of a leaf has exactly one handler. Code cannot iterate over an `in` topic.
+- Each subscribed topic of a leaf has exactly one handler. Code cannot iterate over a subscribed topic.
 - The runtime runs each message in its own supervised task (§7.1). By default, it runs the handler
-  of one `in` topic for one message at a time. A wire setting, for example
-  `via direct{ concurrency: 8 }`, allows more; shared state then needs a lock.
+  of one subscribed topic for one message at a time. A wire setting, for example
+  `via direct{ concurrency: 8 }`, allows more; shared state then needs a lock. With concurrency
+  above 1, the runtime keeps the order that the transport guarantees: if the transport keeps order
+  per key, the runtime runs at most one handler at a time for each key. Thus the order at the wire
+  is also the order at the handler.
 - **The acknowledgement point is the return of the handler.** If the handler returns `nil`, the
   message is acknowledged. If it returns an error or aborts, the message is not acknowledged, and
   the transport applies its policy: for example, retry and then dead-letter, or discard. Thus code
@@ -653,7 +663,8 @@ containers needs no broker. It sends from the publisher straight to each subscri
 - **One queue for each subscriber.** A slow or failing subscriber fills only its own queue. It can
   never block the publisher for other subscribers.
 - **Settings:** `capacity`, `whenFull` (`block`, `dropOldest`, `dropNewest`; default `block`),
-  `ttl`, `deadletters` (a route; required), and `durable` (default `true`, which keeps queues on
+  `ttl`, `retries` (default 5, with exponential backoff), `deadletters` (a route; required), and
+  `durable` (default `true`, which keeps queues on
   disk so that no message is lost across a restart). A value can come from a startup flag:
   `capacity: flag("orders-cap")`.
 - **Delivery:** at least once, unordered. Thus `idempotent` is required on its handlers.
@@ -662,18 +673,26 @@ containers needs no broker. It sends from the publisher straight to each subscri
   size. `keel audit` shows each limit and the total.
 - **Dead letters:** a message that fails all its retries, or expires, goes to the dead-letter
   route. A drop under `dropOldest` or `dropNewest` is counted, not dead-lettered.
+- **A dead-letter route is a subscribed topic** of type `DeadLetter[T]` in some leaf. The wire
+  settings name it, and it can receive from any number of wires whose message type is `T`.
+  Each dead letter carries the message, the last handler error or abort report, the attempt count,
+  the wire, and the time. Thus "why did this message dead-letter?" has an answer without
+  tracing.
 - **Tracing** is off by default. The setting `trace: true` records each step of each message, and
   `keel trace <id>` shows them.
 
 ```go
-Worker/Fulfilment/Picking.Intake.Placed: Api/Orders.OrderFlow.Placed via direct{
-    capacity: 5_000, ttl: 24h, deadletters: Ops.Alerts }
-Obs/Ingest.Feed.Samples: Api/Metrics.Telemetry.Samples via kafka{ topic: "samples" }
+Worker/Fulfilment/Picking.Placed: Api/Orders.Placed via direct{
+    capacity: 5_000, ttl: 24h, deadletters: Worker/Alerts.DeadPlaced }
+Analytics/Ingest.Samples: Api/Metrics.Samples via kafka{ topic: "samples" }
 // startup: --transport.direct.peers=worker=10.0.0.7:7000
 ```
 
-Other transports, for example Kafka, NATS, or SQS, are foreign libraries (§5.4c) that implement the
-interface, each with its own settings and guarantees.
+Other transports, for example Kafka, NATS, or SQS, are **transport libraries**: a separate kind,
+declared `transport library Kafka { go "..." }`. A transport library is part of the runtime, not of
+the architecture. Thus it is exempt from the library rules (§5.4a, §5.4c): it can acquire
+network handles, hold connections, and keep queues. No leaf or library can import it; only a `via`
+in `system.keel` can name it. `keel audit` lists each transport library.
 
 #### 5.5.2 Message evolution
 
@@ -715,7 +734,7 @@ syntax as a port inside a container. The `remote` marker adds what the network m
 
 ```go
 // In Api (the consumer declares what it needs):
-remote port Stock {
+requires remote port Stock {
     func Level(sku SKU) (int, error)
         timeout 200ms
 }
@@ -972,7 +991,7 @@ needs an ownership system, which would be a large break from Go. Keel gives thre
   }
   ```
 
-- **One handler at a time by default.** The runtime runs the handlers of one `in` topic one message
+- **One handler at a time by default.** The runtime runs the handlers of one subscribed topic one message
   at a time, so state that only one handler touches needs no lock (§5.5.0). A wire setting opts into
   concurrency.
 - **The race detector** runs in test builds.
