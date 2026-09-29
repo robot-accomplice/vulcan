@@ -123,7 +123,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `ignore err, "reason"` | Explicit discards that the audit lists (§7) |
 | Sum types are `sealed interface` declarations, matched with Go's type switch, which must be exhaustive | Typed errors, task exits, and state machines (§6) |
 | Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
-| Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
+| Contract expressions add `result`, `old(x)`, and `=>` (implies) | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
 | `m.Get(k)` returns `?V`. Other map reads behave as in Go. | Explicit absence when the code wants it (§7a) |
 | Test files are `*_test.keel` in the leaf directory | Tests next to the code (§9) |
@@ -143,7 +143,7 @@ Keel reserves few words.
   declaration file or a contract, or after a field type (`guarded by`, `limit`). Elsewhere they are
   ordinary identifiers. This applies to
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
-  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in` (in quantifiers only), `topic`,
+  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `topic`,
   `transport`, `nonnil`, `nocancel`, `config`, `startup`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `limit`, `guarded`, `handle`, `pure`, `tasks`, `detach`,
   `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `publishes`, `subscribes`, `acquires`, `idempotent`,
@@ -1256,14 +1256,13 @@ data, or read the clock or a random source. Contract expressions also cannot fai
 - An index in a contract must be proved in range by the contract itself, for example
   `len(xs) > 0 && xs[0] > 0`. `requires xs[0] > 0` alone is a compile error.
 
-Thus a correct program does the same thing when its checks are on and when they are off. Within
-that rule, Keel permits three tiers:
+Thus checking a contract never changes what a correct program does. Within that rule, Keel
+permits two tiers:
 
 | Tier | Adds | Example |
 |---|---|---|
 | 1 | Comparisons, arithmetic, `&&` `\|\|` `!`, `=>` (implies), field access, `len`, `result`, `old(x)` (the value on entry) | `ensures acct.Balance == old(acct.Balance) - amt` |
 | 2 | Calls to functions marked `pure`. The compiler verifies that these functions have no effects, and their bodies follow the same rules as contract expressions: exact arithmetic and proved indexes. A `pure` function can still loop forever; the compiler does not prove termination. | `requires IsSorted(a) && IsSorted(b)` |
-| 3 | Quantifiers over collections: `all x in xs: …` and `some x in xs: …` | `requires all x in xs: !IsNaN(x)` |
 
 ```go
 pure func IsSorted[T cmp.Ordered](xs []T) bool { ... }
@@ -1273,9 +1272,9 @@ func Merge(a, b []int) []int
     ensures  IsSorted(result) && len(result) == len(a) + len(b)
 ```
 
-A runtime check of a quantifier costs O(n). `keel audit` lists each quantifier that release builds
-still check. A leaf can turn these checks off with `contracts off, "reason"` in its
-`component.keel`.
+A rule over a collection uses a `pure` predicate from the standard library, for example
+`requires slices.All(xs, isPositive)`. Its runtime cost is O(n), and `keel audit` lists each such
+contract.
 
 ### 8.2 Struct invariants
 
@@ -1310,10 +1309,8 @@ func (a *Account) Transfer(to *Account, x int) {
 How the compiler checks contracts:
 
 - **Statically**, when the compiler can prove or disprove a contract.
-- **At runtime** in debug builds and test builds. Release builds keep the checks by default. A leaf
-  can turn them off, with one exception: a **load-bearing** contract stays on. A contract is
-  load-bearing when a proof depends on it, for example a bounds proof (§7b) or a narrowing.
-  `keel audit` lists each load-bearing contract.
+- **At runtime** in every build, including release builds. Contracts cannot be turned off, so a
+  proof that depends on a contract (§7b) always holds.
 - **Port contracts bind each implementation**, including test fakes. If a fake violates the
   contract of its port, the test fails.
 
@@ -1333,17 +1330,8 @@ How reviewers audit contracts:
   fake, written or generated, must meet the contract of its port.
 - In a test, port names are bound for each test separately. Tests that run in parallel have
   separate bindings, so they never share a fake.
-- The compiler generates a default fake only when it can build values that meet each `ensures`:
-  a port with no `ensures`, or with simple equalities that it can solve, such as
-  `result.Amount == amount`. Otherwise it reports which clause prevents it, and the developer
-  writes the fake.
-
-  ```
-  K0520: cannot generate a fake for Sorter.Merge
-    clause: ensures IsSorted(result)
-    hint: write fake SorterOK for Sorter { ... }
-  ```
-
+- `keel fake <Port>` writes the skeleton of a fake, with one method for each method of the port.
+  The developer fills in the bodies.
 - A `test` block binds fakes to the required ports of the leaf with a `bind` clause:
 
   ```go
@@ -1503,12 +1491,12 @@ target fails CI.
 |---|---|---|
 | Overflow checks (§7c) | About one branch for each signed arithmetic operation; unsigned arithmetic has no check | Unsigned types or the `wrapping` package for deliberate wrapping; the LLVM backend can remove checks that a range proof covers |
 | Bounds checks (§7b) | One compare for each unproved index | A proved index needs no Keel check; on LLVM, no check at all |
-| Contracts (§8) | The cost of each expression, in release builds | A leaf can turn off contracts that are not load-bearing; quantifier cost is listed in the audit |
+| Contracts (§8) | The cost of each expression, in release builds | The audit lists each contract with a collection-wide cost; the compiler removes checks that it proves |
 | Garbage collection | GC pauses and memory overhead | On the Go backend, Go's GC; the LLVM backend needs Keel's own GC |
 | Durable topics (§5.5.1) | A disk write for each message, on transports that keep queues on disk | The developer chooses the transport and its `durable` setting |
 | Task scopes (§7.1) | A wait at the end of each scope | The same cost as a Go `sync.WaitGroup` |
 | Foreign boundary (§5.4c) | A conversion for each value that crosses | Only at foreign libraries, not at every call |
-| Port calls (§5.3) | An interface dispatch and the port's `requires` and `ensures` at each call | Contracts that are not load-bearing can be turned off; the LLVM backend can make the call direct |
+| Port calls (§5.3) | An interface dispatch and the port's `requires` and `ensures` at each call | The compiler removes checks that it proves; the LLVM backend can make the call direct |
 | Mutex owner (§7.1) | A read of the goroutine ID and a store at each `Lock`; a compare at each `Unlock` | None; it is always on. It needs the patched Go runtime (§12) |
 | Tasks (§7.1, §5.5.0) | A `recover` frame and an exit value for each task, and one task for each message | The same order of cost as a goroutine |
 | Optionals (§7a) | `?T` of a non-pointer type holds a flag next to the value | None; pointers use their own `nil` |
