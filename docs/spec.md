@@ -115,7 +115,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `topic[T]` publish channels between containers | A publish does not wait for a subscriber to read, and a message has zero or more subscribers. A `chan` is different (§5.5) |
 | `requires remote port` (synchronous methods with `timeout` and transport errors), `publishes` and `subscribes` topics, `idempotent`, `via` wiring | Honest communication between containers; the developer chooses a call or an event (§5.5, §5.5.3) |
 | `topic.Publish(msg)` and `handle` functions; a message is acknowledged when its handler returns `nil` | No forgotten or early acknowledgement (§5.5.0) |
-| `max` bounds on variable-size fields | A transport can require bounded messages, so the compiler can calculate queue memory (§5.5.1) |
+| `limit` bounds on variable-size fields | A transport can require bounded messages, so the compiler can calculate queue memory (§5.5.1) |
 | `gateway for` leaves; only gateways import network libraries | Enforced access to external systems (§5.4b) |
 | `foreign library` nodes are the only importers of Go packages | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
@@ -140,13 +140,15 @@ and gofmt-style formatting.
 Each reserved word breaks Go code that uses it as a name, and models write that code (R8). Thus
 Keel reserves few words.
 
-- **Reserved everywhere:** `handle`, `pure`, `tasks`, `detach`, `ignore`, `unreachable`.
-- **Contextual:** all other new words. They are keywords only where they start a declaration, or
-  inside a declaration file or a contract. Elsewhere they are ordinary identifiers. This applies to
+- **Reserved everywhere:** none. Keel reserves no word that Go does not.
+- **Contextual:** every new word. A new word is a keyword only where it starts a declaration or a
+  statement (`tasks {`, `ignore err, "..."`, `detach f()`, `handle X(`, `pure func`), or inside a
+  declaration file or a contract. Elsewhere they are ordinary identifiers. This applies to
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
   `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in` (in quantifiers only), `publishes`,
   `subscribes`, `topic`,
-  `test`, `fake`, `result`, `old`, `all`, `some`, `max`, `guarded`, `acquires`, `idempotent`,
+  `test`, `fake`, `result`, `old`, `all`, `some`, `limit`, `guarded`, `handle`, `pure`, `tasks`, `detach`,
+  `ignore`, `unreachable`, `entry`, `acquires`, `idempotent`,
   `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, `wire`, and
   `flag`.
 
@@ -348,7 +350,10 @@ line records a relationship that no declaration shows, such as a person who uses
    `infra` type such as `sql.Row`.
 9. **No cycles.** The graph of wires between the leaves of one container has no cycles.
 10. **Private types.** A type is private to its leaf. Only `system.keel` can name an exported type
-    of a leaf, in a wire. A type in a port signature must come from a library (§5.4a).
+    of a leaf, in a wire. A type in a port signature must come from a library (§5.4a). This costs a
+    library for each shared type, which is the price of leaves that never import each other. The
+    compiler reduces it: when a port signature uses a leaf-private type, the fix-it moves the type
+    to a library (new or existing) and updates the imports.
 11. **Leaf size budget.** The budget measures what a model reads to work on a leaf: all non-test
     source of the leaf plus its `keel context` output, in tokens. Each project sets one
     `context_budget` value in its config. A leaf over the budget is a compile error. The hint tells
@@ -449,14 +454,32 @@ Rules:
 1. A container that talks to an external system has exactly one gateway leaf for that system. The
    gateway declares `gateway for <External>`, and `<External>` must be an `external` declaration in
    the system.
-2. Only a gateway leaf can import a network library (§5.4c), or a client library for an external
-   system. Any other leaf that imports one causes a compile error. The compiler cannot read a URL
+2. Only a gateway leaf or an entry leaf can import a network library (§5.4c). Only a gateway
+   can import a client library for an external system. Any other leaf that imports one causes a compile error. The compiler cannot read a URL
    string at compile time, so this import rule is the only way to enforce which leaves reach the
    network.
 3. A client library declares the external system that it serves: `library StripeClient { client
    of Stripe }`. A gateway can import only the client libraries of its own external system.
 4. The compiler generates the `uses` relationships in diagrams from the gateway declarations. Thus
    the diagram cannot be wrong.
+
+**Entry leaves.** Traffic that comes **into** the system, for example HTTP requests from a `person`,
+enters through an **entry leaf**. It is the mirror of a gateway:
+
+```go
+// api/web/component.keel
+component Web {
+    entry for Customer          // serves requests from the person Customer
+    requires port Checkout { ... }
+}
+```
+
+- An entry leaf declares `entry for <Person or External>`, and it can import a network library to
+  serve requests. Only gateways and entry leaves can import network libraries.
+- The compiler cannot tell serving from dialing in a Go package, so it does not try. `keel audit`
+  lists each entry leaf and each gateway, and the network libraries that each imports.
+- Each request that an entry leaf serves runs in its own implicit scope (§7.1).
+- The compiler draws the `uses` relationship for each entry leaf, as for gateways.
 
 Why a gateway (§1.1): each rule about an external system goes in one leaf. A reviewer reads all
 traffic to that system in one location. Tests of other leaves fake a port with contracts, not HTTP.
@@ -673,7 +696,7 @@ containers needs no broker. It sends from the publisher straight to each subscri
   disk so that no message is lost across a restart). A value can come from a startup flag:
   `capacity: flag("orders-cap")`.
 - **Delivery:** at least once, unordered. Thus `idempotent` is required on its handlers.
-- **Bounded memory:** `direct` requires topic message types to be bounded with `max` fields (§6),
+- **Bounded memory:** `direct` requires topic message types to be bounded with `limit` fields (§6),
   so that the compiler can calculate the memory limit of each queue: capacity × maximum message
   size. `keel audit` shows each limit and the total.
 - **Dead letters:** a message that fails all its retries, or expires, goes to the dead-letter
@@ -806,8 +829,12 @@ level shows where all behavior is. A container or a group cannot hide logic.
   case Expired:  ...
   }                          // a missing case is a compile error
   ```
-- **`nil` only in `?T` and `error`.** A plain type, including a pointer, an interface, a slice, or a
-  map, can never be `nil` (§7a).
+- **Bounded fields.** A string, slice, or map field can declare a size limit: `Note string limit 4KB`,
+  `Lines []Line limit 100`. A value over the limit fails the invariant of its struct. A transport
+  can require bounded message types (§5.5.1).
+- **`nil` only in `?T` and `error`.** A pointer, an interface, or a function value can never be
+  `nil`. A map or a slice keeps Go's runtime zero value, but code cannot compare it with `nil`
+  (§7a).
 - Methods attach to structs, as in Go. Interfaces and ports are structural, as in Go.
 
 ### 6.1 Generics
@@ -968,7 +995,7 @@ has a destination that the compiler knows.
   supervisor owns it. An abort of a detached task stops the process with the report. `keel audit`
   lists each `detach`.
 - **Implicit scopes contain aborts only.** The body of `main`, each topic handler (§5.5.0), and each
-  request at an entry point (Q21) run in their own scope. For a request, an abort ends that request
+  request that an entry leaf serves (§5.4b) run in their own scope. For a request, an abort ends that request
   with an error response and a report, and the process keeps running. Thus one bad request cannot
   stop a server. An implicit scope does **not** permit a bare `go`: that is still error K0801. Thus
   a `go` in a handler never makes the response wait without a visible `tasks` scope. Use `detach`
@@ -1019,11 +1046,30 @@ needs an ownership system, which would be a large break from Go. Keel gives thre
 ## 7a. Null safety
 
 Keel keeps Go's word `nil`, but only two types can hold it: an optional `?T` and `error`. This is
-the model of Swift. A plain `T`, including a pointer, an interface, a slice, or a map, can never be
-`nil`. No expression can dereference nothing, so a null-pointer failure cannot occur.
+the model of Swift. A pointer, an interface, or a function value can never be `nil`. No expression
+can dereference nothing, so a null-pointer failure cannot occur.
 
-- Each type has a zero value, as in Go, **or** the code must initialize it before use. The code
-  must initialize pointers, interfaces, and function values.
+**Zero values.**
+
+- Numbers, strings, booleans, arrays, and structs of these have Go's zero values.
+- **A map or a slice has Go's zero value at runtime**: the nil map or nil slice, with Go's behavior.
+  A read gives nothing, a write to a zero map aborts (Go panics), `append` works, and
+  `json.Marshal` gives `null`. Keel only forbids comparing a map or a slice with `nil`; the fix-it
+  is `len(x) == 0`. Thus Go code keeps its runtime behavior.
+- **A pointer, an interface, a function, or a struct that holds one has no zero value.** Such a
+  variable must be **definitely assigned** before any read, as in Swift and Java. The compiler
+  checks this:
+
+  ```go
+  var p *Card             // allowed: declared, not yet assigned
+  use(p)                  // compile error: p is read before it is assigned
+  ```
+
+- `make([]*Card, n)` is a compile error, because its elements would have no value. The fix-it is
+  `make([]*Card, 0, n)` with `append`. A struct literal must set each field that has no zero value.
+- **Generic code.** `var x T` in a generic function follows the same rule: it must be assigned
+  before a read. A value that only fills the discarded slot of an error return (`return x, err`,
+  §7) is not a read. Thus the common Go pattern `var zero T; return zero, err` compiles unchanged.
 - Absence is a type, not a value. `?T` means "a `T` or `nil`".
 - The code cannot use a `?T` as a `T`. The compiler narrows the type by control flow:
 
@@ -1068,7 +1114,7 @@ the model of Swift. A plain `T`, including a pointer, an interface, a slice, or 
   if u == nil { ... }
   ```
 
-  For a value type with no zero value (Q20), `m[k]` is a compile error, and the code uses
+  For a value type with no zero value (§7a), `m[k]` is a compile error, and the code uses
   `v, ok := m[k]` with narrowing, or `m.Get(k)`.
 - A value from Go that can be `nil` has the type `?T` at the foreign-library boundary (§5.4c).
 - When code uses a `?T` incorrectly, the diagnostic hint shows the narrowing pattern above. It does
@@ -1173,7 +1219,7 @@ An invariant protects a struct only if no code can go around it. Thus:
 - **Construction is checked.** A struct literal is checked where the code creates it. If the
   compiler can prove the violation, it is a compile error; if not, the check runs at runtime.
 - **The zero value must satisfy the invariant.** If it does not, the type has no zero value
-  (see Q20).
+  (§7a).
 - **Outer calls only.** The invariant is checked when the outermost exported method call on the
   value returns. A nested call on the same value, for example `Transfer` that calls `Withdraw`, is
   not checked on its return. Thus a method can pass through a temporarily broken state. This is
@@ -1404,8 +1450,6 @@ layout directly.
 | # | Question |
 |---|---|
 | Q1 | The final name and file extension. |
-| Q20 | Because plain types cannot be `nil`, some types have no zero value (types that hold pointers, interfaces, or functions). What happens to `make([]*T, n)`, a generic `var x T`, and a partial struct literal? |
-| Q21 | Inbound traffic. A leaf that serves HTTP to a `person` (for example, Api serving Customer) needs a network library, but it is not a gateway to an external system. How does Keel declare and enforce an entry point? |
 | Q22 | Numeric performance targets for the benchmark suite (§12.3): for each benchmark, the accepted ratio of speed and memory against Go, Java, C++, and Rust. |
 
 ## Appendix A: Sources
