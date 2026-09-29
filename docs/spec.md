@@ -101,9 +101,9 @@ sight. This spec must justify each change from Go and list it in this table:
 | Change from Go | Reason |
 |---|---|
 | `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
-| `(T, error)` keeps Go's spelling (`return v, nil`, `return x, err`) but is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. | R3, and no zero value on the error path (§7) |
+| `(T, error)` keeps Go's spelling (`return v, nil`, `return x, err`) but is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. | R3, and the value is never usable on the error path (§7) |
 | `partial` functions return a value and an error together, as in Go | No data lost at Go boundaries such as `io.Reader` (§7) |
-| Only `?T` and `error` can hold `nil` (the Swift model). Optional types `?T` are narrowed by control flow. | No null dereference can occur (§7a) |
+| `nil` and zero values as in Go, but each use that can panic on `nil` (dereference, interface call, map write) needs a compile-time proof. `?T` for optional non-pointer values. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Signed integer overflow aborts; unsigned arithmetic wraps as in Go. `+% -% *%` wrap signed values on purpose. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
 | `guarded by` on struct fields, checked by the compiler | Fewer data races, with no ownership system (§7.1) |
@@ -521,7 +521,7 @@ foreign library StripeClient {
 
 | From Go | To Keel |
 |---|---|
-| a value that can be `nil` | `?T`, unless the foreign library marks it `nonnil` |
+| a value that can be `nil` | the same value; the proof rules of §7a apply, unless the foreign library marks it `nonnil` |
 | a Go `error` | a Keel error |
 | a panic | an abort of the calling task (§7.1) |
 | an integer | an integer; Keel arithmetic on it follows §7c |
@@ -546,7 +546,7 @@ foreign library StripeClient {
 5. Go code inside the boundary can break Keel guarantees. It can start unsupervised goroutines, use
    locks outside Keel's rules, and hold global state. `keel audit` lists each foreign
 . A foreign library marks each Go result that is never `nil` with `nonnil`, for example
-   `nonnil func (r *Request) URL() *url.URL`. A `nonnil` result is a plain `T`, so Go code such as
+   `nonnil func (r *Request) URL() *url.URL`. A `nonnil` result needs no proof, so Go code such as
    `r.URL.Query().Get("id")` works unchanged. If a `nonnil` result is `nil` at runtime, the boundary
    aborts. The standard library wrappers ship with these marks. `keel audit` lists each `nonnil`
    mark in a third-party foreign library, so that a reviewer can check it.
@@ -870,9 +870,8 @@ level shows where all behavior is. A container or a group cannot hide logic.
 - **Bounded fields.** A string, slice, or map field can declare a size limit: `Note string limit 4KB`,
   `Lines []Line limit 100`. A value over the limit fails the invariant of its struct. A transport
   can require bounded message types (§5.5.1).
-- **`nil` only in `?T` and `error`.** A pointer, an interface, or a function value can never be
-  `nil`. A map or a slice keeps Go's runtime zero value, but code cannot compare it with `nil`
-  (§7a).
+- **`nil` and zero values as in Go.** The compiler proves that each dereference, interface call,
+  and map write cannot reach `nil` (§7a).
 - Methods attach to any defined type that is not a pointer or an interface, as in Go (for example
   `type Celsius float64`). Interfaces and ports are structural, as in Go.
 
@@ -900,8 +899,8 @@ An error is an ordinary value. It moves only through return values. Thus the sou
 that an error can take.
 
 A function that can fail declares the Go shape, `(T, error)`, and uses Go's spelling. In Keel the
-shape is a **sum type**: the function returns a value **or** an error, never both. Thus the error
-path needs no usable value of `T`, and no zero value.
+shape is a **sum type**: the function returns a value **or** an error, never both. Thus on the error
+path the value of `T` is never usable.
 
 ```go
 func Charge(c CustomerID, a Money) (Receipt, error) {
@@ -923,8 +922,8 @@ use(r)                         // r is a Receipt here: the check above proved it
 - `return v, nil` returns success. `return x, err` with a non-`nil` error returns failure, and the
   compiler discards `x`, so any expression is accepted there, for example `Receipt{}` or `nil`.
   The caller can never read it.
-- `nil` is the value of `error` that means "no error", as in Go. It is also the absent value of a
-  `?T` (§7a), and it is nothing else. A function that returns only `error` ends with `return nil`
+- `nil` is the value of `error` that means "no error", as in Go. It keeps all its Go meanings
+  (§7a). A function that returns only `error` ends with `return nil`
   on success.
 - A shape with more values works the same way: `(A, B, error)`.
 - **`partial` keeps Go's shape where both results matter.** Some functions return a value and an
@@ -1090,46 +1089,43 @@ needs an ownership system, which would be a large break from Go. Keel gives thre
 
 ## 7a. Null safety
 
-Keel keeps Go's word `nil`, but only two types can hold it: an optional `?T` and `error`. This is
-the model of Swift. A pointer, an interface, or a function value can never be `nil`. No expression
-can dereference nothing, so a null-pointer failure cannot occur.
+Keel keeps Go's `nil` and Go's zero values, unchanged. A pointer, an interface, a map, a slice, a
+channel, or a function can be `nil`, and `var p *Card` is `nil`, exactly as in Go. What Keel adds
+is a **compile-time proof**: the compiler rejects each use that can reach `nil` and would panic in
+Go. Thus a null-pointer failure cannot occur, and Go code keeps its types and its zero values.
+(Uber's NilAway checks Go code in a similar way.)
 
-**Zero values.**
+**Uses that need a proof.** These panic in Go on `nil`, so the compiler must prove that the value
+is not `nil` at that point:
 
-- Numbers, strings, booleans, arrays, and structs of these have Go's zero values.
-- **A map or a slice has Go's zero value at runtime**: the nil map or nil slice, with Go's behavior.
-  A read gives nothing, a write to a zero map aborts (Go panics), `append` works, and
-  `json.Marshal` gives `null`. Keel only forbids comparing a map or a slice with `nil`; the fix-it
-  is `len(x) == 0`. Thus Go code keeps its runtime behavior.
-- **A pointer, an interface, a function, or a struct that holds one has no zero value.** Such a
-  variable must be **definitely assigned** before any read, as in Swift and Java. The compiler
-  checks this:
+- a dereference or a field access through a pointer: `p.Number`, `*p`
+- a method call on an interface value
+- a call of a function value
+- a write to a map: `m[k] = v`
+- a send on, or a close of, a channel
 
-  ```go
-  var p *Card             // allowed: declared, not yet assigned
-  use(p)                  // compile error: p is read before it is assigned
-  ```
+Reads from a `nil` map or slice, `len`, `range`, and `append` are safe in Go, so they need no proof.
 
-- `make([]*Card, n)` is a compile error, because its elements would have no value. The fix-it is
-  `make([]*Card, 0, n)` with `append`. A struct literal must set each field that has no zero value.
-- **Generic code.** `var x T` in a generic function follows the same rule: it must be assigned
-  before a read. A value that only fills the discarded slot of an error return (`return x, err`,
-  §7) is not a read. Thus the common Go pattern `var zero T; return zero, err` compiles unchanged.
-- Absence is a type, not a value. `?T` means "a `T` or `nil`".
-- The code cannot use a `?T` as a `T`. The compiler narrows the type by control flow:
+**What proves a value is not `nil`:**
 
-  ```go
-  u := users.Find(id)        // u is ?User
-  if u == nil {
-      return NotFound
-  }
-  send(u.Email)              // u is User here: the check above proved it
-  ```
+- a check narrowed by control flow: `if p != nil { ... p.Number ... }`, or an early `return`
+- an allocation: `&Card{}`, `new(Card)`, `make(map[K]V)`
+- a result of a function marked `nonnil`, which the compiler checks in the body of that function:
+  `nonnil func NewCard() *Card`
 
-- **Only a stable local narrows.** Narrowing applies to a local variable that no code assigns
-  between the check and the use, and that no closure or task captures. A field, a pointer target,
-  or shared data does not narrow, because a call or another task can change it. The fix-it copies
-  the value into a local first:
+```go
+var p *Card                // nil, as in Go
+use(p.Number)              // compile error: p may be nil
+if p != nil {
+    use(p.Number)          // proved by the check
+}
+c := NewCard()             // NewCard is nonnil
+use(c.Number)              // proved
+```
+
+- **Only a stable local narrows.** A check proves a local variable that no code assigns between
+  the check and the use, and that no closure or task captures. A field does not narrow, because a
+  call or another task can change it. The fix-it copies the value into a local first:
 
   ```go
   if s.user != nil {
@@ -1140,30 +1136,35 @@ can dereference nothing, so a null-pointer failure cannot occur.
   u := s.user
   if u != nil {
       notify()
-      send(u.Email)            // u is User here
+      send(u.Email)            // proved
   }
   ```
 
+- When the compiler cannot prove a use, the diagnostic shows these patterns, not only
+  "may be nil".
+
+**Optional values.** A pointer can already be `nil`, so `?T` is only for types that cannot:
+numbers, strings, booleans, and structs. `?int` means "an `int` or `nil`", and the same proof
+rules apply before its value is used.
+
+- An API that "might not find" a value of such a type returns `?T`. Examples: `Find`, a search,
+  and a parse that has no error.
 - `x ?? fallback` gives an explicit default. Keel permits it, because the code states the default
   where it is used. But `keel audit` lists each `??`, the same as `ignore`.
-- An API that "might not find" a value returns `?T`. Examples: `Find`, a search, and a parse that
-  has no error.
-- **Maps behave as in Go.** `m[k]` gives the zero value when the key is missing, and
-  `v, ok := m[k]` and `m[k]++` work. When the code wants absence to be explicit, `m.Get(k)` returns
-  `?V`:
 
-  ```go
-  n := counts[word]              // 0 when the key is missing, as in Go
-  v, ok := counts[word]          // the Go comma-ok form
-  u := users.Get(id)             // ?User
-  if u == nil { ... }
-  ```
+**Maps behave as in Go.** `m[k]` gives the zero value when the key is missing, and `v, ok := m[k]`
+and `m[k]++` work. When the code wants absence to be explicit, `m.Get(k)` returns `?V` (or a
+possibly-`nil` pointer, for a pointer value type):
 
-  For a value type with no zero value (§7a), `m[k]` is a compile error, and the code uses
-  `v, ok := m[k]` with narrowing, or `m.Get(k)`.
-- A value from Go that can be `nil` has the type `?T` at the foreign-library boundary (§5.4c).
-- When code uses a `?T` incorrectly, the diagnostic hint shows the narrowing pattern above. It does
-  not only say "type mismatch".
+```go
+n := counts[word]              // 0 when the key is missing, as in Go
+v, ok := counts[word]          // the Go comma-ok form
+u := users.Get(id)             // ?User
+if u == nil { ... }
+```
+
+**At the foreign boundary**, a Go value that can be `nil` stays a possibly-`nil` value, and the
+same proof rules apply. A foreign library can mark results `nonnil` (§5.4c).
 
 ## 7b. Bounds
 
@@ -1263,8 +1264,8 @@ An invariant protects a struct only if no code can go around it. Thus:
   its own methods. A write from anywhere else is a compile error.
 - **Construction is checked.** A struct literal is checked where the code creates it. If the
   compiler can prove the violation, it is a compile error; if not, the check runs at runtime.
-- **The zero value must satisfy the invariant.** If it does not, the type has no zero value
-  (§7a).
+- **The zero value must satisfy the invariant.** If it does not, `var x T` and `make([]T, n)` of
+  that type are compile errors, and code creates its values with checked literals or constructors.
 - **Outer calls only.** The invariant is checked when the outermost exported method call on the
   value returns. A nested call on the same value, for example `Transfer` that calls `Withdraw`, is
   not checked on its return. Thus a method can pass through a temporarily broken state. This is
