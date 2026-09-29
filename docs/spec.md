@@ -486,8 +486,8 @@ Rules:
    library for an external system.
 3. A client library declares the external system that it serves: `library StripeClient { client
    of Stripe }`. A gateway can import only the client libraries of its own external system. It can
-   also import a generic network library such as `net/http`, so an external system without a Go SDK
-   needs no wrapper.
+   also call generic `acquires network` functions such as those of `net/http`, so an external
+   system without a Go SDK needs no wrapper.
 4. The compiler generates the `uses` relationships in diagrams from the gateway declarations. Thus
    the diagram cannot be wrong.
 
@@ -503,10 +503,10 @@ component Web {
 }
 ```
 
-- An entry leaf declares `entry for <Person or External>`, and it can import a network library to
-  serve requests. Only gateways and entry leaves can import network libraries.
-- The compiler cannot tell serving from dialing in a Go package, so it does not try. `keel audit`
-  lists each entry leaf and each gateway, and the network libraries that each imports.
+- An entry leaf declares `entry for <Person or External>`, and it can call `acquires network`
+  functions to serve requests, under the one network rule (§5.4c, rule 2).
+- The compiler cannot tell serving from dialing, so it does not try. `keel audit` lists each entry
+  leaf and each gateway, and the `acquires network` calls in each.
 - Each request that an entry leaf serves runs in its own implicit scope (§7.1).
 - The compiler draws the `uses` relationship for each entry leaf, as for gateways.
 
