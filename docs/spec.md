@@ -198,7 +198,8 @@ has no directory of its own declarations and no code: it is a section of the arc
 - **Each leaf is a directory** with one `component.keel` and its source files. `component.keel`
   declares the **boundary** of the leaf: its layer, and the full declaration of each port that it
   requires.
-- **Directories mirror the tree**: `api/orders/`, `worker/fulfilment/picking/`. The compiler checks
+- **Directories mirror containers and leaves**: `api/orders/`, `worker/picking/`. Groups are only
+  labels in `system.keel`, so they are not directories and not part of any path. The compiler checks
   that the directories and `system.keel` agree.
 - Libraries are in `lib/`.
 
@@ -262,7 +263,10 @@ separate processes.
 
 **The architecture file wires the leaves.** A wire connects a required port to a providing type.
 Inside a container section, a wire names leaves by name. A wire between containers names each leaf
-by its path: `Container/Leaf`, or `Container/Group/Leaf`.
+by its path: `Container/Leaf`. Groups are not part of paths, so regrouping for a diagram never
+changes a wire. Every wire reads `needer: supplier`: the left side needs what the right side
+supplies, a method for a port and messages for a topic. `keel query` lists the subscribers of a
+topic in one command.
 
 ```go
 // system.keel
@@ -292,8 +296,8 @@ system Shop {
     }
 
     // Between containers: topics and remote method ports only (§5.5).
-    Worker/Fulfilment/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
-    Api/Orders.Shipped: Worker/Fulfilment/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
+    Worker/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
+    Api/Orders.Shipped: Worker/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
 
     uses Customer -> Api "places orders over HTTPS"
     // Api -> Stripe comes from the gateway declaration (§5.4b).
@@ -470,7 +474,9 @@ Rules:
    string at compile time, so this import rule is the only way to enforce which leaves reach the
    network.
 3. A client library declares the external system that it serves: `library StripeClient { client
-   of Stripe }`. A gateway can import only the client libraries of its own external system.
+   of Stripe }`. A gateway can import only the client libraries of its own external system. It can
+   also import a generic network library such as `net/http`, so an external system without a Go SDK
+   needs no wrapper.
 4. The compiler generates the `uses` relationships in diagrams from the gateway declarations. Thus
    the diagram cannot be wrong.
 
@@ -581,16 +587,16 @@ component Orders {
     subscribes Shipped topic[ShipmentSent]
 }
 
-// worker/fulfilment/picking/component.keel
+// worker/picking/component.keel
 component Picking {
     subscribes Placed  topic[OrderPlaced]
     publishes  Shipped topic[ShipmentSent]
 }
 
 // In system.keel. Each subscriber names its source; the wire names the transport and settings.
-Worker/Fulfilment/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
+Worker/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
 Analytics/Ingest.Placed:           Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
-Api/Orders.Shipped: Worker/Fulfilment/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
+Api/Orders.Shipped: Worker/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
 ```
 
 **Why publish: it is the loosest coupling possible.** The only job of the publisher is to publish.
@@ -673,7 +679,9 @@ idempotent handle Shipped(m ShipmentSent) error {
 - Each subscribed topic of a leaf has exactly one handler. Code cannot iterate over a subscribed topic.
 - The runtime runs each message in its own supervised task (§7.1). By default, it runs the handler
   of one subscribed topic for one message at a time. A wire setting, for example
-  `via direct{ concurrency: 8 }`, allows more; shared state then needs a lock. With concurrency
+  `via direct{ concurrency: 8 }`, allows more; shared state then needs a lock. At most
+  `concurrency` handlers run at once for one subscribed topic; other messages wait in the
+  transport's queue, which its capacity bounds. With concurrency
   above 1, the runtime keeps the order that the transport guarantees: if the transport keeps order
   per key, the runtime runs at most one handler at a time for each key. Thus the order at the wire
   is also the order at the handler.
@@ -713,7 +721,8 @@ containers needs no broker. It sends from the publisher straight to each subscri
   `ttl`, `retries` (default 5, with exponential backoff), `deadletters` (a route; required), and
   `durable` (default `true`, which keeps queues on
   disk so that no message is lost across a restart). A value can come from a startup flag:
-  `capacity: flag("orders-cap")`.
+  `capacity: flag("orders-cap", max: 10_000)`. A flag that sets a size must declare a maximum, and
+  the compiler uses the maximum to calculate the memory limit.
 - **Delivery:** at least once, unordered. Thus `idempotent` is required on its handlers.
 - **Bounded memory:** `direct` requires topic message types to be bounded with `limit` fields (§6),
   so that the compiler can calculate the memory limit of each queue: capacity × maximum message
@@ -729,7 +738,7 @@ containers needs no broker. It sends from the publisher straight to each subscri
   `keel trace <id>` shows them.
 
 ```go
-Worker/Fulfilment/Picking.Placed: Api/Orders.Placed via direct{
+Worker/Picking.Placed: Api/Orders.Placed via direct{
     capacity: 5_000, ttl: 24h, deadletters: Worker/Alerts.DeadPlaced }
 Analytics/Ingest.Samples: Api/Metrics.Samples via kafka{ topic: "samples" }
 // startup: --transport.direct.peers=worker=10.0.0.7:7000
@@ -864,7 +873,8 @@ level shows where all behavior is. A container or a group cannot hide logic.
 - **`nil` only in `?T` and `error`.** A pointer, an interface, or a function value can never be
   `nil`. A map or a slice keeps Go's runtime zero value, but code cannot compare it with `nil`
   (§7a).
-- Methods attach to structs, as in Go. Interfaces and ports are structural, as in Go.
+- Methods attach to any defined type that is not a pointer or an interface, as in Go (for example
+  `type Celsius float64`). Interfaces and ports are structural, as in Go.
 
 ### 6.1 Generics
 
@@ -1002,7 +1012,8 @@ has a destination that the compiler knows.
   cancellation to the callee as a context deadline.
 - **No error and no abort is silent.** At the end of the scope, the compiler and the runtime
   handle each exit that the code did not observe:
-  - An unobserved `Failed` exit becomes the error of the scope. A `tasks { }` scope that can
+  - Each unobserved `Failed` exit becomes part of the error of the scope, joined as with Go's
+    `errors.Join`, so no failure is lost. A `tasks { }` scope that can
     produce an error is an expression of type `error`, and the code must handle it like any error
     (§7), for example with `tasks { ... }?`.
   - An unobserved `Aborted` exit aborts the function that contains the scope, at the end of the
@@ -1014,7 +1025,7 @@ has a destination that the compiler knows.
           for _, it := range items {
               go process(it)            // process returns error
           }
-      }?                                // waits here; the first Failed error returns
+      }?                                // waits here; returns all Failed errors, joined
       return nil
   }
   ```
@@ -1030,7 +1041,9 @@ has a destination that the compiler knows.
   a `go` in a handler never makes the response wait without a visible `tasks` scope. Use `detach`
   or a topic for work that must outlive the request.
 - The runtime records each abort report as an RCA trail: the task, the owning scope, the
-  invariant, the source position, and the values.
+  invariant, the source position, and the values. A value of a `secret` type
+  (`type CardNumber secret string`) is always recorded as `[secret]`, in abort reports, traces,
+  dead letters, and logs.
 
 **Aborts under a lock.** Locks use Go's API: `mu.Lock()` and `mu.Unlock()`, with no error. Keel
 adds one thing: a mutex records the task that locked it, and an unlock from another task aborts. Go
@@ -1292,8 +1305,10 @@ How reviewers audit contracts:
 - `test` blocks are next to the code that they test, in `*_test.keel` files in the leaf directory.
 - The design makes each leaf testable in isolation: its only dependencies are the ports in its
   `requires` list.
-- A `fake` block implements a port for tests. Each fake, written or generated, must meet the
-  contract of its port.
+- A fake is declared in a test file with one form: `fake CheckoutOK for Checkout { ... }`. Each
+  fake, written or generated, must meet the contract of its port.
+- In a test, port names are bound for each test separately. Tests that run in parallel have
+  separate bindings, so they never share a fake.
 - The compiler generates a default fake only when it can build values that meet each `ensures`:
   a port with no `ensures`, or with simple equalities that it can solve, such as
   `result.Amount == amount`. Otherwise it reports which clause prevents it, and the developer
@@ -1420,8 +1435,9 @@ Compilation has two separate modes. They run in parallel.
 - **Both modes must pass before linking.** The compiler makes a binary only when the holistic check
   passes and all leaves compile. Neither mode accepts the results of the other without a check.
 - **Both modes run on each build.** `keel build` starts the holistic check at the same time as the
-  per-leaf jobs. The holistic check reads mostly declarations. Thus it is fast, and it is almost
-  never the slowest job.
+  per-leaf jobs. The architecture part of the holistic check reads only declarations, so it finishes
+  early. The near-duplicate part needs the fingerprints of every leaf, so it finishes after the
+  slowest leaf job.
 - **Caching.** The compiler caches the result of each leaf. The cache key is a hash of the
   contents of the leaf directory and the declarations that the leaf depends on. The query engine
   (§12.1) makes the holistic check incremental.
@@ -1449,8 +1465,8 @@ Keel must be competitive with Go, Java, C++, and Rust in speed and in resource u
 
 **How the project measures it.** A benchmark suite runs in CI. It covers CPU-bound work,
 allocation-heavy work, concurrency, and a service with topics. Each benchmark has a target
-relative to Go, Java, C++, and Rust. A change that misses a target fails CI. The numeric targets
-are open question Q22.
+relative to Go, Java, C++, and Rust. Once the numeric targets exist (open question Q22), a change that misses a
+target fails CI.
 
 **What each safety feature costs, and how Keel reduces the cost:**
 
@@ -1463,6 +1479,10 @@ are open question Q22.
 | Durable topics (§5.5.1) | A disk write for each message, on transports that keep queues on disk | The developer chooses the transport and its `durable` setting |
 | Task scopes (§7.1) | A wait at the end of each scope | The same cost as a Go `sync.WaitGroup` |
 | Foreign boundary (§5.4c) | A conversion for each value that crosses | Only at foreign libraries, not at every call |
+| Port calls (§5.3) | An interface dispatch and the port's `requires` and `ensures` at each call | Contracts that are not load-bearing can be turned off; the LLVM backend can make the call direct |
+| Mutex owner (§7.1) | One store of the owner task at each `Lock` and a compare at each `Unlock` | None; it is always on |
+| Tasks (§7.1, §5.5.0) | A `recover` frame and an exit value for each task, and one task for each message | The same order of cost as a goroutine |
+| Optionals (§7a) | `?T` of a non-pointer type holds a flag next to the value | None; pointers use their own `nil` |
 
 **Backends.** On the Go backend, Keel performs like Go, plus the checks above. To close the gap
 with C++ and Rust, the LLVM backend (§12) can use proofs to remove checks and can control memory
