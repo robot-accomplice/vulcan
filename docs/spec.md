@@ -40,7 +40,6 @@ use the same terms.
 | **Composite** | A system, container, or group. A section of `system.keel`, with no code. |
 | **Leaf** | A `component` node: one flat directory of code. |
 | **Library** | A node that holds shared types and reusable code, with no ports and no topics. Its package-level variables cannot be reassigned after startup. It can use an I/O resource but never acquire one. |
-| **Foreign library** | The only kind of library that can import a Go package. It converts values at the boundary. |
 | **Gateway** | The one leaf in a container that talks to a given external system. |
 | **External system** | Software outside the system, such as Stripe. Declared with `external`. |
 | **Person** | A human who uses the system. Declared with `person`. For diagrams. |
@@ -105,21 +104,20 @@ tests. This spec must justify each change and list it in this table:
 | `limit` bounds on variable-size fields | A transport can require bounded messages (§5.5.1) |
 | `requires`, `ensures`, `invariant`, `pure`, and `result`, `old(x)`, `=>` inside contracts; only its own methods write the fields of a struct with an invariant | Contracts in the code (§8) |
 | `startup` functions; `main` is generated | The architecture decides how a process starts (§6) |
-| `test` blocks, `fake X for Port`, `bind`, `*_test.keel` files | Testability by design (§9) |
+| `*_test.keel` files; `keel.Bind` and `keel.Published` in Go tests | Testability by design (§9) |
 
 All other syntax and behavior follow Go.
 
 ### 4.1 Keywords
 
 Keel reserves no word that Go does not. Each new word is a keyword only where the grammar expects
-it: at the start of a declaration (`needs port`, `pure func`, `handle X(`, `test "..."`), after a
+it: at the start of a declaration (`needs port`, `pure func`, `handle X(`), after a
 field type (`limit`), after a signature or a struct (`requires`, `ensures`, `invariant`,
-`timeout`), inside a contract (`result`, `old`), inside a declaration file, and in a `bind` clause
-(`fake`). Everywhere else it can be an identifier.
+`timeout`), inside a contract (`result`, `old`), and inside a declaration file. Everywhere else it can be an identifier.
 
 The new words: `system`, `container`, `group`, `component`, `library`, `transport`, `port`,
 `remote`, `needs`, `requires`, `ensures`, `invariant`, `pure`, `result`, `old`, `uses`, `via`,
-`topic`, `publishes`, `subscribes`, `handle`, `idempotent`, `test`, `fake`, `bind`, `limit`,
+`topic`, `publishes`, `subscribes`, `handle`, `idempotent`, `limit`,
 `gateway`, `entry`, `person`, `external`, `timeout`, `config`, `startup`, and `flag`.
 
 ```go
@@ -188,7 +186,7 @@ component Orders {
     needs port Checkout {
         func Pay(customer CustomerID, amount Money) (Receipt, error)
             requires amount > 0 && amount < MaxOrder
-            ensures  result.Amount == amount
+            ensures  err == nil => result.Amount == amount
     }
 }
 ```
@@ -344,16 +342,53 @@ must be the *same* type on both sides, so it cannot belong to either leaf. It go
 **library**. A library is a node that holds shared types and reusable code. It is not part of the
 architecture at runtime.
 
+A library is a Go package. Its directory holds one `library.keel`, which declares it, and ordinary
+Go code files. Code imports it by its Go import path, as any Go package, and uses its package name
+as the qualifier.
+
 ```go
 // lib/money/library.keel
 // Money represents amounts in minor currency units.
-library Money {
+library money {
+}
+
+// lib/money/money.keel
+package money
+
+type Money int64
+
+// api/billing/billing.keel
+package billing
+
+import "shop/lib/money"      // the module path from go.mod, then the directory
+
+func total(xs []money.Money) money.Money { ... }
+```
+
+A `component.keel` imports libraries the same way, at its top, so its port signatures can use
+their types:
+
+```go
+// api/orders/component.keel
+import "shop/lib/money"
+
+component Orders {
+    needs port Checkout {
+        func Pay(c money.CustomerID, amt money.Money) (money.Receipt, error)
+    }
 }
 ```
 
+**Code files are Go files.** Each starts with a `package` clause that names its directory. A
+function with a contract writes the contract lines between its signature and its body:
+
 ```go
-// api/billing/billing.keel
-import "lib/money"
+func Withdraw(a *Account, amt Money) (Money, error)
+    requires amt > 0
+    ensures  err != nil => a.Balance == old(a.Balance)
+{
+    ...
+}
 ```
 
 Rules:
@@ -383,7 +418,7 @@ Rules:
 
    // lib/orderlogic: compile error. The library chose to open a database.
    func Reprice(id OrderID) error {
-       db := sql.Open(config.DSN)?
+       db, err := sql.Open("postgres", config.DSN)
        ...
    }
    ```
@@ -519,7 +554,9 @@ how many subscribers there are, or when they read.
 
 These rules are part of the language, for every transport:
 
-- **Publish, do not wait for a reader.** A publish gives the message to the transport and returns.
+- **Publish, do not wait for a reader.** `Placed.Publish(msg)` returns nothing. It gives the
+  message to the transport and returns. A message that breaks its invariant or a `limit` panics at
+  the publish, as a failed contract does; a transport that cannot accept the message panics too.
   Subscribers cannot make a publish fail. What happens when a queue is full is the policy of the
   transport. **Under the default `block` policy of `direct`, a publish waits when a subscriber's
   queue is full, so a slow subscriber can slow the publisher.** A developer who wants the publisher
@@ -534,7 +571,7 @@ These rules are part of the language, for every transport:
   response, use a remote method port (§5.5.3). If a publisher needs to know what happened later, it
   subscribes to a separate event that the other side publishes. `Shipped` in the example above is
   such an event.
-- **A state change and a publish are not atomic.** In `orders.Save(o)?; Placed.Publish(m)`, the
+- **A state change and a publish are not atomic.** In `orders.Save(o); Placed.Publish(m)`, the
   process can stop between the two lines, and the event is then lost. Keeping them together is the
   developer's decision: for example, the transactional outbox pattern (write the event to the same
   database transaction, and publish it from there). Keel does not hide this risk.
@@ -585,7 +622,9 @@ Placed.Publish(OrderPlaced{ID: id, Total: t})
 
 ```go
 idempotent handle Shipped(m ShipmentSent) error {
-    orders.MarkShipped(m.OrderID)?
+    if err := orders.MarkShipped(m.OrderID); err != nil {
+        return err      // not acknowledged: the transport retries
+    }
     return nil          // the message is acknowledged here
 }
 ```
@@ -637,12 +676,18 @@ containers needs no broker. It sends from the publisher straight to each subscri
   `capacity: flag("orders-cap", max: 10_000)`. A flag that sets a size must declare a maximum, and
   the compiler uses the maximum to calculate the memory limit.
 - **Delivery:** at least once, unordered. Thus `idempotent` is required on its handlers.
-- **Bounded memory:** `direct` requires topic message types to be bounded with `limit` fields (§6),
-  so that the compiler can calculate the memory limit of each queue: capacity × maximum message
+- **Bounded memory:** `direct` requires topic message types to be bounded with `limit` fields (§6).
+  A `limit` goes on a field, not on a named type: `ID OrderID limit 64`. It counts bytes for a
+  string (Go's `len`) and elements for a slice or a map. The limits bound the memory,
+  and the compiler calculates the memory limit of each queue: capacity × maximum message
   size. `keel audit` shows each limit and the total.
 - **Dead letters:** a message that fails all its retries, or expires, goes to the dead-letter
   route. A drop under `dropOldest` or `dropNewest` is counted, not dead-lettered.
-- **A dead-letter route is a subscribed topic** of type `DeadLetter[T]` in some leaf. If its own
+- **A dead-letter route is a subscribed topic** of type `DeadLetter[T]` in some leaf, declared as
+  `subscribes DeadPlaced topic[keel.DeadLetter[OrderPlaced]]`. `keel.DeadLetter[T]` is a type of
+  the runtime package `keel`, with the fields `Message T`, `Error string` (at most 4 KB),
+  `Attempts int`, `Wire string`, and `Time time.Time`. Its handler must be `idempotent`, as on any
+  `direct` topic. If its own
   handler fails, the message is retried with the source wire's settings, then counted and reported;
   there is no dead letter of a dead letter. The wire
   settings name it, and it can receive from any number of wires whose message type is `T`.
@@ -785,8 +830,8 @@ A contract is a clause on a declaration. It is not a comment.
 | Clause | Attaches to | Meaning |
 |---|---|---|
 | `requires expr` | functions, port methods | Precondition: the obligation of the caller |
-| `ensures expr` | functions, port methods | Postcondition. For a function that can fail, it applies only when the function succeeds, and `result` is the success value. With more than one success value, `result.0`, `result.1`, and so on name them. |
-| `invariant expr` | structs | Is true after construction and after the outermost exported method call returns (§8.2) |
+| `ensures expr` | functions, port methods | Postcondition, checked at every return. `err` is the error result, and `result` is the first other result (`result.0`, `result.1` for several). An expression that uses `result` of a function that can fail must be guarded by `err == nil =>`; the compiler rejects it otherwise. Thus a failure rule is a contract too: `ensures err != nil => a.Balance == old(a.Balance)`. |
+| `invariant expr` | structs | Is true after construction and after the outermost method call returns, exported or not (§8.2) |
 
 ### 8.1 What a contract can contain
 
@@ -867,24 +912,30 @@ How reviewers audit contracts:
 
 ## 9. Testing
 
-- `test` blocks are next to the code that they test, in `*_test.keel` files in the leaf directory.
+Tests are Go tests: `func TestX(t *testing.T)` in `*_test.keel` files in the leaf directory.
+
 - The design makes each leaf testable in isolation: its only dependencies are the ports that it
   `needs` and the topics that it subscribes to.
-- A fake is declared in a test file with one form: `fake CheckoutOK for Checkout { ... }`. Each
-  fake must meet the contract of its port.
-- In a test, port names are bound for each test separately. Tests that run in parallel run in
-  separate processes, so they never share a fake.
-- In a test, each published topic records its messages, and the test can read them.
-- `keel fake <Port>` writes the skeleton of a fake, with one method for each method of the port.
-  The developer fills in the bodies.
-- A `test` block binds fakes to the required ports of the leaf with a `bind` clause:
+- **A fake is an ordinary type** that satisfies the port. It must meet the contract of the port,
+  which is checked at each call, as for the real provider.
+- `keel.Bind(t, &Checkout, CheckoutOK{})` binds a fake to a port name for one test, and restores
+  the wiring when the test ends. Tests that run in parallel run in separate processes.
+- `keel.Published(t, Placed)` returns the messages that the test published on a topic.
+- `keel fake <Port>` writes the skeleton of a fake type, with one method for each method of the
+  port.
 
-  ```go
-  test "pays for an order" {
-      bind { Checkout: fake CheckoutOK }
-      ...
-  }
-  ```
+```go
+func TestPaysForAnOrder(t *testing.T) {
+    keel.Bind(t, &Checkout, CheckoutOK{})
+    if err := Place(order); err != nil {
+        t.Fatal(err)
+    }
+    if got := keel.Published(t, Placed); len(got) != 1 {
+        t.Fatalf("published %d, want 1", len(got))
+    }
+}
+```
+
 - `keel test Billing` builds and runs the tests of one leaf. It does not build the rest of the
   system.
 
@@ -937,7 +988,7 @@ The tools assume that one of their users is an LLM (R8):
 | `keel audit` / `keel archdiff` | Audits contracts and architecture (§8, §10). |
 | `keel fmt` | The one formatter. |
 | `keel test <leaf>` | Builds and runs the tests of one leaf (§9). |
-| `keel fake <Port>` | Writes the skeleton of a fake (§9). |
+| `keel fake <Port>` | Writes the skeleton of a fake type (§9). |
 | `keel trace <id>` | Shows the steps of one traced message (§5.5.1). |
 | `keel check` / `keel build` | The holistic boundary check, and the parallel build of each leaf (§12.2). |
 
