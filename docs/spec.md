@@ -108,7 +108,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
 | Signed integer overflow aborts; unsigned arithmetic wraps as in Go. `+% -% *%` wrap signed values on purpose. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
 | `guarded by` on struct fields, checked by the compiler | Fewer data races, with no ownership system (§7.1) |
-| `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. A task exit is `Completed`, `Failed`, or `Aborted`. | Each error and abort has a known destination (§7.1) |
+| `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. `t := go f()` is an expression that returns a handle; `t.Wait()` returns the sealed exit `Completed`, `Failed`, or `Aborted`. A `sync.Mutex` records its owner task. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
 | `pure` functions | Contracts can call them. The compiler verifies that they have no effects (§8.1) |
 | `test` and `fake` blocks | Testability by design (§9) |
@@ -121,7 +121,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
 | `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
-| Sum types with an exhaustive `switch` | Typed errors, task exits, and state machines (§6) |
+| Sum types are `sealed interface` declarations, matched with Go's type switch, which must be exhaustive | Typed errors, task exits, and state machines (§6) |
 | Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
 | Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
@@ -146,7 +146,7 @@ Keel reserves few words.
   `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
   `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in`, `out`, `topic`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `max`, `guarded`, `acquires`, `idempotent`,
-  `gateway`, `client`, `budget`, `partial`, `person`, `external`, `by`, `of`, `timeout`, `wire`, and
+  `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, `wire`, and
   `flag`.
 
 ```go
@@ -679,13 +679,14 @@ interface, each with its own settings and guarantees.
 
 Containers do not deploy at the same moment. Thus two builds of one system run together, and their
 message types can differ. The holistic check (§12.2) sees only one build. So the compiler also
-compares each message type with the version that is already deployed.
+compares each message type with the last committed schema, in `topics.lock`. It cannot see the
+deployed build; the lock stands for it.
 
 - **The compiler owns the wire format.** It serializes each message in a binary format. Each field
   has a number, and the wire carries the number, not the name. A field number is never used again.
 - **A lock file records each message schema.** `topics.lock`, in the system directory, lists each
-  topic message type with its field numbers, field types, and invariants. The compiler generates
-  the file, and the project commits it.
+  topic message type with its field numbers, field types, and invariants. The compiler assigns
+  the field numbers, generates the file, and the project commits it.
 - **`keel check` compares the current types with the lock.** A compatible change passes, and the
   compiler updates the lock. A breaking change is a compile error.
 
@@ -693,12 +694,11 @@ compares each message type with the version that is already deployed.
 |---|---|
 | Add a field of type `?T` | Compatible. A message from an older publisher has `nil` in the field. |
 | Remove a field of type `?T` | Compatible. An older subscriber reads `nil`. |
-| Rename a field | Compatible. The wire carries the number, not the name. |
-| Relax an invariant | Compatible. |
+| Rename a field | Breaking. Source has no field numbers, so a rename looks like a remove and an add. |
+| Change an invariant (relax or tighten) | Breaking. Both sides check invariants, so a change in either direction rejects messages in one deploy order. |
 | Add a required field (not `?T`) | Breaking. |
 | Remove a required field | Breaking. |
 | Change the type of a field | Breaking. |
-| Tighten an invariant | Breaking. |
 
 - **A breaking change needs a new message type.** For example, `OrderPlacedV2`. During the
   migration, the publisher publishes both types. When no subscriber reads the old type, the
@@ -725,7 +725,8 @@ qty := Stock.Level(sku)?        // the caller must handle Unavailable and Timeou
 ```
 
 - **Transport errors are part of the error set.** Each method of a remote port can also return
-  `Unavailable` and `Timeout`. A `switch` on its errors must handle them.
+  `Unavailable` and `Timeout`: the compiler adds them to the method's sealed error type, so a type
+  switch on its errors must handle them.
 - **Each call has a timeout.** The project config sets a default timeout. A method can override it
   with `timeout`. If no timeout resolves, the code does not compile.
 - **A timeout means the outcome is unknown.** The call can have run or not. The runtime never
@@ -769,11 +770,21 @@ level shows where all behavior is. A container or a group cannot hide logic.
   and in diffs. Thus a model or a reviewer never has to find a type by hand.
 - **Inference works on incomplete programs.** Thus the tools can suggest completions that have
   valid types (R5).
-- **Sum types** (tagged unions), with an exhaustive `switch`. Typed errors and state machines need
-  them. They are a deliberate addition to Go.
+- **Sum types are sealed interfaces.** A `sealed interface` lists its variants, and only those
+  types implement it. Code matches a sum with Go's own type switch, and the compiler checks that
+  the switch handles each variant. Typed errors, task exits, and state machines use this one form.
+
+  ```go
+  type PayError sealed interface { Declined | Expired }
+
+  switch e := err.(type) {
+  case Declined: ...
+  case Expired:  ...
+  }                          // a missing case is a compile error
+  ```
 - **`nil` only in `?T` and `error`.** A plain type, including a pointer, an interface, a slice, or a
   map, can never be `nil` (§7a).
-- Methods attach to structs, as in Go. Interfaces are structural, as in Go. Ports are nominal.
+- Methods attach to structs, as in Go. Interfaces and ports are structural, as in Go.
 
 ### 6.1 Generics
 
@@ -855,8 +866,8 @@ The code **must handle each error explicitly**:
   try/catch block.
 - To discard an error, the code must give a reason. The audit records the reason:
   `ignore err, "cache miss is not an error here"`.
-- A port declares the kinds of error that each of its functions can return. A `switch` on these
-  kinds must be exhaustive.
+- A function or port method can return a sealed error type in place of `error`:
+  `func Pay(...) (Receipt, PayError)`. A type switch on it must be exhaustive.
 - A lint, on by default, marks each catch-all handler that returns a default value. This pattern
   is error masking (R3).
 - **An abort is not an exception.** A broken invariant stops the task with a diagnostic report.
@@ -889,14 +900,14 @@ has a destination that the compiler knows.
 
   ```go
   tasks {
-      t := go price(order)
-      switch exit := <-t.Exit {
-      case Completed:
-          ...
+      t := go price(order)                   // go as an expression returns a handle
+      switch x := t.Wait().(type) {          // Wait returns the sealed Exit[Price]
+      case Completed[Price]:
+          use(x.Value)
       case Failed:
-          log.Error(exit.Err)
+          log.Error(x.Err)
       case Aborted:
-          log.Report(exit.Report)   // the diagnostic: which invariant, where, with what values
+          log.Report(x.Report)   // the diagnostic: which invariant, where, with what values
       }
   }
   ```
@@ -933,17 +944,20 @@ has a destination that the compiler knows.
 - The runtime records each abort report as an RCA trail: the task, the owning scope, the
   invariant, the source position, and the values.
 
-**Aborts under a lock.** Locks behave exactly as in Go: `mu.Lock()` and `mu.Unlock()`, with no
-error. An abort during an update can leave shared data half-changed. Thus, if a task aborts while
-it holds a lock, the abort is **process-level**: the process stops with a report, and the
-deployment restarts it. No other task can see the half-changed data.
+**Aborts under a lock.** Locks use Go's API: `mu.Lock()` and `mu.Unlock()`, with no error. Keel
+adds one thing: a mutex records the task that locked it, and an unlock from another task aborts. Go
+permits a cross-task unlock, but it is rare and hard to review, and without an owner "the task holds
+a lock" has no meaning.
 
-- **Deferred calls run when a task aborts**, in reverse order, as in Go. Thus files and
+An abort during an update can leave shared data half-changed. Thus, if a task aborts while it holds
+a lock, the abort is **process-level**: the process stops at once, **before any deferred call
+runs**, with a report. The deployment restarts it. No other task can see the half-changed data.
+
+- **Deferred calls run when a task that holds no lock aborts**, in reverse order, as in Go. Thus files and
   connections close. An abort inside a deferred call stops the remaining deferred calls, and the
   runtime adds it to the report.
 - Limit: this protects only data that a lock guards. A change to shared data without a lock is a
-  data race, and a data race is already a bug. The sharing rules below and the race detector in
-  test builds find data races.
+  data race, and a data race is already a bug. The data-race tools below help find them.
 
 **Data races.** Keel does not prevent all data races; neither does Go. Preventing all of them
 needs an ownership system, which would be a large break from Go. Keel gives three tools:
