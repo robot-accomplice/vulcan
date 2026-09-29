@@ -90,7 +90,7 @@ each failure. Appendix A lists the sources.
 | R5 | About 94% of compile errors in typed languages are type errors. | Strong static types, and inference that works on incomplete programs, so tools can guide generation by type. | §6 |
 | R6 | AI code is harder to review. It "looks right but isn't". | Contracts in the code that reviewers can audit, and diffs at the architecture level. | §8, §10 |
 | R7 | Developers feel faster than they measure. | Fast verification: incremental builds and per-leaf tests. | §9 |
-| R8 | A new language has no training data, so LLM quality drops steeply. | Syntax close to Go, so the model can use what it knows. A primer (`keel guide`) small enough for a prompt; the full spec is reference. Tools that instruct the model. | §4, §11 |
+| R8 | A new language has no training data, so LLM quality drops steeply. | Syntax close to Go, so the model can use what it knows. A primer (`keel guide`) with a hard budget of 4,000 tokens; the full spec is reference. Tools that instruct the model. | §4, §11 |
 
 ## 4. Syntax
 
@@ -1394,7 +1394,7 @@ The tools assume that one of their users is an LLM (R8):
 
 | Command | Purpose |
 |---|---|
-| `keel guide` | Prints a short language primer, small enough for a prompt, and the conventions of the project. The spec stays small, so that this primer can be complete. |
+| `keel guide` | Prints the language primer (`docs/guide.md`) and the conventions of the project. **The primer has a hard budget of 4,000 tokens**, and it must stay complete: a model that reads only the primer must be able to write correct Keel. A language change that does not fit the budget must be cut or simplified. |
 | `keel context <component>` | Emits the minimum context to work on one leaf: its `component.keel`, the wires in `system.keel` that connect it, and the method sets of the types on the other end of each wire (R1). |
 | `keel query <symbol>` | Looks up a symbol exactly in the symbol index of the compiler. This prevents invented APIs (R4). |
 | `keel explain <code>` | Gives a long explanation of a diagnostic, with examples. |
