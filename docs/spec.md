@@ -58,7 +58,6 @@ use the same terms.
 | **Error** | An ordinary value that reports a failure the code expects and handles. |
 | **Abort** | The stop of a task after a broken invariant (a bug) or an environment failure that the code cannot handle, such as a full disk under a publish. It is not an exception. |
 | **Contract** | A `requires`, `ensures`, or `invariant` clause. |
-| **Layer** | A named level (`domain < app < infra`) that constrains source dependencies. |
 | **Audit** | The `keel audit` report of each escape hatch, override, and unproved claim. |
 
 ## 2. Design principles
@@ -100,7 +99,7 @@ sight. This spec must justify each change from Go and list it in this table:
 
 | Change from Go | Reason |
 |---|---|
-| `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external`, `layer` declarations | Architecture as a first-class construct (§5) |
+| `system`, `container`, `group`, `component`, `library`, `port`, `person`, `external` declarations | Architecture as a first-class construct (§5) |
 | `(T, error)` keeps Go's spelling (`return v, nil`, `return x, err`) but is a sum type: a value or an error, never both. An unhandled error is a compile error. Postfix `?` propagates an error. | R3, and the value is never usable on the error path (§7) |
 | `partial` functions return a value and an error together, as in Go | No data lost at Go boundaries such as `io.Reader` (§7) |
 | `nil` and zero values as in Go, but each use that can panic on `nil` (a dereference, an interface method call, a function-value call, a map write, a channel close) needs a compile-time proof. Parameters and receivers are non-`nil` at entry; `nonnil` marks Go results and fields. `?T` for optional values of any type. | No null dereference can occur (§7a) |
@@ -122,7 +121,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
 | `ignore err, "reason"` | Explicit discards that the audit lists (§7) |
 | Sum types are `sealed interface` declarations, matched with Go's type switch, which must be exhaustive | Typed errors, task exits, and state machines (§6) |
-| Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
+| Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `via`, `flag("...")`, transport settings (`via name{ ... }`), `gateway for`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
 | Contract expressions add `result`, `old(x)`, and `=>` (implies) | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
 | `m.Get(k)` returns `?V`. Other map reads behave as in Go. | Explicit absence when the code wants it (§7a) |
@@ -142,12 +141,12 @@ Keel reserves few words.
   statement (`tasks {`, `ignore err, "..."`, `detach f()`, `handle X(`, `pure func`), or inside a
   declaration file or a contract, or after a field type (`guarded by`, `limit`). Elsewhere they are
   ordinary identifiers. This applies to
-  `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`, `layer`,
-  `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `topic`,
+  `system`, `container`, `group`, `component`, `library`, `foreign`, `port`, `remote`,
+  `requires`, `ensures`, `invariant`, `uses`, `via`, `topic`,
   `transport`, `nonnil`, `nocancel`, `config`, `startup`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `limit`, `guarded`, `handle`, `pure`, `tasks`, `detach`,
   `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `publishes`, `subscribes`, `acquires`, `idempotent`,
-  `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, and `flag`.
+  `gateway`, `partial`, `sealed`, `person`, `external`, `by`, `timeout`, and `flag`.
 
 ```go
 port := 8080                   // an identifier
@@ -191,10 +190,10 @@ has no directory of its own declarations and no code: it is a section of the arc
 ### 5.2 Layout
 
 - **`system.keel`**, at the root, is the architecture file. It declares the containers and groups,
-  the leaves in each, the layers, the people, the external systems, and **every wire**.
+  the leaves in each, the people, the external systems, and **every wire**.
 - **Each leaf is a directory** with one `component.keel` and its source files. `component.keel`
-  declares the **boundary** of the leaf: its layer, each port that it needs, each topic that it
-  publishes or subscribes to, and its `gateway for`, `entry for`, and `budget` lines.
+  declares the **boundary** of the leaf: each port that it needs, each topic that it publishes or
+  subscribes to, and its `gateway for` or `entry for` line.
 - **Directories mirror containers and leaves**: `api/orders/`, `worker/picking/`. Groups are only
   labels in `system.keel`, so they are not directories and not part of any path. The compiler checks
   that the directories and `system.keel` agree.
@@ -206,14 +205,12 @@ and code next to its boundary.
 ### 5.3 Declarations
 
 **A port is declared once, by the leaf that requires it.** This is the Go idiom: the consumer
-defines the interface where it uses it. A leaf declares its boundary in `component.keel`: its
-layer, and each port that it requires, with its methods and contracts.
+defines the interface where it uses it. A leaf declares its boundary in `component.keel`: each
+port that it requires, with its methods and contracts.
 
 ```go
 // api/orders/component.keel
 component Orders {
-    layer app
-
     // Checkout takes payment for a confirmed order.
     needs port Checkout {
         func Pay(customer CustomerID, amount Money) (Receipt, error)
@@ -269,8 +266,6 @@ topic in one command.
 // system.keel
 // Shop is the online store.
 system Shop {
-    layers domain < app < infra
-
     person   Customer "Buys goods through the web store"
     external Stripe   "Card payment processor"
 
@@ -357,28 +352,17 @@ shows.
 7. **Boundary ownership.** A leaf declares each port that it requires, once, in its own
    `component.keel`. The code and the boundary of a leaf never name another leaf. Only
    `system.keel` names two leaves together, in a wire.
-8. **Layers.** The `layers` order of the system constrains **source dependencies**: the libraries
-   that a leaf imports, and the types in its port signatures. A leaf can use these only from its
-   own layer or a lower layer. Layers do not constrain wires. Two wired leaves share no source
-   code, because each owns its own ports, so a wire can connect leaves in any layers. Thus an `app`
-   leaf can require a port that an `infra` adapter provides, and an `infra` HTTP handler can
-   require a port that a `domain` leaf provides. But a port in an `app` leaf cannot mention an
-   `infra` type such as `sql.Row`.
-9. **No cycles.** The graph of wires between the leaves of one container has no cycles.
-10. **Private types.** A type is private to its leaf. Only `system.keel` can name an exported type
+8. **No cycles.** The graph of wires between the leaves of one container has no cycles.
+9. **Private types.** A type is private to its leaf. Only `system.keel` can name an exported type
     of a leaf, in a wire. A type in a port signature must come from a library (§5.4a). This costs a
     library for each shared type, which is the price of leaves that never import each other. The
     compiler reduces it: when a port signature uses a leaf-private type, the fix-it moves the type
     to a library (new or existing) and updates the imports.
-11. **Leaf size budget.** The budget measures the leaf's own text: its `component.keel` and its
-    non-test source, in non-blank, non-comment lines. It does not depend on any other leaf, so a
-    change elsewhere can never push a leaf over its budget. `keel context` reports the full context
-    size as information. Each project sets one
-    `context_budget` value in the `config { }` section of `system.keel`, the one location for
-    project settings. A leaf over the budget is a compile error. The hint tells
-    where to split the leaf. A leaf can raise its own limit with a reason:
-    `budget 12k, "generated parser tables"`. `keel audit` lists each override. Thus each unit stays
-    small enough for a model to hold completely.
+10. **Leaf size (audit).** `keel audit` reports the size of each leaf: its `component.keel` and
+    its non-test source, in non-blank, non-comment lines. A leaf over the project's
+    `context_budget` (set in the `config { }` section of `system.keel`) gets a warning, with a hint
+    that tells where to split it. It is not a compile error, so one more line never forces a
+    split.
 
 ### 5.4a Libraries
 
@@ -391,7 +375,6 @@ architecture at runtime.
 // lib/money/library.keel
 // Money represents amounts in minor currency units.
 library Money {
-    layer domain
 }
 ```
 
@@ -439,10 +422,9 @@ Rules:
    }
    ```
 3. A library can import other libraries. It cannot import leaves or composites. Library imports
-   have no cycles and obey `layers`.
-4. A leaf can import a library in the same layer or a lower layer.
-5. The leaf size budget (rule 11) also applies to libraries.
-6. `keel diagram` shows libraries as shared dependencies. `keel audit` lists the leaves that use
+   have no cycles.
+4. Any leaf can import any library.
+5. `keel diagram` shows libraries as shared dependencies. `keel audit` lists the leaves that use
    each library.
 
 Libraries compile before the leaves that import them. Leaves compile against the library
@@ -458,7 +440,6 @@ they contain no network code.
 // api/stripegateway/component.keel
 // StripeGateway charges cards through Stripe.
 component StripeGateway {
-    layer infra
     gateway for Stripe
 }
 // api/stripegateway/cards.keel: type Cards, with a Charge method that calls Stripe
@@ -477,13 +458,9 @@ Rules:
 1. A container that talks to an external system has exactly one gateway leaf for that system. The
    gateway declares `gateway for <External>`, and `<External>` must be an `external` declaration in
    the system.
-2. Network access follows the single rule in §5.4c, rule 2. Only a gateway can import a client
-   library for an external system.
-3. A client library declares the external system that it serves: `library StripeClient { client
-   of Stripe }`. A gateway can import only the client libraries of its own external system. It can
-   also call generic `acquires network` functions such as those of `net/http`, so an external
-   system without a Go SDK needs no wrapper.
-4. The compiler generates the `uses` relationships in diagrams from the gateway declarations. Thus
+2. Network access follows the single rule in §5.4c, rule 2. A gateway can use any foreign library,
+   including an SDK for its external system or `net/http`.
+3. The compiler generates the `uses` relationships in diagrams from the gateway declarations. Thus
    the diagram cannot be wrong.
 
 **Entry leaves.** Traffic that comes **into** the system, for example HTTP requests from a `person`,
@@ -492,7 +469,6 @@ enters through an **entry leaf**. It is the mirror of a gateway:
 ```go
 // api/web/component.keel
 component Web {
-    layer infra
     entry for Customer          // serves requests from the person Customer
     needs port Checkout { ... }
 }
@@ -518,7 +494,6 @@ that can import a Go package. It gives a Keel API to the rest of the program.
 // lib/stripeclient/library.keel
 // StripeClient wraps the Stripe Go SDK.
 foreign library StripeClient {
-    client of Stripe
     go "github.com/stripe/stripe-go/v82"
 }
 ```
@@ -1443,7 +1418,7 @@ Compilation has two separate modes. They run in parallel.
 |---|---|---|
 | Purpose | Enforce boundaries. Find errors that need global context. | Compile code fast. |
 | Input | All declaration files, all ports, and all signatures. Bodies only for global analyses. | One leaf directory, its `component.keel`, and the declarations of the libraries that it imports. |
-| Finds | All of §5.4 (ports only, wiring, layers, cycles, port compatibility), the topic and transport rules (§5.5 to §5.5.3), near-duplicate code in different leaves (§10), architecture diffs, and the project audit. | Type, error-handling, null, bounds, overflow, and contract errors inside the leaf. |
+| Finds | All of §5.4 (ports only, wiring, cycles, port compatibility), the topic and transport rules (§5.5 to §5.5.3), near-duplicate code in different leaves (§10), architecture diffs, and the project audit. | Type, error-handling, null, bounds, overflow, and contract errors inside the leaf. |
 | Parallelism | One pass over the whole tree. | One job for each leaf. All the jobs run in parallel. |
 
 - **Why a leaf can compile alone.** A leaf declares each port that it requires (§5.3). Thus it
@@ -1465,9 +1440,7 @@ the usual obstacles:
 
 - Consumer-owned ports (§5.3): a leaf compiles against its own declarations, not against the code
   of providers.
-- Inference from the body only (§6): the compiler never infers a type from a call site in another
-  leaf.
-- The leaf size budget (§5.4, rule 11) limits the largest job, and thus the critical path.
+- No cross-leaf inference: every function declares its types (§6).
 - Global analyses of bodies use output from the per-leaf jobs. Each job emits normalized
   fingerprints of its functions. The holistic check compares the fingerprints to find
   near-duplicates, and it does not read the bodies again.
