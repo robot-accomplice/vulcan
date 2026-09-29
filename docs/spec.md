@@ -105,7 +105,7 @@ sight. This spec must justify each change from Go and list it in this table:
 | `partial` functions return a value and an error together, as in Go | No data lost at Go boundaries such as `io.Reader` (§7) |
 | `nil` and zero values as in Go, but each use that can panic on `nil` (a dereference, an interface method call, a function-value call, a map write, a channel close) needs a compile-time proof. Parameters and receivers are non-`nil` at entry; `nonnil` marks Go results and fields. `?T` for optional values of any type. | No null dereference can occur (§7a) |
 | No exceptions of any kind. No `try`, `catch`, `throw`, or `recover()`. | Errors are values. Only a supervising task handles an abort (§7, §7.1) |
-| Signed integer overflow aborts; unsigned arithmetic wraps as in Go. `+% -% *%` wrap signed values on purpose. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
+| Signed integer overflow aborts; unsigned arithmetic wraps as in Go. Signed code that wraps on purpose behaves differently from Go (warning K0701). | Signed overflow is almost always a bug (§7c) |
 | `guarded by` on struct fields and `holds` on helpers, checked by the compiler | Fewer data races, with no ownership system (§7.1) |
 | `go` runs only inside a `tasks { }` scope (structured concurrency); `detach` for background tasks. `t := go f()` is an expression that returns a task value; `t.Wait()` returns the sealed exit `Completed`, `Failed`, or `Aborted`. A `sync.Mutex` records its owner task. | Each error and abort has a known destination (§7.1) |
 | `requires`, `ensures`, and `invariant` clauses | Contracts in the code (§8) |
@@ -118,19 +118,14 @@ sight. This spec must justify each change from Go and list it in this table:
 | `gateway for` and `entry for` leaves; only they call `acquires network` functions | Enforced network access (§5.4b, §5.4c) |
 | `foreign library` and `transport` nodes are the only importers of Go packages; `acquires`, `acquires network`, and `nonnil` marks at the boundary | Keel guarantees hold outside a guarded boundary (§5.4c) |
 | `entry for` leaves serve inbound traffic; `startup` functions; `main` is generated | Architecture as a first-class construct (§5.4b, §7.1) |
-| `secret` types | Redacted in runtime records (§7.1) |
-| Duration and size literals: `200ms`, `24h`, `4KB` | Readable settings and bounds (§5.5.1, §6) |
 | Only leaves call `acquires` functions; libraries use handles they are given | Each I/O decision is visible in a leaf (§5.4a) |
 | `const` extends to composite values and is deeply immutable; libraries have no package-level `var` | Enforceable “no mutable state” in libraries (§5.4a) |
-| `ignore err, "reason"` and `x ?? fallback` | Explicit discards and defaults that the audit lists (§7, §7a) |
+| `ignore err, "reason"` | Explicit discards that the audit lists (§7) |
 | Sum types are `sealed interface` declarations, matched with Go's type switch, which must be exhaustive | Typed errors, task exits, and state machines (§6) |
 | Declaration files (`system.keel` for the architecture, `component.keel` and `library.keel` for boundaries) have their own syntax: wires with paths (`Api/Orders.Checkout`), `uses A -> B`, `layers a < b`, `via`, `flag("...")`, transport settings (`via name{ ... }`), `budget`, `gateway for`, `client of`, `go "package"` | Architecture as a first-class construct. These files hold no Go-style code (§5) |
 | Contract expressions add `result`, `old(x)`, `=>` (implies), `all x in xs: ...`, and `some x in xs: ...` | Contracts in the code (§8.1) |
 | `unreachable` statement | Marks code that must never run; reaching it aborts (§7) |
-| Methods on built-in types: `xs.At(i)`, `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Explicit handling of bounds and overflow (§7b, §7c) |
-| A conversion to a signed type (`int32(x)`) aborts when the value does not fit; conversions to unsigned types truncate as in Go | Go truncates without a signal (§7c) |
 | `m.Get(k)` returns `?V`. Other map reads behave as in Go. | Explicit absence when the code wants it (§7a) |
-| A private function can omit its result types; the body alone determines them | Less noise, with no inference across call sites (§6) |
 | Test files are `*_test.keel` in the leaf directory | Tests next to the code (§9) |
 
 All other syntax follows Go, unless a later section says otherwise. This includes `:=`, `func`,
@@ -151,7 +146,7 @@ Keel reserves few words.
   `layers`, `requires`, `ensures`, `invariant`, `uses`, `via`, `in` (in quantifiers only), `topic`,
   `transport`, `nonnil`, `nocancel`, `config`, `startup`,
   `test`, `fake`, `result`, `old`, `all`, `some`, `limit`, `guarded`, `handle`, `pure`, `tasks`, `detach`,
-  `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `secret`, `publishes`, `subscribes`, `acquires`, `idempotent`,
+  `ignore`, `unreachable`, `entry`, `needs`, `bind`, `holds`, `publishes`, `subscribes`, `acquires`, `idempotent`,
   `gateway`, `client`, `budget`, `partial`, `sealed`, `person`, `external`, `by`, `of`, `timeout`, and `flag`.
 
 ```go
@@ -752,7 +747,7 @@ containers needs no broker. It sends from the publisher straight to each subscri
 
 ```go
 Worker/Picking.Placed: Api/Orders.Placed via direct{
-    capacity: 5_000, ttl: 24h, deadletters: Worker/Alerts.DeadPlaced }
+    capacity: 5_000, ttl: "24h", deadletters: Worker/Alerts.DeadPlaced }
 Analytics/Ingest.Samples: Api/Metrics.Samples via kafka{ topic: "samples" }
 // startup: --transport.direct.peers=worker=10.0.0.7:7000
 ```
@@ -807,7 +802,7 @@ syntax as a port inside a container. The `remote` marker adds what the network m
 // In Api (the consumer declares what it needs):
 needs remote port Stock {
     func Level(sku SKU) (int, error)
-        timeout 200ms
+        timeout "200ms"
 }
 
 // In a leaf of Api:
@@ -859,17 +854,6 @@ level shows where all behavior is. A container or a group cannot hide logic.
 - **Inferred where possible.** The compiler infers the types of local variables, closures, and
   generic instantiations. Port signatures and exported functions are explicit, because humans
   review them as contracts.
-- **A private function can omit its result types, never its parameter types.** A private function
-  is a function that is not exported and is not in a port. The compiler infers its result types
-  from the **body only**, never from its call sites. Parameters always have declared types, so the
-  inference depends only on them: a change to a caller, or a new unrelated type, can never change
-  or break the inferred type. A recursive function must declare its result types.
-
-  ```go
-  func area(s Rect) { return s.W * s.H }   // result int is inferred
-  func area(s) { ... }                      // compile error: a parameter needs a type
-  ```
-
   The tools always show the full inferred signature: in `keel context`, in `keel doc`, on hover,
   and in diffs. Thus a model or a reviewer never has to find a type by hand.
 - **Inference works on incomplete programs.** Thus the tools can suggest completions that have
@@ -887,7 +871,7 @@ level shows where all behavior is. A container or a group cannot hide logic.
   case Expired:  ...
   }                          // a missing case is a compile error
   ```
-- **Bounded fields.** A string, slice, or map field can declare a size limit: `Note string limit 4KB`,
+- **Bounded fields.** A string, slice, or map field can declare a size limit: `Note string limit 4096`,
   `Lines []Line limit 100`. A value over the limit fails the invariant of its struct. A transport
   can require bounded message types (§5.5.1).
 - **`nil` and zero values as in Go.** The compiler proves that each dereference, interface call,
@@ -1066,11 +1050,8 @@ has a destination that the compiler knows.
   a `go` in a handler never makes the response wait without a visible `tasks` scope. Use `detach`
   or a topic for work that must outlive the request.
 - The runtime records each abort report as an RCA trail: the task, the owning scope, the
-  invariant, the source position, and the values. A value of a `secret` type
-  (`type CardNumber secret string`) is always recorded as `[secret]` in the records that the Keel
-  runtime writes: abort reports and traces. A dead letter keeps the real value, so that a replay
-  works. When a secret crosses into Go (§5.4c), it becomes its base type, and `keel audit` lists
-  each crossing, because Go code can log it.
+  invariant, the source position, and the values. For a value that must not appear in
+  records, the standard library type `secret.String` prints as `[secret]`.
 
 **Aborts under a lock.** Locks use Go's API: `mu.Lock()` and `mu.Unlock()`, with no error. Keel
 adds one thing: a mutex records the task that locked it, and an unlock from another task aborts. Go
@@ -1182,12 +1163,10 @@ use(c.Number)              // proved
 **Optional values.** `?T` means "a `T` or absent", for every type `T`. For a type that cannot be
 `nil` (`?int`), absent is written `nil`. For a type that can (`?*User`), `?T` is a separate wrapper,
 so a stored `nil` pointer and "absent" stay different. The same proof rules apply before the value
-is used. Thus generic code such as `?R` or `xs.At(i)` works for every element type.
+is used. Thus generic code such as `?R` or `slices.At(xs, i)` works for every element type.
 
 - An API that "might not find" a value of such a type returns `?T`. Examples: `Find`, a search,
   and a parse that has no error.
-- `x ?? fallback` gives an explicit default. Keel permits it, because the code states the default
-  where it is used. But `keel audit` lists each `??`, the same as `ignore`.
 
 **Maps behave as in Go.** `m[k]` gives the zero value when the key is missing, and `v, ok := m[k]`
 and `m[k]++` work. When the code wants absence to be explicit, `m.Get(k)` returns `?V` (or a
@@ -1219,7 +1198,7 @@ A proof needs both bounds, because `int` is signed. Narrowing follows the stable
 |---|---|
 | The index is proved in range | No Keel runtime check. On the LLVM backend, the check is removed. On the Go backend, Go still emits its own check; the proof gives the compile-time guarantee only. |
 | The index is proved out of range | Compile error. |
-| The compiler cannot decide | **Warning.** The hint shows the three proof patterns above and `xs.At(i)`, which returns `?T`. The runtime checks the index, and `keel audit` lists it. |
+| The compiler cannot decide | **Warning.** The hint shows the three proof patterns above and `slices.At(xs, i)` from the standard library, which returns `?T`. The runtime checks the index, and `keel audit` lists it. |
 | The index is out of range at runtime | Abort, as in Go. Only a supervising parent task observes it (§7.1). |
 
 ## 7c. Integer overflow
@@ -1236,9 +1215,8 @@ where an overflow is a bug.
 | `+ - *`, `<<`, and unary `-` on an unsigned type (`uint`, `uint8` to `uint64`, `byte`, `uintptr`) | Wraps, as in Go. |
 | A conversion to an unsigned type (`byte(x)`, `uint32(x)`) | Truncates, as in Go. |
 | `+ - * / <<` and unary `-` on a signed type (`int`, `int8` to `int64`), for example `math.MinInt64 / -1` | Abort. |
-| A conversion to a signed type (`int32(x)`) | Truncates, as in Go. `CheckedConvert[T]` detects a value that does not fit. |
-| `+% -% *%` on a signed type | Wraps (two's complement), for deliberate signed wrapping. |
-| `a.CheckedAdd(b)`, `CheckedSub`, `CheckedMul`, `CheckedConvert[T]` | Returns `?T`, which is `nil` on overflow. Use these when the code handles the overflow itself. |
+| A conversion to a signed type (`int32(x)`) | Truncates, as in Go. `checked.Convert[T]` detects a value that does not fit. |
+| `checked.Add(a, b)`, `checked.Sub`, `checked.Mul`, `checked.Convert[T](x)` (standard library) | Returns `?T`, which is `nil` on overflow. Use these when the code handles the overflow itself. |
 | Constant expressions | Compile error, as in Go. |
 
 Division by zero aborts, as in Go.
@@ -1256,7 +1234,7 @@ change its behavior. These are the deliberate exceptions, each listed in §4:
 ```
 h = h*31 + int(c)          // h is int
   warning K0701: signed arithmetic that looks like deliberate wrapping
-    fix-it: h = h *% 31 +% int(c), or use an unsigned type
+    fix-it: use an unsigned type, or wrapping.Mul and wrapping.Add from the standard library
 ```
 
 ## 8. Contracts
@@ -1523,7 +1501,7 @@ target fails CI.
 
 | Feature | Runtime cost | Reduction |
 |---|---|---|
-| Overflow checks (§7c) | About one branch for each signed arithmetic operation; unsigned arithmetic has no check | `+%` for deliberate wrapping; the LLVM backend can remove checks that a range proof covers |
+| Overflow checks (§7c) | About one branch for each signed arithmetic operation; unsigned arithmetic has no check | Unsigned types or the `wrapping` package for deliberate wrapping; the LLVM backend can remove checks that a range proof covers |
 | Bounds checks (§7b) | One compare for each unproved index | A proved index needs no Keel check; on LLVM, no check at all |
 | Contracts (§8) | The cost of each expression, in release builds | A leaf can turn off contracts that are not load-bearing; quantifier cost is listed in the audit |
 | Garbage collection | GC pauses and memory overhead | On the Go backend, Go's GC; the LLVM backend needs Keel's own GC |
