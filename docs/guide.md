@@ -18,45 +18,48 @@ transports/kafka/           a transport
 - A **container** is one process. Most systems have one container.
 - A **library** is a Go package that holds shared types and code: a `library.keel` with
   `library money {}`, plus Go files. It has no ports or topics, its package-level `var` is set once
-  at startup, and it never acquires a resource (`os.Open`, `sql.Open`, a client): only leaves do.
+  at startup, and it never chooses a file or a network target (`os.Open`, `sql.Open`, `http.Get`):
+  only leaves do. It can use a handle that its caller gives it (an `io.Reader`, a `*sql.DB`).
 - Every code file is a Go file: `package orders`, imports, code. Import a library by its Go path
   (`import "shop/lib/money"`) and use its package name (`money.Money`).
-- Go packages are imported as in Go. A package that depends on `net`, `os/exec`, or `database/sql`
-  can be imported
-  only by a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf (`entry for Customer`).
-- `main` is generated. A leaf's code runs only from a handler, a port that it provides, an entry
-  leaf's server, or a plain Go function `func startup(ctx context.Context) error` (tests can call
-  it). `main` reads flags, calls constructors, binds ports, then runs every `startup` at once. So
-  open a provider's resources (a database) in its constructor, not in `startup`. A container with
-  no subscription, served remote port, or entry leaf exits after its startup functions finish.
+- Import any Go package. Only a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf
+  (`entry for Customer`) can reach a network function: dial, listen, send an HTTP request,
+  `sql.Open`, `exec.Command`, also inside an SDK. The diagnostic shows the call path.
+- `main` is generated. It reads flags, calls constructors and binds ports, starts subscriptions,
+  then runs every `func startup(ctx context.Context) error` at once (a plain Go function; tests can
+  call it). So open a provider's resources (a database) in its constructor. A leaf cannot declare
+  `init`, and code never assigns a port name. On a stop signal, `main` cancels the startup `ctx`,
+  waits for running work (`shutdown_timeout`, 30 s), then exits.
 
 ## 2. Boundaries and wiring
 
 ```go
 // api/orders/component.keel
-import "shop/lib/money"
+import ("shop/lib/money"; "shop/lib/events")
 
 component Orders {
     needs port Checkout {
         func Pay(c money.CustomerID, amt money.Money) (money.Receipt, error)
             requires amt > 0
     }
-    publishes  Placed  topic[OrderPlaced]
-    subscribes Shipped topic[ShipmentSent]
+    publishes  Placed  topic[events.OrderPlaced]
+    subscribes Shipped topic[events.ShipmentSent]
 }
 ```
 
 - The consumer declares the port. Any exported type with matching methods satisfies it, as a Go
   interface does. The provider never names the consumer.
 - In code, call the port by its name: `r, err := Checkout.Pay(c, amt)`. It is an ordinary call.
-- Types in a port signature come from a library, imported at the top of `component.keel`.
+- Every type that crosses a boundary (port, topic, remote call) is a Go built-in or standard type,
+  or comes from a library. Topic and remote types must come from a library.
 
 ```go
 // system.keel
 system Shop {
     container Api {
-        Web, Orders, Billing
-        Orders.Checkout: Billing.NewPayer
+        Web{ Addr: flag("web-addr", default: ":8080") }, Orders, Billing, StripeGateway
+        Orders.Checkout:     Billing.NewPayer
+        Billing.CardNetwork: StripeGateway.NewCards{ Key: flag("stripe-key") }
     }
     container Worker {
         Alerts
@@ -65,25 +68,24 @@ system Shop {
     person   Customer "Buys goods"
     external Stripe   "Card payments"
     Worker/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
+    Api/Orders.Shipped: Worker/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
     config { context_budget: 400 }
 }
 ```
 
 - Every wire reads `needer: supplier`. Every needed port and subscribed topic is wired once.
-- A wire can fill its constructor's settings struct:
-  `Billing.Cards: Stripe.NewCards{ Key: flag("stripe-key") }`. A constructor can return
-  `(T, error)`. A leaf with no constructor (an entry leaf) gets settings in the container list,
-  `Web{ Addr: flag("web-addr", default: ":8080") }`, as the second parameter of
-  `startup(ctx, s Settings)`.
+- A wire names a constructor, which can return `(T, error)` and take one settings struct, filled
+  at the wire. A wire that names a type `T` provides `new(T)`. An entry leaf gets settings in the
+  container list, as the second parameter of `startup(ctx, s Settings)`.
 - `flag("x")` reads `--x`, else the variable `X`. Without `default:` it is required. A size needs
-  `max:`: `capacity: flag("orders-cap", max: 10_000)`.
+  `max:`: `capacity: flag("orders-cap", max: 10_000)`. A `secret` setting accepts only a flag.
 - Between containers only topics and `needs remote port` cross.
 
 ## 3. Contracts
 
 ```go
 func Withdraw(a *Account, amt Money) (Money, error)
-    requires amt > 0
+    requires a != nil && amt > 0
     ensures  err == nil => a.Balance == old(a.Balance) - amt
     ensures  err != nil => a.Balance == old(a.Balance)
 {
@@ -92,40 +94,49 @@ func Withdraw(a *Account, amt Money) (Money, error)
 
 type Range struct{ Lo, Hi int }
     invariant Lo <= Hi
+
+pure func Positive(x int) bool { return x > 0 }   // contracts call only pure functions
 ```
 
-- `requires` is checked at entry, `ensures` at every return, `invariant` after the outermost
-  method. `err` names the error result and `result` the first other one; use `result` only after
-  `err == nil =>`. A failed contract panics with a report.
-- Contracts run in every build. They may call only `pure` functions: no I/O, no mutation.
+- `requires` is checked at entry, `ensures` at every return, `invariant` after each method call
+  except a call through the method's own receiver. `err` names the error result and `result` the
+  first other one (`result.0`, `result.1` for several); use `result` only after `err == nil =>`.
+- A contract must prove its own index, dereference, and divisor safe, from the conditions on its
+  left or from `requires`: `len(xs) > 0 && xs[0] > 0`. `old(x)` needs a type with no references:
+  `old(len(xs))`.
+- A `pure` function has no effects: it writes only values that it created, and calls only `pure`
+  functions. Its body is plain Go. Use `keel.All(xs, Positive)` for a rule over a collection.
+- Contracts run in every build. A failed contract panics with a report.
 - An invariant must hold for the zero value. Only a struct's own methods write its fields or take
   a field's address (`&e.Amount`): elsewhere, read into locals and build a literal.
 
 ## 4. Topics and remote calls
 
 ```go
-Placed.Publish(OrderPlaced{ID: id})   // returns nothing
+Placed.Publish(events.OrderPlaced{ID: id})   // returns nothing
 
-idempotent handle Shipped(m ShipmentSent) error {
+idempotent handle Shipped(ctx context.Context, m events.ShipmentSent) error {
     return orders.MarkShipped(m.OrderID)
-}                   // acknowledged when it returns nil
+}                   // acknowledged when it returns nil; ctx is optional
 ```
 
 - An error or a panic in a handler means the message is not acknowledged; the transport retries,
   then sends it to the wire's `deadletters` route: a topic declared
-  `subscribes DeadPlaced topic[keel.DeadLetter[OrderPlaced]]`, with fields `Message`, `Error`,
-  `Attempts`, `Wire`, `Time`.
+  `subscribes DeadPlaced topic[keel.DeadLetter[events.OrderPlaced]]`, with fields `Message`,
+  `Error`, `Attempts`, `Wire`, `Time`. A message that fails its invariant goes there at once.
 - `direct` delivers at least once, so every handler on it, including a dead-letter handler, is
-  `idempotent`.
+  `idempotent`. It promises no order.
 - A handler runs one message at a time unless the wire sets `concurrency`.
-- `direct` needs every variable-size message field bounded with `limit`, including named string
-  types: `ID OrderID limit 64`, `Note string limit 2000`, `Lines []Line limit 100`. A `limit`
-  counts bytes for a string, elements for a slice or a map. It takes a constant: `limit MaxNote`.
-  A publish that breaks a limit panics.
+- `direct` needs every variable-size message field bounded with `limit`, one bound per
+  variable-size part: `ID OrderID limit 64`, `Note string limit MaxNote`, `Lines []Line limit 100`,
+  `Tags []string limit 10, 64`. A bound counts bytes for a string, elements for a slice or a map. A
+  publish that breaks a limit panics.
 - Message types are locked in `topics.lock`. Adding or removing a field is compatible if the zero
-  value passes the invariant. A rename, a type change, or an invariant change needs a new type.
-- `needs remote port Stock { func Level(sku SKU) (int, error) timeout 200 * time.Millisecond }`.
-  Errors can also be `Unavailable`, `Timeout`, or `RemotePanic`. The runtime never retries a call.
+  value passes the invariant. A rename, a type change, a `limit` change, or an invariant change
+  needs a new type.
+- `needs remote port Stock { func Level(sku stock.SKU) (int, error) timeout 200 * time.Millisecond }`.
+  The last result is `error`; it can also be `keel.Unavailable`, `keel.Timeout`, or
+  `keel.RemotePanic`. The runtime never retries a call.
 
 ## 5. Tests
 
@@ -136,11 +147,14 @@ type CheckoutOK struct{}
 func (CheckoutOK) Pay(c money.CustomerID, a money.Money) (money.Receipt, error) { return money.Receipt{Amount: a}, nil }
 
 func TestPlace(t *testing.T) {
-    keel.Bind(t, &Checkout, CheckoutOK{})          // this test only
+    keel.Bind(t, &Checkout, CheckoutOK{})          // this test only; not with t.Parallel
     if err := Place(o); err != nil { t.Fatal(err) }
     if got := keel.Published(t, Placed); len(got) != 1 { t.Fatalf("got %d", len(got)) }
+    if err := keel.Deliver(t, Shipped, events.ShipmentSent{OrderID: "o-1"}); err != nil { t.Fatal(err) }
 }
 ```
+
+A fake must meet the port's contract. `keel test` runs the race detector; a race fails the test.
 
 ## 6. Commands
 

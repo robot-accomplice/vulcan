@@ -13,4 +13,4 @@ Keel is a compiled, garbage-collected language. Humans and LLMs use it to build 
 **Status:** specification draft. Nothing is implemented.
 
 - [Specification](docs/spec.md): the design, the research behind it (§3 and Appendix A), and the
-  open questions (§14).
+  open questions (§13).
