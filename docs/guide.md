@@ -25,11 +25,13 @@ transports/kafka/           a transport
 - Import any Go package. Only a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf
   (`entry for Customer`) can reach a network function: dial, listen, send an HTTP request,
   `sql.Open`, `exec.Command`, also inside an SDK. The diagnostic shows the call path.
-- `main` is generated. It reads flags, calls constructors and binds ports, starts subscriptions,
-  then runs every `func startup(ctx context.Context) error` at once (a plain Go function; tests can
-  call it). So open a provider's resources (a database) in its constructor. A leaf cannot declare
-  `init`, and code never assigns a port name. On a stop signal, `main` cancels the startup `ctx`,
-  waits for running work (`shutdown_timeout`, 30 s), then exits.
+- `main` is generated. It reads flags, calls constructors and binds ports, runs every
+  `func setup(ctx context.Context) error`, starts subscriptions, then runs every
+  `func startup(ctx context.Context) error` at once (plain Go functions; tests can call them). Open
+  a provider's resources (a database) in its constructor, and a subscriber's in `setup`. A leaf
+  cannot declare `init`, and code never assigns a port name. On a stop signal, `main` cancels the
+  startup `ctx`, waits for running work (`shutdown_timeout`, 30 s), then exits.
+- Leaf names are unique in the system, also across containers.
 
 ## 2. Boundaries and wiring
 
@@ -101,9 +103,11 @@ pure func Positive(x int) bool { return x > 0 }   // contracts call only pure fu
 - `requires` is checked at entry, `ensures` at every return, `invariant` after each method call
   except a call through the method's own receiver. `err` names the error result and `result` the
   first other one (`result.0`, `result.1` for several); use `result` only after `err == nil =>`.
+  A function with a contract cannot name a parameter or a result `err` or `result`.
 - A contract must prove its own index, dereference, and divisor safe, from the conditions on its
-  left or from `requires`: `len(xs) > 0 && xs[0] > 0`. `old(x)` needs a type with no references:
-  `old(len(xs))`.
+  left, or from a `requires` conjunct that reads only parameters the body never assigns (not their
+  fields): `len(xs) > 0 && xs[0] > 0`, `requires a != nil`. `old(x)` needs a type with no
+  references: `old(len(xs))`.
 - A `pure` function has no effects: it writes only values that it created, and calls only `pure`
   functions. Its body is plain Go. Use `keel.All(xs, Positive)` for a rule over a collection.
 - Contracts run in every build. A failed contract panics with a report.
@@ -131,12 +135,16 @@ idempotent handle Shipped(ctx context.Context, m events.ShipmentSent) error {
   variable-size part: `ID OrderID limit 64`, `Note string limit MaxNote`, `Lines []Line limit 100`,
   `Tags []string limit 10, 64`. A bound counts bytes for a string, elements for a slice or a map. A
   publish that breaks a limit panics.
+- A message type is a struct from a library. It holds only `bool`, numbers, `string`, `[]byte`,
+  `time.Time`, `time.Duration`, arrays, slices, maps with integer, `bool`, or `string` keys, and
+  such structs: no pointers (use a zero value or a separate field for "absent"), no interfaces.
 - Message types are locked in `topics.lock`. Adding or removing a field is compatible if the zero
   value passes the invariant. A rename, a type change, a `limit` change, or an invariant change
   needs a new type.
 - `needs remote port Stock { func Level(sku stock.SKU) (int, error) timeout 200 * time.Millisecond }`.
   The last result is `error`; it can also be `keel.Unavailable`, `keel.Timeout`, or
-  `keel.RemotePanic`. The runtime never retries a call.
+  `keel.RemotePanic`. The runtime never retries a call. An error crosses as text; declare it with
+  `keel.NewError("stock.unknown-sku", "unknown SKU")` so that `errors.Is` matches on the caller.
 
 ## 5. Tests
 
