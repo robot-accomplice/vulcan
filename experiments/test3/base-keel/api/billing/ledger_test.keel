@@ -1,0 +1,31 @@
+package billing
+
+import (
+    "errors"
+    "testing"
+
+    "shop/lib/shop"
+)
+
+// A refund must never return money that was not taken.
+func TestRefundNeverExceedsCharge(t *testing.T) {
+    l := NewLedger()
+    if _, err := l.Charge("c1", "o-1", 1000); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := l.Refund("o-1", 600); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := l.Refund("o-1", 401); !errors.Is(err, shop.ErrOverRefund) {
+        t.Fatalf("second refund: got %v, want ErrOverRefund", err)
+    }
+    if _, err := l.Refund("o-1", 400); err != nil {
+        t.Fatalf("exact remainder must refund: %v", err)
+    }
+}
+
+func TestRefundWithoutChargeFails(t *testing.T) {
+    if _, err := NewLedger().Refund("o-9", 1); !errors.Is(err, shop.ErrNotCharged) {
+        t.Fatalf("got %v, want ErrNotCharged", err)
+    }
+}

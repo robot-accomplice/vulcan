@@ -1,0 +1,81 @@
+package billing
+
+import (
+    "fmt"
+    "sync"
+
+    "shop/lib/shop"
+)
+
+// account is the money that one order has charged and refunded.
+type account struct {
+    customer shop.CustomerID
+    charged  shop.Money
+    refunded shop.Money
+}
+    invariant charged >= 0 && refunded >= 0 && refunded <= charged
+
+func (a *account) charge(amount shop.Money)
+    requires amount > 0
+    ensures  a.charged == old(a.charged) + amount
+{
+    a.charged += amount
+}
+
+func (a *account) refund(amount shop.Money) error
+    requires amount > 0
+    ensures  err == nil => a.refunded == old(a.refunded) + amount
+    ensures  err != nil => a.refunded == old(a.refunded)
+{
+    if a.refunded+amount > a.charged {
+        return fmt.Errorf("refund of %d (charged %d, refunded %d): %w",
+            amount, a.charged, a.refunded, shop.ErrOverRefund)
+    }
+    a.refunded += amount
+    return nil
+}
+
+// Ledger records charges and refunds per order.
+type Ledger struct {
+    mu       sync.Mutex
+    accounts map[shop.OrderID]*account
+}
+
+// NewLedger returns an empty ledger.
+func NewLedger() *Ledger {
+    return &Ledger{accounts: map[shop.OrderID]*account{}}
+}
+
+// Charge takes amount from the customer for the order.
+func (l *Ledger) Charge(customer shop.CustomerID, order shop.OrderID, amount shop.Money) (shop.Receipt, error)
+    requires amount > 0
+    ensures  err == nil => result.Amount == amount && result.Order == order
+{
+    l.mu.Lock()
+    defer l.mu.Unlock()
+    a, ok := l.accounts[order]
+    if !ok {
+        a = &account{customer: customer}
+        l.accounts[order] = a
+    }
+    a.charge(amount)
+    return shop.Receipt{Customer: customer, Order: order, Amount: amount}, nil
+}
+
+// Refund returns amount to the customer who paid for the order.
+// The total refunded for an order never exceeds the total charged.
+func (l *Ledger) Refund(order shop.OrderID, amount shop.Money) (shop.Receipt, error)
+    requires amount > 0
+    ensures  err == nil => result.Amount == amount && result.Order == order
+{
+    l.mu.Lock()
+    defer l.mu.Unlock()
+    a, ok := l.accounts[order]
+    if !ok || a.charged == 0 {
+        return shop.Receipt{}, fmt.Errorf("refund %s: %w", order, shop.ErrNotCharged)
+    }
+    if err := a.refund(amount); err != nil {
+        return shop.Receipt{}, fmt.Errorf("refund %s: %w", order, err)
+    }
+    return shop.Receipt{Customer: a.customer, Order: order, Amount: amount}, nil
+}

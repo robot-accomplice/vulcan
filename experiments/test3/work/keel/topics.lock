@@ -1,0 +1,22 @@
+# topics.lock: the committed schema of each topic message type (spec §5.5.2).
+# keel check generates and updates this file. Commit it. Do not edit it by hand.
+# Field numbers are never used again.
+
+message shop.OrderShipped {
+    package  shop/lib/shop
+    topics   Worker/Picking.Shipped -> Api/Orders.Shipped
+    field 1  Order  shop.OrderID  limit 64
+    field 2  Note   string        limit 500
+    invariants none
+}
+
+message keel.DeadLetter[shop.OrderShipped] {
+    package  keel.dev/keel
+    topics   deadletters of Api/Orders.Shipped -> Api/Alerts.DeadShipped
+    field 1  Message   shop.OrderShipped
+    field 2  Error     string     limit 4096
+    field 3  Attempts  int
+    field 4  Wire      string
+    field 5  Time      time.Time
+    invariants none
+}

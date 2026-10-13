@@ -1,0 +1,3 @@
+// shop holds the types that cross a port or a topic: ids, money, receipts, orders, events.
+library shop {
+}

@@ -1,0 +1,135 @@
+package orders
+
+import (
+    "fmt"
+    "strconv"
+    "sync"
+
+    "shop/lib/shop"
+)
+
+// record is one order as Orders stores it.
+type record struct {
+    id       shop.OrderID
+    customer shop.CustomerID
+    amount   shop.Money
+    status   shop.Status
+    note     string
+}
+    invariant amount >= 0 && len(note) <= shop.MaxNoteBytes
+
+func (r *record) view() shop.Order {
+    return shop.Order{ID: r.id, Customer: r.customer, Amount: r.amount, Status: r.status, ShippingNote: r.note}
+}
+
+func (r *record) cancel()
+    ensures r.status == shop.Cancelled
+{
+    r.status = shop.Cancelled
+}
+
+func (r *record) ship(note string)
+    requires len(note) <= shop.MaxNoteBytes
+    ensures  r.status == shop.Shipped
+{
+    r.status = shop.Shipped
+    r.note = note
+}
+
+// orderBook holds every order of this process. The Ordering methods and the Shipped
+// handler both use it, so a lock guards it.
+type orderBook struct {
+    mu     sync.Mutex
+    nextID int
+    orders map[shop.OrderID]*record
+}
+
+func newBook() *orderBook {
+    return &orderBook{orders: map[shop.OrderID]*record{}}
+}
+
+var book = newBook()
+
+// Service is the order desk that the web entry point calls.
+type Service struct{}
+
+// NewService returns the order desk.
+func NewService() *Service { return &Service{} }
+
+// Place creates an order and charges the customer for it.
+func (s *Service) Place(customer shop.CustomerID, amount shop.Money) (shop.Order, error)
+    requires amount > 0
+    ensures  err == nil => result.Amount == amount && result.Customer == customer && result.Status == shop.Placed
+{
+    book.mu.Lock()
+    defer book.mu.Unlock()
+    book.nextID++
+    id := shop.OrderID("o-" + strconv.Itoa(book.nextID))
+    if _, err := Payments.Charge(customer, id, amount); err != nil {
+        return shop.Order{}, fmt.Errorf("place %s: %w", id, err)
+    }
+    r := &record{id: id, customer: customer, amount: amount, status: shop.Placed}
+    book.orders[id] = r
+    return r.view(), nil
+}
+
+// Cancel cancels a placed order and refunds its full amount.
+func (s *Service) Cancel(id shop.OrderID) (shop.Order, error)
+    ensures err == nil => result.ID == id && result.Status == shop.Cancelled
+{
+    book.mu.Lock()
+    defer book.mu.Unlock()
+    r, ok := book.orders[id]
+    if !ok {
+        return shop.Order{}, shop.ErrNotFound
+    }
+    switch r.status {
+    case shop.Cancelled:
+        return shop.Order{}, shop.ErrCancelled
+    case shop.Shipped:
+        return shop.Order{}, shop.ErrShipped
+    }
+    if _, err := Payments.Refund(id, r.amount); err != nil {
+        return shop.Order{}, fmt.Errorf("cancel %s: %w", id, err)
+    }
+    r.cancel()
+    return r.view(), nil
+}
+
+// Get returns one order.
+func (s *Service) Get(id shop.OrderID) (shop.Order, error)
+    ensures err == nil => result.ID == id
+{
+    book.mu.Lock()
+    defer book.mu.Unlock()
+    r, ok := book.orders[id]
+    if !ok {
+        return shop.Order{}, shop.ErrNotFound
+    }
+    return r.view(), nil
+}
+
+// markShipped marks an order shipped. A repeat for a shipped order succeeds and
+// changes nothing, because direct can deliver the same message more than once.
+func markShipped(m shop.OrderShipped) error {
+    book.mu.Lock()
+    defer book.mu.Unlock()
+    r, ok := book.orders[m.Order]
+    if !ok {
+        return fmt.Errorf("ship %s: %w", m.Order, shop.ErrNotFound)
+    }
+    switch r.status {
+    case shop.Shipped:
+        return nil
+    case shop.Cancelled:
+        return fmt.Errorf("ship %s: %w", m.Order, shop.ErrCancelled)
+    }
+    r.ship(m.Note)
+    return nil
+}
+
+// Shipped is acknowledged when markShipped returns nil. An error makes direct
+// retry, then send the message to the dead-letter route.
+idempotent handle Shipped(m shop.OrderShipped) error {
+    return markShipped(m)
+}

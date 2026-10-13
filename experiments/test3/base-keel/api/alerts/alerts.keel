@@ -1,0 +1,17 @@
+package alerts
+
+import (
+    "log"
+    "time"
+
+    "keel.dev/keel"
+    "shop/lib/shop"
+)
+
+// DeadShipped logs a shipment that its subscriber failed to record. Logging the same
+// dead letter twice is harmless, so the handler is idempotent.
+idempotent handle DeadShipped(m keel.DeadLetter[shop.OrderShipped]) error {
+    log.Printf("dead letter on %s: order %s after %d attempts at %s: %s",
+        m.Wire, m.Message.Order, m.Attempts, m.Time.Format(time.RFC3339), m.Error)
+    return nil
+}

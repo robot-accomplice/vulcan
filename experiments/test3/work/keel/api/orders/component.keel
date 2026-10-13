@@ -1,0 +1,18 @@
+import "shop/lib/shop"
+
+// Orders places, cancels, and ships orders. It keeps orders in memory.
+// It provides the type Service.
+component Orders {
+    // Payments charges a customer when an order is placed, and refunds on cancel.
+    needs port Payments {
+        func Charge(customer shop.CustomerID, order shop.OrderID, amount shop.Money) (shop.Receipt, error)
+            requires amount > 0
+            ensures  err == nil => result.Amount == amount && result.Order == order
+        func Refund(order shop.OrderID, amount shop.Money) (shop.Receipt, error)
+            requires amount > 0
+            ensures  err == nil => result.Amount == amount && result.Order == order
+    }
+
+    // Shipped: an order left the warehouse. Delivery can repeat.
+    subscribes Shipped topic[shop.OrderShipped]
+}

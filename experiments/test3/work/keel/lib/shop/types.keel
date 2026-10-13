@@ -1,0 +1,78 @@
+package shop
+
+import (
+    "errors"
+    "time"
+)
+
+// CustomerID identifies a customer.
+type CustomerID string
+
+// OrderID identifies an order.
+type OrderID string
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records one charge or one refund.
+type Receipt struct {
+    Customer CustomerID
+    Order    OrderID
+    Amount   Money
+}
+    invariant Amount >= 0
+
+// AuditKind says which money movement an audit entry records.
+type AuditKind string
+
+const (
+    AuditCharge AuditKind = "charge"
+    AuditRefund AuditKind = "refund"
+)
+
+// AuditEntry is one line of the audit trail: one charge or one refund that Billing
+// recorded. The audit store sets At when it writes the entry; a writer leaves it zero.
+type AuditEntry struct {
+    Order    OrderID    `json:"order"`
+    Customer CustomerID `json:"customer"`
+    Kind     AuditKind  `json:"kind"`
+    Amount   Money      `json:"amount"`
+    At       time.Time  `json:"at"`
+}
+    invariant Amount >= 0
+
+// Status is the state of an order.
+type Status string
+
+const (
+    Placed    Status = "placed"
+    Cancelled Status = "cancelled"
+    Shipped   Status = "shipped"
+)
+
+// Order is the view of one order that the web API returns.
+type Order struct {
+    ID           OrderID    `json:"id"`
+    Customer     CustomerID `json:"customer"`
+    Amount       Money      `json:"amount"`
+    Status       Status     `json:"status"`
+    ShippingNote string     `json:"shippingNote,omitempty"`
+}
+
+// MaxNoteBytes is the largest Note that an OrderShipped event can carry.
+const MaxNoteBytes = 500
+
+// OrderShipped announces that an order left the warehouse.
+type OrderShipped struct {
+    Order OrderID limit 64
+    Note  string  limit 500
+}
+
+// Errors that callers match with errors.Is.
+var (
+    ErrNotCharged = errors.New("billing: order not charged")
+    ErrOverRefund = errors.New("billing: refund exceeds charge")
+    ErrNotFound   = errors.New("orders: order not found")
+    ErrCancelled  = errors.New("orders: order is cancelled")
+    ErrShipped    = errors.New("orders: order is shipped")
+)

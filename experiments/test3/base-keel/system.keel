@@ -1,0 +1,18 @@
+// Shop is the online store.
+system Shop {
+    person Customer "Places, cancels, and looks up orders through the web API"
+
+    container Api {
+        Web, Orders, Billing, Alerts
+
+        Web.Ordering:    Orders.NewService
+        Orders.Payments: Billing.NewLedger
+    }
+
+    container Worker {
+        Picking
+    }
+
+    // Between containers: topics only.
+    Api/Orders.Shipped: Worker/Picking.Shipped via direct{ deadletters: Api/Alerts.DeadShipped }
+}

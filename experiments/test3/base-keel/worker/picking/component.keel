@@ -1,0 +1,6 @@
+import "shop/lib/shop"
+
+// Picking ships orders and announces each shipment.
+component Picking {
+    publishes Shipped topic[shop.OrderShipped]
+}

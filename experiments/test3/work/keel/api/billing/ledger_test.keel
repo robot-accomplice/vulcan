@@ -1,0 +1,109 @@
+package billing
+
+import (
+    "errors"
+    "testing"
+
+    "keel.dev/keel"
+    "shop/lib/shop"
+)
+
+// auditFake keeps the entries that Billing wrote. If err is set, every write fails.
+type auditFake struct {
+    entries []shop.AuditEntry
+    err     error
+}
+
+func (f *auditFake) Record(e shop.AuditEntry) error {
+    if f.err != nil {
+        return f.err
+    }
+    f.entries = append(f.entries, e)
+    return nil
+}
+
+// A refund must never return money that was not taken.
+func TestRefundNeverExceedsCharge(t *testing.T) {
+    keel.Bind(t, &Audit, &auditFake{})
+    l := NewLedger()
+    if _, err := l.Charge("c1", "o-1", 1000); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := l.Refund("o-1", 600); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := l.Refund("o-1", 401); !errors.Is(err, shop.ErrOverRefund) {
+        t.Fatalf("second refund: got %v, want ErrOverRefund", err)
+    }
+    if _, err := l.Refund("o-1", 400); err != nil {
+        t.Fatalf("exact remainder must refund: %v", err)
+    }
+}
+
+func TestRefundWithoutChargeFails(t *testing.T) {
+    keel.Bind(t, &Audit, &auditFake{})
+    if _, err := NewLedger().Refund("o-9", 1); !errors.Is(err, shop.ErrNotCharged) {
+        t.Fatalf("got %v, want ErrNotCharged", err)
+    }
+}
+
+// The audit trail must show every money movement and nothing else: one line per
+// charge and per refund that succeeded, and no line for a refund the ledger rejected.
+func TestAuditRecordsEachMovementOnce(t *testing.T) {
+    f := &auditFake{}
+    keel.Bind(t, &Audit, f)
+    l := NewLedger()
+    if _, err := l.Charge("c1", "o-1", 1000); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := l.Refund("o-1", 300); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := l.Refund("o-1", 701); !errors.Is(err, shop.ErrOverRefund) {
+        t.Fatalf("over-refund: got %v, want ErrOverRefund", err)
+    }
+    if _, err := l.Refund("o-2", 1); !errors.Is(err, shop.ErrNotCharged) {
+        t.Fatalf("refund uncharged: got %v, want ErrNotCharged", err)
+    }
+    want := []shop.AuditEntry{
+        {Order: "o-1", Customer: "c1", Kind: shop.AuditCharge, Amount: 1000},
+        {Order: "o-1", Customer: "c1", Kind: shop.AuditRefund, Amount: 300},
+    }
+    if len(f.entries) != len(want) {
+        t.Fatalf("entries = %+v, want %+v", f.entries, want)
+    }
+    for i := range want {
+        if f.entries[i] != want[i] {
+            t.Fatalf("entry %d = %+v, want %+v", i, f.entries[i], want[i])
+        }
+    }
+}
+
+// No money moves without an audit line: a failed audit write fails the charge or
+// the refund and leaves the ledger as it was.
+func TestFailedAuditMovesNoMoney(t *testing.T) {
+    f := &auditFake{}
+    keel.Bind(t, &Audit, f)
+    l := NewLedger()
+
+    f.err = errors.New("db down")
+    if _, err := l.Charge("c1", "o-1", 1000); err == nil {
+        t.Fatal("charge succeeded without an audit line")
+    }
+    f.err = nil
+    if _, err := l.Refund("o-1", 1); !errors.Is(err, shop.ErrNotCharged) {
+        t.Fatalf("failed charge was kept: refund got %v, want ErrNotCharged", err)
+    }
+
+    if _, err := l.Charge("c1", "o-1", 1000); err != nil {
+        t.Fatal(err)
+    }
+    f.err = errors.New("db down")
+    if _, err := l.Refund("o-1", 1000); err == nil {
+        t.Fatal("refund succeeded without an audit line")
+    }
+    f.err = nil
+    if _, err := l.Refund("o-1", 1000); err != nil {
+        t.Fatalf("failed refund was kept: full refund got %v", err)
+    }
+}

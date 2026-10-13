@@ -1,0 +1,80 @@
+package auditlog
+
+import (
+    "context"
+    "database/sql"
+    "os"
+    "strconv"
+    "testing"
+    "time"
+
+    "shop/lib/shop"
+)
+
+// openTestDB opens the database named by AUDIT_DATABASE_URL and creates the table.
+// Without that variable the test is skipped, because the store is only Postgres code.
+func openTestDB(t *testing.T) {
+    t.Helper()
+    dsn := os.Getenv(dsnEnv)
+    if dsn == "" {
+        t.Skipf("%s not set; skipping Postgres test", dsnEnv)
+    }
+    conn, err := sql.Open("pgx", dsn)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if _, err := conn.ExecContext(context.Background(), schema); err != nil {
+        t.Fatal(err)
+    }
+    db = conn
+    t.Cleanup(func() {
+        db = nil
+        if err := conn.Close(); err != nil {
+            t.Errorf("close test database: %v", err)
+        }
+    })
+}
+
+// The trail of an order must list its own entries in write order, so a reader sees
+// the charge before the refund, and must not show other orders.
+func TestForOrderReturnsOwnEntriesInOrder(t *testing.T) {
+    openTestDB(t)
+    s := NewStore()
+    order := shop.OrderID("test-" + strconv.FormatInt(time.Now().UnixNano(), 10))
+    other := order + "-other"
+    writes := []shop.AuditEntry{
+        {Order: order, Customer: "c1", Kind: shop.AuditCharge, Amount: 1000},
+        {Order: other, Customer: "c2", Kind: shop.AuditCharge, Amount: 50},
+        {Order: order, Customer: "c1", Kind: shop.AuditRefund, Amount: 400},
+    }
+    for _, e := range writes {
+        if err := s.Record(e); err != nil {
+            t.Fatal(err)
+        }
+    }
+    got, err := s.ForOrder(order)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(got) != 2 || got[0].Kind != shop.AuditCharge || got[1].Kind != shop.AuditRefund ||
+        got[0].Amount != 1000 || got[1].Amount != 400 || got[0].At.IsZero() {
+        t.Fatalf("trail = %+v", got)
+    }
+}
+
+// An order with no entries returns an empty list, so the web API answers [] and not null.
+func TestForOrderUnknownIsEmpty(t *testing.T) {
+    openTestDB(t)
+    got, err := NewStore().ForOrder("no-such-order")
+    if err != nil || got == nil || len(got) != 0 {
+        t.Fatalf("got %v, %v; want empty slice", got, err)
+    }
+}
+
+// A call before startup must fail with an error, not panic on a nil database.
+func TestNotStarted(t *testing.T) {
+    db = nil
+    if err := NewStore().Record(shop.AuditEntry{Order: "o-1", Kind: shop.AuditCharge, Amount: 1}); err != ErrNotStarted {
+        t.Fatalf("got %v, want ErrNotStarted", err)
+    }
+}

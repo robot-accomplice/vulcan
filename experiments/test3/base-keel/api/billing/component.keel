@@ -1,0 +1,4 @@
+// Billing charges and refunds customers, and keeps an in-memory ledger.
+// It provides the type Ledger. It needs nothing.
+component Billing {
+}

@@ -1,0 +1,17 @@
+import "shop/lib/shop"
+
+// Web serves the HTTP API for orders.
+component Web {
+    entry for Customer
+
+    // Ordering places, cancels, and looks up orders.
+    needs port Ordering {
+        func Place(customer shop.CustomerID, amount shop.Money) (shop.Order, error)
+            requires amount > 0
+            ensures  err == nil => result.Amount == amount && result.Customer == customer && result.Status == shop.Placed
+        func Cancel(id shop.OrderID) (shop.Order, error)
+            ensures  err == nil => result.ID == id && result.Status == shop.Cancelled
+        func Get(id shop.OrderID) (shop.Order, error)
+            ensures  err == nil => result.ID == id
+    }
+}

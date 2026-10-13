@@ -1,0 +1,128 @@
+package auditlog
+
+import (
+    "context"
+    "database/sql"
+    "errors"
+    "fmt"
+    "log"
+    "os"
+    "time"
+
+    _ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+
+    "shop/lib/shop"
+)
+
+// dsnEnv names the environment variable that holds the Postgres connection string.
+const dsnEnv = "AUDIT_DATABASE_URL"
+
+// queryTimeout bounds each database call. The ports have no context, so the store sets one.
+const queryTimeout = 2 * time.Second
+
+// ErrNotStarted means a call came before startup opened the database.
+var ErrNotStarted = errors.New("auditlog: database not open")
+
+const schema = `
+CREATE TABLE IF NOT EXISTS billing_audit (
+    id       bigserial   PRIMARY KEY,
+    order_id text        NOT NULL,
+    customer text        NOT NULL,
+    kind     text        NOT NULL CHECK (kind IN ('charge', 'refund')),
+    amount   bigint      NOT NULL CHECK (amount > 0),
+    at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS billing_audit_order ON billing_audit (order_id, id);`
+
+// db is opened once by startup and shared by every Store.
+var db *sql.DB
+
+// Store writes and reads audit entries.
+type Store struct{}
+
+// NewStore returns the audit store.
+func NewStore() *Store { return &Store{} }
+
+// Record writes one audit entry. The database sets its time.
+func (s *Store) Record(e shop.AuditEntry) error
+    requires e.Amount > 0 && e.Order != "" && (e.Kind == shop.AuditCharge || e.Kind == shop.AuditRefund)
+{
+    if db == nil {
+        return ErrNotStarted
+    }
+    ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+    defer cancel()
+    _, err := db.ExecContext(ctx,
+        `INSERT INTO billing_audit (order_id, customer, kind, amount) VALUES ($1, $2, $3, $4)`,
+        string(e.Order), string(e.Customer), string(e.Kind), int64(e.Amount))
+    if err != nil {
+        return fmt.Errorf("auditlog: record %s %s %d: %w", e.Kind, e.Order, e.Amount, err)
+    }
+    return nil
+}
+
+// ForOrder returns the audit entries of one order, oldest first. An order with no
+// entries returns an empty slice and no error.
+func (s *Store) ForOrder(id shop.OrderID) ([]shop.AuditEntry, error)
+    ensures err == nil => result != nil
+{
+    if db == nil {
+        return nil, ErrNotStarted
+    }
+    ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+    defer cancel()
+    rows, err := db.QueryContext(ctx,
+        `SELECT order_id, customer, kind, amount, at FROM billing_audit WHERE order_id = $1 ORDER BY id`,
+        string(id))
+    if err != nil {
+        return nil, fmt.Errorf("auditlog: read %s: %w", id, err)
+    }
+    entries, err := scanEntries(rows)
+    if err = errors.Join(err, rows.Close()); err != nil {
+        return nil, fmt.Errorf("auditlog: read %s: %w", id, err)
+    }
+    return entries, nil
+}
+
+// scanEntries reads every row. The caller closes rows.
+func scanEntries(rows *sql.Rows) ([]shop.AuditEntry, error) {
+    entries := []shop.AuditEntry{}
+    for rows.Next() {
+        var e shop.AuditEntry
+        if err := rows.Scan(&e.Order, &e.Customer, &e.Kind, &e.Amount, &e.At); err != nil {
+            return nil, err
+        }
+        entries = append(entries, e)
+    }
+    return entries, rows.Err()
+}
+
+// startup opens the database, checks that it answers, and creates the table if it
+// is missing. It closes the database when ctx is cancelled.
+startup func(ctx context.Context) error {
+    dsn := os.Getenv(dsnEnv)
+    if dsn == "" {
+        return fmt.Errorf("auditlog: %s is not set", dsnEnv)
+    }
+    conn, err := sql.Open("pgx", dsn)
+    if err != nil {
+        return fmt.Errorf("auditlog: open: %w", err)
+    }
+    pingCtx, cancel := context.WithTimeout(ctx, queryTimeout)
+    defer cancel()
+    if err := conn.PingContext(pingCtx); err != nil {
+        return errors.Join(fmt.Errorf("auditlog: connect: %w", err), conn.Close())
+    }
+    if _, err := conn.ExecContext(pingCtx, schema); err != nil {
+        return errors.Join(fmt.Errorf("auditlog: create table: %w", err), conn.Close())
+    }
+    db = conn
+    go func() {
+        <-ctx.Done()
+        // The process is stopping and no caller is left to return to, so the error is logged.
+        if err := conn.Close(); err != nil {
+            log.Printf("auditlog: close database: %v", err)
+        }
+    }()
+    return nil
+}

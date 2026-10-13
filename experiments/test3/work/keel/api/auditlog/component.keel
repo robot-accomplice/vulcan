@@ -1,0 +1,5 @@
+// AuditLog stores the audit trail of charges and refunds in Postgres, and reads it back.
+// It provides the type Store. It is the only leaf that talks to AuditDB.
+component AuditLog {
+    gateway for AuditDB
+}

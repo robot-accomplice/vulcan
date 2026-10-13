@@ -1,0 +1,93 @@
+package web
+
+import (
+    "context"
+    "encoding/json"
+    "errors"
+    "net/http"
+
+    "shop/lib/shop"
+)
+
+// listenAddr is where the API serves HTTP.
+const listenAddr = ":8080"
+
+type placeRequest struct {
+    Customer shop.CustomerID `json:"customer"`
+    Amount   shop.Money      `json:"amount"`
+}
+
+// routes serves:
+//
+//    POST /orders              {"customer":"c1","amount":1250}
+//    POST /orders/{id}/cancel
+//    GET  /orders/{id}
+func routes() http.Handler {
+    mux := http.NewServeMux()
+    mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
+        var req placeRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            http.Error(w, "bad JSON: "+err.Error(), http.StatusBadRequest)
+            return
+        }
+        // Ordering.Place requires amount > 0, so the request is checked here.
+        if req.Customer == "" || req.Amount <= 0 {
+            http.Error(w, "customer is required and amount must be positive", http.StatusBadRequest)
+            return
+        }
+        o, err := Ordering.Place(req.Customer, req.Amount)
+        if err != nil {
+            writeErr(w, err)
+            return
+        }
+        writeJSON(w, http.StatusCreated, o)
+    })
+    mux.HandleFunc("POST /orders/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
+        o, err := Ordering.Cancel(shop.OrderID(r.PathValue("id")))
+        if err != nil {
+            writeErr(w, err)
+            return
+        }
+        writeJSON(w, http.StatusOK, o)
+    })
+    mux.HandleFunc("GET /orders/{id}", func(w http.ResponseWriter, r *http.Request) {
+        o, err := Ordering.Get(shop.OrderID(r.PathValue("id")))
+        if err != nil {
+            writeErr(w, err)
+            return
+        }
+        writeJSON(w, http.StatusOK, o)
+    })
+    return mux
+}
+
+func writeErr(w http.ResponseWriter, err error) {
+    status := http.StatusInternalServerError
+    switch {
+    case errors.Is(err, shop.ErrNotFound):
+        status = http.StatusNotFound
+    case errors.Is(err, shop.ErrCancelled), errors.Is(err, shop.ErrShipped):
+        status = http.StatusConflict
+    }
+    http.Error(w, err.Error(), status)
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    _ = json.NewEncoder(w).Encode(v) // the status is already sent; nothing is left to report to
+}
+
+// startup serves HTTP until ctx is cancelled.
+startup func(ctx context.Context) error {
+    srv := &http.Server{Addr: listenAddr, Handler: routes()}
+    stopped := make(chan error, 1)
+    go func() {
+        <-ctx.Done()
+        stopped <- srv.Shutdown(context.Background())
+    }()
+    if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+        return err
+    }
+    return <-stopped
+}

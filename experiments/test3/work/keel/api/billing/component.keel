@@ -1,0 +1,12 @@
+import "shop/lib/shop"
+
+// Billing charges and refunds customers, and keeps an in-memory ledger.
+// It provides the type Ledger.
+component Billing {
+    // Audit keeps a durable line for every charge and refund. Billing moves no money
+    // that Audit did not record.
+    needs port Audit {
+        func Record(e shop.AuditEntry) error
+            requires e.Amount > 0 && e.Order != "" && (e.Kind == shop.AuditCharge || e.Kind == shop.AuditRefund)
+    }
+}

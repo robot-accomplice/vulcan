@@ -1,0 +1,112 @@
+package web
+
+import (
+    "errors"
+    "net/http"
+    "net/http/httptest"
+    "strings"
+    "testing"
+
+    "keel.dev/keel"
+    "shop/lib/shop"
+)
+
+// orderingFake keeps one order. It meets the Ordering contract: results echo the inputs.
+type orderingFake struct{ o shop.Order }
+
+func (f *orderingFake) Place(c shop.CustomerID, a shop.Money) (shop.Order, error) {
+    f.o = shop.Order{ID: "o-1", Customer: c, Amount: a, Status: shop.Placed}
+    return f.o, nil
+}
+
+func (f *orderingFake) Cancel(id shop.OrderID) (shop.Order, error) {
+    if id != f.o.ID {
+        return shop.Order{}, shop.ErrNotFound
+    }
+    f.o.Status = shop.Cancelled
+    return f.o, nil
+}
+
+func (f *orderingFake) Get(id shop.OrderID) (shop.Order, error) {
+    if id != f.o.ID {
+        return shop.Order{}, shop.ErrNotFound
+    }
+    return f.o, nil
+}
+
+func serve(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
+    rec := httptest.NewRecorder()
+    h.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+    return rec
+}
+
+// The three routes map to the Ordering port and its errors.
+func TestPlaceCancelGet(t *testing.T) {
+    keel.Bind(t, &Ordering, &orderingFake{})
+    h := routes()
+
+    if rec := serve(h, "POST", "/orders", `{"customer":"c1","amount":1250}`); rec.Code != http.StatusCreated {
+        t.Fatalf("place: %d %s", rec.Code, rec.Body)
+    }
+    if rec := serve(h, "POST", "/orders/o-1/cancel", ""); rec.Code != http.StatusOK {
+        t.Fatalf("cancel: %d %s", rec.Code, rec.Body)
+    }
+    rec := serve(h, "GET", "/orders/o-1", "")
+    if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"cancelled"`) {
+        t.Fatalf("get: %d %s", rec.Code, rec.Body)
+    }
+    if rec := serve(h, "GET", "/orders/o-404", ""); rec.Code != http.StatusNotFound {
+        t.Fatalf("get missing: %d", rec.Code)
+    }
+}
+
+// A non-positive amount must be rejected before it reaches the port, whose contract requires amount > 0.
+func TestPlaceRejectsBadAmount(t *testing.T) {
+    keel.Bind(t, &Ordering, &orderingFake{})
+    if rec := serve(routes(), "POST", "/orders", `{"customer":"c1","amount":0}`); rec.Code != http.StatusBadRequest {
+        t.Fatalf("got %d, want 400", rec.Code)
+    }
+}
+
+// auditFake returns a fixed trail per order. It meets the AuditTrail contract: the
+// result is never nil when err is nil.
+type auditFake struct {
+    trails map[shop.OrderID][]shop.AuditEntry
+    err    error
+}
+
+func (f *auditFake) ForOrder(id shop.OrderID) ([]shop.AuditEntry, error) {
+    if f.err != nil {
+        return nil, f.err
+    }
+    if e, ok := f.trails[id]; ok {
+        return e, nil
+    }
+    return []shop.AuditEntry{}, nil
+}
+
+// The audit route returns the trail as JSON, an empty list for an order with no
+// entries (a client can always range over it), and 500 when the store fails.
+func TestAuditTrail(t *testing.T) {
+    keel.Bind(t, &AuditTrail, &auditFake{trails: map[shop.OrderID][]shop.AuditEntry{
+        "o-1": {
+            {Order: "o-1", Customer: "c1", Kind: shop.AuditCharge, Amount: 1250},
+            {Order: "o-1", Customer: "c1", Kind: shop.AuditRefund, Amount: 1250},
+        },
+    }})
+    h := routes()
+    rec := serve(h, "GET", "/orders/o-1/audit", "")
+    body := rec.Body.String()
+    if rec.Code != http.StatusOK || !strings.Contains(body, `"kind":"charge"`) || !strings.Contains(body, `"kind":"refund"`) ||
+        strings.Index(body, `"kind":"charge"`) > strings.Index(body, `"kind":"refund"`) {
+        t.Fatalf("audit: %d %s", rec.Code, body)
+    }
+    if rec := serve(h, "GET", "/orders/o-2/audit", ""); rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "[]" {
+        t.Fatalf("empty audit: %d %s", rec.Code, rec.Body)
+    }
+
+    keel.Bind(t, &AuditTrail, &auditFake{err: errors.New("db down")})
+    if rec := serve(routes(), "GET", "/orders/o-1/audit", ""); rec.Code != http.StatusInternalServerError {
+        t.Fatalf("store down: got %d, want 500", rec.Code)
+    }
+}

@@ -1,0 +1,21 @@
+// Shop is the online store.
+system Shop {
+    person   Customer "Places, cancels, and looks up orders through the web API"
+    external AuditDB  "Postgres database that keeps the audit trail of charges and refunds"
+
+    container Api {
+        Web, Orders, Billing, Alerts, AuditLog
+
+        Web.Ordering:    Orders.NewService
+        Web.AuditTrail:  AuditLog.NewStore
+        Orders.Payments: Billing.NewLedger
+        Billing.Audit:   AuditLog.NewStore
+    }
+
+    container Worker {
+        Picking
+    }
+
+    // Between containers: topics only.
+    Api/Orders.Shipped: Worker/Picking.Shipped via direct{ deadletters: Api/Alerts.DeadShipped }
+}

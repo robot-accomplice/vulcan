@@ -1,0 +1,9 @@
+import (
+    "keel.dev/keel"
+    "shop/lib/shop"
+)
+
+// Alerts receives the OrderShipped messages that a subscriber could not handle.
+component Alerts {
+    subscribes DeadShipped topic[keel.DeadLetter[shop.OrderShipped]]
+}

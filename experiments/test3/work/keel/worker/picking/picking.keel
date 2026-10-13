@@ -1,0 +1,46 @@
+package picking
+
+import (
+    "bufio"
+    "context"
+    "errors"
+    "log"
+    "os"
+    "strings"
+
+    "shop/lib/shop"
+)
+
+// ErrNoteTooBig means a shipping note is longer than the limit on OrderShipped.Note.
+var ErrNoteTooBig = errors.New("picking: note too long")
+
+// ship announces that the order left the warehouse. A note over the limit would
+// make Publish panic, so ship rejects it first.
+func ship(order shop.OrderID, note string) error {
+    if len(note) > shop.MaxNoteBytes {
+        return ErrNoteTooBig
+    }
+    Shipped.Publish(shop.OrderShipped{Order: order, Note: note})
+    return nil
+}
+
+// startup reads one shipment per line from stdin, "<order-id> <note>", and
+// announces each one. The Worker exits when stdin ends.
+startup func(ctx context.Context) error {
+    in := bufio.NewScanner(os.Stdin)
+    for in.Scan() {
+        if ctx.Err() != nil {
+            return ctx.Err()
+        }
+        id, note, _ := strings.Cut(strings.TrimSpace(in.Text()), " ")
+        if id == "" {
+            continue
+        }
+        if err := ship(shop.OrderID(id), note); err != nil {
+            log.Printf("ship %s: %v", id, err)
+            continue
+        }
+        log.Printf("shipped %s", id)
+    }
+    return in.Err()
+}
