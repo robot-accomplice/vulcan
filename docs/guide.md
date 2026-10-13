@@ -25,8 +25,10 @@ transports/kafka/           a transport
   can be imported
   only by a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf (`entry for Customer`).
 - `main` is generated. A leaf's code runs only from a handler, a port that it provides, an entry
-  leaf's server, or `startup func(ctx context.Context) error`. A container with no subscription,
-  served remote port, or entry leaf exits after its startup functions finish.
+  leaf's server, or a plain Go function `func startup(ctx context.Context) error` (tests can call
+  it). `main` reads flags, calls constructors, binds ports, then runs every `startup` at once. So
+  open a provider's resources (a database) in its constructor, not in `startup`. A container with
+  no subscription, served remote port, or entry leaf exits after its startup functions finish.
 
 ## 2. Boundaries and wiring
 
@@ -68,7 +70,13 @@ system Shop {
 ```
 
 - Every wire reads `needer: supplier`. Every needed port and subscribed topic is wired once.
-- Settings can come from startup flags: `capacity: flag("orders-cap", max: 10_000)`.
+- A wire can fill its constructor's settings struct:
+  `Billing.Cards: Stripe.NewCards{ Key: flag("stripe-key") }`. A constructor can return
+  `(T, error)`. A leaf with no constructor (an entry leaf) gets settings in the container list,
+  `Web{ Addr: flag("web-addr", default: ":8080") }`, as the second parameter of
+  `startup(ctx, s Settings)`.
+- `flag("x")` reads `--x`, else the variable `X`. Without `default:` it is required. A size needs
+  `max:`: `capacity: flag("orders-cap", max: 10_000)`.
 - Between containers only topics and `needs remote port` cross.
 
 ## 3. Contracts
@@ -111,7 +119,8 @@ idempotent handle Shipped(m ShipmentSent) error {
 - A handler runs one message at a time unless the wire sets `concurrency`.
 - `direct` needs every variable-size message field bounded with `limit`, including named string
   types: `ID OrderID limit 64`, `Note string limit 2000`, `Lines []Line limit 100`. A `limit`
-  counts bytes for a string, elements for a slice or a map. A publish that breaks a limit panics.
+  counts bytes for a string, elements for a slice or a map. It takes a constant: `limit MaxNote`.
+  A publish that breaks a limit panics.
 - Message types are locked in `topics.lock`. Adding or removing a field is compatible if the zero
   value passes the invariant. A rename, a type change, or an invariant change needs a new type.
 - `needs remote port Stock { func Level(sku SKU) (int, error) timeout 200 * time.Millisecond }`.
