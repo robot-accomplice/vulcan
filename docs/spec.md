@@ -702,12 +702,14 @@ containers needs no broker. It sends from the publisher straight to each subscri
   route. A drop under `dropOldest` or `dropNewest` is counted, not dead-lettered.
 - **A dead-letter route is a subscribed topic** of type `DeadLetter[T]` in some leaf, declared as
   `subscribes DeadPlaced topic[keel.DeadLetter[OrderPlaced]]`. `keel.DeadLetter[T]` is a type of
-  the runtime package `keel`, with the fields `Message T`, `Error string` (at most 4 KB),
-  `Attempts int`, `Wire string`, and `Time time.Time`. Its handler must be `idempotent`, as on any
-  `direct` topic. If its own
-  handler fails, the message is retried with the source wire's settings, then counted and reported;
-  there is no dead letter of a dead letter. The wire
-  settings name it, and it can receive from any number of wires whose message type is `T`.
+  the runtime package `keel`, with the fields `Message T`, `Error string limit 4096`,
+  `Attempts int`, `Wire string`, and `Time time.Time`. The type is bounded, so the `direct` rule
+  holds for it: `Message` has the limits of `T`, and `Wire` holds the text of a wire, which the
+  compiler knows. Thus the compiler sets the limit of `Wire` to the longest wire in the system.
+  Its handler must be `idempotent`, as on any `direct` topic. If its own handler fails, the message
+  is retried with the source wire's settings, then counted and reported; there is no dead letter of
+  a dead letter. The wire settings name it, and it can receive from any number of wires whose message
+  type is `T`.
   Each dead letter carries the message, the last handler error or panic report, the attempt count,
   the wire, and the time. Thus "why did this message dead-letter?" has an answer without
   tracing.
@@ -1128,7 +1130,7 @@ layout directly.
 
 | # | Question |
 |---|---|
-| Q1 | The final name and file extension. |
+| Q1 | The final name and file extension. Candidates: Keel (working name), domí. |
 | Q22 | Numeric performance targets for the benchmark suite (§12.3): for each benchmark, the accepted ratio of speed and memory against Go, Java, C++, and Rust. |
 
 ## Appendix A: Sources
