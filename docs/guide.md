@@ -98,7 +98,8 @@ type Range struct{ Lo, Hi int }
   method. `err` names the error result and `result` the first other one; use `result` only after
   `err == nil =>`. A failed contract panics with a report.
 - Contracts run in every build. They may call only `pure` functions: no I/O, no mutation.
-- An invariant must hold for the zero value. Only a struct's own methods write its fields.
+- An invariant must hold for the zero value. Only a struct's own methods write its fields or take
+  a field's address (`&e.Amount`): elsewhere, read into locals and build a literal.
 
 ## 4. Topics and remote calls
 
@@ -143,7 +144,8 @@ func TestPlace(t *testing.T) {
 
 ## 6. Commands
 
-`keel check`, `keel build`, `keel test <leaf>`, `keel context <leaf>` (what to read before an edit),
+`keel mod tidy` (not `go mod tidy`, which cannot see `.keel` imports), `keel check`, `keel build`,
+`keel test <leaf>`, `keel context <leaf>` (what to read before an edit),
 `keel query <symbol>` (never guess an API), `keel explain <code>`, `keel fake <Port>`, `keel audit`
 (warnings on Go code, escape hatches, unproved claims), `keel archdiff`, `keel diagram`,
 `keel doc`, `keel trace <id>`.

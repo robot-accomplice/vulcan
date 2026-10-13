@@ -865,10 +865,19 @@ and the tools (§10, §11).
 warning never stops a build, and `keel audit` lists them. The warnings are the ones that Go's own
 analysis tools define, with their definitions:
 
-- an unhandled error: an `error` result that the code discards (as `errcheck` reports)
-- error masking: a branch that receives an error and neither returns it, logs it, nor wraps it
+- an unhandled error: an `error` result that the code drops without assigning it (as `errcheck`
+  reports). An explicit `_ = f()` is a visible, deliberate discard: it is not a warning, and
+  `keel audit` lists each one.
+- error masking: a branch that receives an error and never reads the error value. Any read
+  handles it: a return, a wrap, a log, an inspection (`errors.Is`), or a pass to another call, for
+  example into an HTTP response. Whether a response should show an error is a question for review,
+  not a check.
 - a possible `nil` dereference (as `nilaway` reports)
-- a shared field accessed without a lock (as the race detector reports in tests)
+- a data race, as the race detector reports. `keel test` runs every test with the race detector.
+  Keel does no static race analysis.
+
+Each Keel version pins the version of each analysis tool, so a warning depends only on the code
+and the Keel version.
 
 **The runtime package.** Code imports the runtime package as `keel.dev/keel`, which provides
 `keel.DeadLetter`, `keel.Bind`, and `keel.Published`. It is not a network package: it holds only
@@ -876,6 +885,11 @@ types and test helpers, and it does not depend on `net`, `os/exec`, or `database
 transports, `direct` included, are separate packages that only the generated `main` imports
 (§5.5.1). Thus the network rule (§5.4c) has no exception for the runtime. `keel check` needs
 `go.sum`, as `go build` does, to resolve the Go dependencies that the network rule reads.
+
+**Modules.** The `go` command cannot see imports in `.keel` files, so `go mod tidy` would remove
+each dependency that only Keel code uses. `keel mod <args>` runs `go mod <args>` over the Go code
+that the compiler generates, with the project's `go.mod` and `go.sum`. Thus `keel mod tidy` adds
+each dependency that Keel code imports, and writes `go.sum`.
 
 **Where code starts.** The compiler generates `main` from `system.keel`; code never writes it. A
 leaf can define one function `startup` in its code: a plain Go function, which Keel finds by its
@@ -954,6 +968,16 @@ An invariant protects a struct only if no code can go around it. Thus:
 
 - **Only methods write fields.** The fields of a struct with an invariant are read-only outside
   its own methods. A write from anywhere else is a compile error.
+- **No field addresses outside methods.** Code outside the struct's own methods cannot take the
+  address of a field (`&e.Amount`), because a write through that pointer would go around the
+  invariant. It is a compile error. The fix-it reads into local variables, then builds the value
+  with a literal, which is checked. A pointer to the whole struct is allowed: a write through it,
+  `p.Amount = 1`, is a field write, and the first rule covers it.
+- **Elements are a limit.** A slice or a map field shares its elements with each copy of it. Code
+  that holds a copy can change the elements without a method, and the compiler does not track
+  copies. Thus an invariant over the elements holds only while no copy leaves the struct's
+  methods. `keel audit` lists each method that returns a slice or a map field of a struct with an
+  invariant.
 - **Construction is checked.** A struct literal is checked where the code creates it. If the
   compiler can prove the violation, it is a compile error; if not, the check runs at runtime.
 - **The zero value must satisfy the invariant.** Go creates zero values in many places (`var`,
@@ -963,7 +987,8 @@ An invariant protects a struct only if no code can go around it. Thus:
 - **Outer calls only.** The invariant is checked when the outermost method call on the value
   returns, exported or not. A nested call on the same value, for example `Transfer` that calls `Withdraw`, is
   not checked on its return. Thus a method can pass through a temporarily broken state. This is
-  the rule of Eiffel.
+  the rule of Eiffel. A method that writes no field, and calls no method that does, skips the
+  check: the invariant held when it started, so the result is the same.
 
 ```go
 type Account struct { Balance int }
@@ -1004,7 +1029,9 @@ Tests are Go tests: `func TestX(t *testing.T)` in `*_test.keel` files in the lea
 - **A fake is an ordinary type** that satisfies the port. It must meet the contract of the port,
   which is checked at each call, as for the real provider.
 - `keel.Bind(t, &Checkout, CheckoutOK{})` binds a fake to a port name for one test, and restores
-  the wiring when the test ends. Tests that run in parallel run in separate processes.
+  the wiring when the test ends. A second `keel.Bind` on the same port in one test replaces the
+  first. When the test ends, the bindings are undone in reverse order, so the wiring is as it was
+  before the test. Tests that run in parallel run in separate processes.
 - `keel.Published(t, Placed)` returns the messages that the test published on a topic.
 - `keel fake <Port>` writes the skeleton of a fake type, with one method for each method of the
   port.
@@ -1028,7 +1055,11 @@ func TestPaysForAnOrder(t *testing.T) {
 
 In addition to type checks, the compiler reports these problems as diagnostics with fix-its:
 
-- **Near-duplicate code** in the project (R2). The fix depends on where the duplicates are:
+- **Near-duplicate code** in the project (R2). Two functions or methods are near-duplicates when their
+  token sequences, with names and literals replaced by placeholders, are at least 90% similar, and
+  the smaller has at least 50 tokens. A function literal counts as part of the function around it.
+  `config { duplicate_similarity: 90, duplicate_min_tokens: 50 }` changes these values.
+  The fix depends on where the duplicates are:
   - Inside one leaf: the diagnostic points to the existing function to reuse.
   - In different leaves: a leaf cannot call another leaf's function (§5.4, rule 1). So the fix-it
     is **extract to library**. The compiler moves the function, and the private types that it
@@ -1072,7 +1103,8 @@ The tools assume that one of their users is an LLM (R8):
 | `keel doc` / `keel diagram` | Generates docs, and C4 diagrams at each level (context, container, component, code), from the source (§5.6). |
 | `keel audit` / `keel archdiff` | Audits contracts and architecture (§8, §10). |
 | `keel fmt` | The one formatter. |
-| `keel test <leaf>` | Builds and runs the tests of one leaf (§9). |
+| `keel test <leaf>` | Builds and runs the tests of one leaf (§9)., with the race detector (§6). |
+| `keel mod <args>` | Runs `go mod <args>` over the generated Go, so `keel mod tidy` sees imports in `.keel` files (§6). |
 | `keel fake <Port>` | Writes the skeleton of a fake type (§9). |
 | `keel trace <id>` | Shows the steps of one traced message (§5.5.1). |
 | `keel check` / `keel build` | The holistic boundary check, and the parallel build of each leaf (§12.2). |
