@@ -1130,7 +1130,7 @@ layout directly.
 
 | # | Question |
 |---|---|
-| Q1 | The final name and file extension. Candidates: Keel (working name), domí. |
+| Q1 | The final name and file extension. Candidates: Keel (working name), Domí. |
 | Q22 | Numeric performance targets for the benchmark suite (§12.3): for each benchmark, the accepted ratio of speed and memory against Go, Java, C++, and Rust. |
 
 ## Appendix A: Sources
