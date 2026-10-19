@@ -4,7 +4,7 @@ Scope: `docs/spec.md` (Draft 0) and `docs/guide.md`, read in full. Nothing else 
 was read. The §13 open questions, style, and new features are out of scope.
 
 Go claims were checked with Go 1.27.2 (module `go 1.24`) in
-`/private/tmp/claude-501/-Users-jmachen-code-outrider-kopos/5545766a-ddc7-4e78-bac6-61990c472cca/scratchpad/review9/`:
+a scratch directory:
 
 - `c/`: the Appendix C API compiles as written. Generic aliases and inference for `Published`,
   `Deliver`, and `Bind` work. The Appendix C claim about `Bind` taking `any` is correct: a typed

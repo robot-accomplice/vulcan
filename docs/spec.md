@@ -1501,7 +1501,7 @@ layout directly.
 
 | # | Question |
 |---|---|
-| Q1 | The final name and file extension. Candidates: Keel (working name), Domí. |
+| Q1 | The name is Vulcan (decided 2026-10-19). Open: the file extension, the command name, and the runtime module path. The text still uses the working name Keel (see `docs/status.md`). |
 | Q22 | Numeric performance targets for the benchmark suite (§11.3): for each benchmark, the accepted ratio of speed and memory against Go, Java, C++, and Rust. |
 
 ## Appendix A: Sources
