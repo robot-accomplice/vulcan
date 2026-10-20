@@ -1118,8 +1118,8 @@ A contract is a clause on a declaration. It is not a comment.
 | Clause | Attaches to | Meaning |
 |---|---|---|
 | `requires expr` | functions, port methods | Precondition: the obligation of the caller |
-| `ensures expr` | functions, port methods | Postcondition, checked at every return. `err` and `result` name the results (§7.1). Thus a failure rule is a contract too: `ensures err != nil => a.Balance == old(a.Balance)`. |
-| `invariant expr` | structs | Is true after construction and after the outermost method call returns, exported or not (§7.2) |
+| `ensures expr` | functions, port methods | Postcondition, checked at every return, and again after the deferred calls when one of them can change a result (§7.3). `err` and `result` name the results (§7.1). Thus a failure rule is a contract too: `ensures err != nil => a.Balance == old(a.Balance)`. |
+| `invariant expr` | structs | Is true after construction and when an outer method call returns normally, exported or not. A panic that leaves an outer call with the invariant false becomes a contract failure (§7.2, §7.3). |
 
 ### 7.1 What a contract can contain
 
@@ -1233,7 +1233,8 @@ An invariant protects a struct only if no code can go around it. Thus:
   example `json.Unmarshal(b, a)`. `keel audit` lists each such check with its cost, and each use of
   `reflect` or `unsafe` on such a struct.
 - **Function literals and goroutines.** A function literal inside a method counts as outside the
-  method for these rules, unless the method calls it directly or with `defer`. A `go` statement
+  method for these rules, unless the method calls it directly or with `defer`. A deferred call
+  still cannot write a field (§7.3, rule 2). A `go` statement
   in a method runs after the method returns, so the invariant check does not cover it; it is a
   warning (K0520).
 - **Elements are a limit.** A slice or a map field shares its elements with each copy of it. Code
@@ -1263,7 +1264,8 @@ An invariant protects a struct only if no code can go around it. Thus:
 - **Checks run before deferred calls.** The invariant and `ensures` are checked at each return,
   before the method's deferred calls run. Thus a method that unlocks with `defer mu.Unlock()` is
   checked while it still holds the lock. A method of such a struct that unlocks other than by
-  `defer` gets a warning (K0521), because its check then runs after the unlock.
+  `defer` gets a warning (K0521), because its check then runs after the unlock. §7.3 covers what
+  the deferred calls and a panic can change after this check.
 
 ```go
 type Account struct { Balance int }
@@ -1276,6 +1278,73 @@ func (a *Account) Transfer(to *Account, x int) {
     a.Withdraw(x)           // call through the receiver: no check on its return
     to.Deposit(x)           // call through another expression: checks to
 }                           // checked here
+```
+
+### 7.3 Deferred calls and panics
+
+Go runs deferred calls after a `return`, and they can change the named results. A deferred
+`recover` turns a panic into a normal return that passes no `return` statement. A panic can leave
+a method halfway through a change. These rules keep the checks of §7.1 and §7.2 valid on each of
+these paths ([decision 1](decisions/0001-contract-timing.md)).
+
+1. **Return check.** `ensures` and the invariant are checked at each `return` and at a reachable
+   end of the body, before the deferred calls run (§7.2).
+2. **No deferred field writes.** In a method of a struct `T` with an invariant, a deferred call
+   cannot write a field of `T` (K0522). This covers a deferred function literal and a deferred call
+   of a method of `T` that skips its check. A deferred call of a method of `T` through the receiver
+   is an outer call, so its own check runs. The fix-it moves the write before the `return`.
+3. **Check after the deferred calls.** A *risky deferred call* is one of these:
+   - a deferred function literal that assigns a named result, takes its address, or calls
+     `recover`;
+   - a deferred call of a named function that receives the address of a named result, or that
+     calls `recover` directly;
+   - a deferred call through a function value or an interface value.
+
+   A function whose `ensures` reads a named result, and that has a risky deferred call, checks
+   `ensures` again after its deferred calls, with the final results. The second check does not
+   read the state again. At the return check, the compiler saves by value each atom of a conjunct
+   that reads a named result and other state, for example `a.Balance` or `len(a.items)`. The
+   second check uses the saved values, so it reads no field after a deferred unlock. A conjunct
+   that reads a named result and passes state by reference to a `pure` function, for example
+   `err == nil => IsSorted(a.items)`, cannot be saved. In a function with a risky deferred call,
+   it is a compile error (K0523).
+4. **Recovered panics.** When a function with a risky deferred call returns normally and no return
+   check ran, a deferred call recovered a panic. The function then checks all of its `ensures`, and
+   its receiver's invariant, against the state after its deferred calls. If the function also
+   unlocks in a deferred call, this check runs after the unlock: a warning (K0524).
+5. **Panics that leave a method.** No result reaches the caller, so `ensures` is not checked. When
+   a panic leaves an outer method call of `T` before a return check ran, the method checks the
+   invariant. If the invariant is false, the panic continues as a `*keel.ContractFailure` whose
+   `Cause` is the original panic value (Appendix C). The panic value changes only when the
+   invariant is false. This check runs after the deferred calls, so it can read the fields after a
+   deferred unlock. It runs only while a panic leaves the method, so it has no warning.
+6. **Data races.** The checks assume a program without data races. Keel does no static race
+   analysis (§6); `keel test` runs the race detector.
+
+Thus:
+
+- When a function with `ensures` returns normally, its results satisfy `ensures`, also after its
+  deferred calls and after a recovered panic. The state that the conjuncts read is the state at
+  the `return`, or, after a recovered panic, the state after the deferred calls.
+- When an outer method call on a struct with an invariant returns normally, the value satisfies
+  the invariant. When a panic leaves the call with the invariant false, the panic is a contract
+  failure.
+- **Limit.** A caller that recovers that contract failure, as `net/http` does for each request,
+  can still use the broken value. Keel reports the break; it does not prevent the later use.
+  Elements of slice and map fields stay a limit (§7.2).
+
+```go
+func (a *Account) Deposit(f *os.File, x int) (err error)
+    ensures err != nil => a.Balance == old(a.Balance)
+{
+    defer func() {                       // risky: assigns err
+        if cerr := f.Close(); err == nil {
+            err = cerr
+        }
+    }()
+    a.Balance += x
+    return nil                           // return check passes; Balance is saved
+}                                        // second check: err != nil and Balance changed: fails
 ```
 
 How the compiler checks contracts:
@@ -1292,7 +1361,8 @@ How the compiler checks contracts:
 How reviewers audit contracts:
 
 - `keel audit` lists each contract. For each contract, it shows if the compiler proved it and if
-  tests exercised it.
+  tests exercised it. It also lists each function with a check after its deferred calls (§7.3), and
+  each K0524 site.
 - Contracts appear in the generated docs and diagrams.
 
 ## 8. Testing
@@ -1694,8 +1764,9 @@ type RemoteError = rt.RemoteError             // Code, Text string
 func NewError(code, text string) error        // an error that keeps its identity across containers
 
 // Contract failures (§7). Kind is "requires", "ensures", "invariant", "limit", or "panic"
-// (a panic in a pure function while a contract runs).
-type ContractFailure = rt.ContractFailure     // Kind, Contract, Position, Caller string; Values []Value
+// (a panic in a pure function while a contract runs). Cause is the panic value that the failure
+// replaced (§7.3, rule 5), or nil; Unwrap returns Cause when it is an error.
+type ContractFailure = rt.ContractFailure     // Kind, Contract, Position, Caller string; Values []Value; Cause any
 type Value = rt.Value                         // Name, Text string
 
 // Pure helpers for contracts (§7.1).
@@ -1924,6 +1995,9 @@ the long form.
 | K0514 | E | A function with a contract has no body | App. B |
 | K0520 | W | A `go` statement in a method of a struct with an invariant | §7.2 |
 | K0521 | W | A method of a struct with an invariant unlocks a mutex other than by `defer` | §7.2 |
+| K0522 | E | A deferred call in a method of a struct with an invariant writes a field of that struct | §7.3 |
+| K0523 | E | An `ensures` conjunct reads a named result and passes state by reference to a `pure` function, in a function with a risky deferred call | §7.3 |
+| K0524 | W | The check after a recovered panic runs after a deferred unlock | §7.3 |
 | **K06** | | **Startup, settings, and flags** | |
 | K0601 | E | A function named `setup` or `startup` has the wrong signature | §6 |
 | K0602 | E | One flag name is used with two types, defaults, or maxima, or two flag names give one environment variable | §5.3 |
@@ -2006,10 +2080,32 @@ with a name in the code.
    ```
 
    A bare `return` checks the named results. If the end of the body can be reached, the checks
-   run there too. A panic reaches no `return`, so `ensures` is not checked during a panic. A
-   deferred call that changes a named result after the check is not checked; `keel audit` lists
-   each function with a contract and such a deferred call. This form compiles where a named result
-   is shadowed, and it adds no name to the body's scope.
+   run there too. This form compiles where a named result is shadowed, and it adds no name to the
+   body's scope.
+
+   A function with a risky deferred call (§7.3, rule 3) runs its body in a generated closure, and
+   checks again after the closure returns. Each return check in the body also sets `keel_checked`
+   and saves the state atoms of §7.3, rule 3:
+
+   ```go
+   func (a *Account) Deposit(f *os.File, x int) (err error) {
+       var keel_checked bool
+       var keel_s0 int                          // a.Balance, saved at the return check
+       keel_old0 := a.Balance
+       err = func() (err error) {
+           // the body, unchanged, with its deferred calls
+       }()
+       if keel_checked {
+           if !(!(err != nil) || keel_s0 == keel_old0) { rt.Fail("ensures", ...) }
+       } else {
+           // a recovered panic: ensures and the invariant on the current state (§7.3, rule 4)
+       }
+       return err
+   }
+   ```
+
+   A deferred `recover` in the body is still called directly by a deferred function, so it works as
+   in Go. A panic that leaves the closure leaves the generated function too.
 4. `a => b` becomes `!a || b`.
 5. **Exact arithmetic.** Integer arithmetic in a contract expression gives the mathematical
    result (§7.1). The compiler uses machine integers with an overflow check, and changes to
@@ -2026,7 +2122,10 @@ package of `T`, the exported method `func (v *T) Keel_invariant()`, which does n
 
 - **Outer calls.** Each method `M` is generated twice: `M`, which checks the invariant at each
   `return` and at a reachable end of its body, before its deferred calls run; and `keel_M`, the
-  same body without these checks. Inside a method of `T`, a call whose receiver expression is the
+  same body without these checks. `M` also gets one generated deferred call, registered first so
+  that it runs last. If a panic leaves `M` before a return check ran, it checks the invariant, and
+  when the invariant is false it panics again with a `*keel.ContractFailure` whose `Cause` is the
+  original value (§7.3, rule 5). Inside a method of `T`, a call whose receiver expression is the
   method's own receiver variable, not assigned in the method, calls `keel_M`. Every other call, for
   example `to.Deposit(x)`, calls `M` (§7.2). A method that writes no field, calls no method that
   does, and passes no pointer to `T` to a function has no check.

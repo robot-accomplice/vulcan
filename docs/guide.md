@@ -111,6 +111,10 @@ pure func Positive(x int) bool { return x > 0 }   // contracts call only pure fu
 - A `pure` function has no effects: it writes only values that it created, and calls only `pure`
   functions. Its body is plain Go. Use `keel.All(xs, Positive)` for a rule over a collection.
 - Contracts run in every build. A failed contract panics with a report.
+- Deferred calls and `recover` cannot hide a broken contract: when a deferred call can change a
+  result or recover a panic, `ensures` and the invariant are checked again after it. A deferred
+  call in a method cannot write the struct's fields. A panic that leaves a method with its
+  invariant false becomes a contract failure.
 - An invariant must hold for the zero value. Only a struct's own methods write its fields or take
   a field's address (`&e.Amount`): elsewhere, read into locals and build a literal.
 
