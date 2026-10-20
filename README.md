@@ -23,7 +23,8 @@ enforce it, draw it, and teach it.
 
 The premise (spec §1.1): with an AI model, a developer spends most time on three tasks. The
 developer states the requirements, reads the code, and validates and corrects it. Vulcan makes the
-second and third tasks shorter. Two writing experiments showed where the gain is:
+second and third tasks shorter. Two early writing experiments suggest where the gain is. Their
+data is lost and no compiler existed, so these are hypotheses that a compiler must test:
 
 - Vulcan takes the architecture rules out of review. The compiler checks them on every change.
 - Vulcan rejects rule-breaking changes before review, so a model fixes them against the compiler.

@@ -52,9 +52,9 @@ Each finding was then resolved and logged.
 ## Experiments
 
 - **Experiments 1 and 2** (writing and review, with written rules): their data was lost. Their
-  conclusions are in the premise, §1.1: Vulcan moves architecture rules out of review and rejects
-  rule-breaking changes before review. It does not shorten a thorough reviewer's reading, and it
-  does not reduce logic defects.
+  conclusions are in the premise, §1.1, as hypotheses (audit 2, H10): Vulcan moves architecture
+  rules out of review and rejects rule-breaking changes before review. It does not shorten a
+  thorough reviewer's reading, and it does not reduce logic defects.
 - **Test 3** (`experiments/test3/`): a Go writer and a Keel writer each add a feature
   (`feature.md`) to the same shop system, with no written rules. The grader alone reads
   `hidden/rules.md`.
@@ -62,10 +62,16 @@ Each finding was then resolved and logged.
     writers (`work/go`, `work/keel`, notes in `results/`), the first simulated `keel check`
     (`results/check-round1.md`: 1 error, 5 warnings), and the Keel writer's round 2.
   - Not done: the round-2 check, and the grading of both changes against `hidden/rules.md`.
+  - For the grading: audit 2 found that the Go change mixes the audit trails of different orders
+    after a restart (C1), and that both changes can overflow in the refund check (H1). The writers'
+    code is a record; do not fix it.
   - The spec changed a lot after the bases were built (reviews 8 and 9). Rebuild `base-keel`
     against the current spec before grading, or grade against the spec at commit `de1430a`.
 
 ## Open work, in order
+
+[Audit 2](../experiments/audit-2.md) (2026-10-20) lists the findings against the spec and test 3,
+with a remediation roadmap. Its spec findings belong in the milestone-0 decision packet.
 
 A proposed compiler-and-application validation sequence is in
 [Development plan](development-plan.md). It is a draft; it does not replace the decisions below

@@ -27,8 +27,11 @@ In all three tasks, predictable structure, architectural legibility, and compile
 They make tasks 2 and 3 shorter, so that the developer can spend more time on task 1 and do it
 faster. Each design decision in this spec serves that goal.
 
-**How Keel makes validation shorter.** Two experiments with a model writing and reviewing code in
-Go and in Keel (2026-09-29) showed where the gain is, and where it is not:
+**How Keel makes validation shorter (hypotheses).** Two experiments with a model writing and
+reviewing code in Go and in Keel (2026-09-29) suggested where the gain is, and where it is not.
+Their data is lost, the Keel side had no compiler, and each had one writer. Thus the statements
+below are hypotheses, not findings. A compiler-based experiment must test them (development plan,
+milestone 4):
 
 - **Keel takes the architecture rules out of review.** A rule that the compiler enforces (which
   leaf may use which, where the network and databases are reached, what a port promises) no longer
@@ -39,8 +42,8 @@ Go and in Keel (2026-09-29) showed where the gain is, and where it is not:
 - **Keel does not make a thorough reviewer read less code, and it does not reduce defects in
   logic that no rule covers.** Order-state logic, races, and design choices still need review.
 
-Thus the gain is a smaller and more reliable review: a reviewer checks the logic and trusts the
-compiler for the architecture.
+If these hold, the gain is a smaller and more reliable review: a reviewer checks the logic and
+trusts the compiler for the architecture.
 
 ### 1.2 Terms
 
@@ -1382,7 +1385,7 @@ The tools assume that one of their users is an LLM (R8):
 | `keel doc` / `keel diagram` | Generates docs, and C4 diagrams at each level (context, container, component, code), from the source (§5.6). |
 | `keel audit` / `keel archdiff` | Audits contracts and architecture (§7, §9). |
 | `keel fmt` | The one formatter. |
-| `keel test <leaf>` | Builds and runs the tests of one leaf (§8)., with the race detector (§6). |
+| `keel test <leaf>` | Builds and runs the tests of one leaf (§8), with the race detector (§6). |
 | `keel mod <args>` | Runs `go mod <args>` over the generated Go, so `keel mod tidy` sees imports in `.keel` files (§6). |
 | `keel fake <Port>` | Writes the skeleton of a fake type (§8). |
 | `keel trace <id>` | Shows the steps of one traced message (§5.5.1). |
