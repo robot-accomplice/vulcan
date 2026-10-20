@@ -188,6 +188,7 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 ## Audit traceability
 
 The findings below come from an external audit of the project; its report is not stored here.
+[Audit 2](../experiments/audit-2.md) repeats that audit from the sources.
 
 | Finding | Planned response |
 |---|---|
