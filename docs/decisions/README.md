@@ -12,7 +12,7 @@ code.
 | # | Decision | Status |
 |---|---|---|
 | 1 | [Contract timing](0001-contract-timing.md): deferred calls, recovery, panics, concurrency | Accepted |
-| 2 | Architecture enforcement: the guarantee matrix, and strict and ordinary modes | Not started |
+| 2 | [Architecture enforcement](0002-architecture-enforcement.md): the guarantee matrix, and strict and ordinary modes | Accepted |
 | 3 | Contract failure: what a panic does to external effects | Not started |
 | 4 | Compiler structure: staged compiler or incremental query engine | Not started |
 | 5 | Names and reproducibility: extension, command, module path, Go version, platforms | Not started |

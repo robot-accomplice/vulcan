@@ -25,6 +25,10 @@ transports/kafka/           a transport
 - Import any Go package. Only a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf
   (`entry for Customer`) can reach a network function: dial, listen, send an HTTP request,
   `sql.Open`, `exec.Command`, also inside an SDK. The diagnostic shows the call path.
+- Never write `//go:linkname` in a leaf or a library. `keel audit` lists each path around the
+  architecture rules (callbacks through ports, shared library state). `config { strict: true }`
+  rejects most of them: then port methods take no function, channel, or interface types except
+  `error` and `context.Context`, library `var`s hold no references, and only gateways dial.
 - `main` is generated. It reads flags, calls constructors and binds ports, runs every
   `func setup(ctx context.Context) error`, starts subscriptions, then runs every
   `func startup(ctx context.Context) error` at once (plain Go functions; tests can call them). Open

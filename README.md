@@ -79,7 +79,7 @@ compiler rejects a reference to another leaf that does not go through a port, an
 
 | Area | What it gives | Spec |
 |---|---|---|
-| Architecture | Systems, containers, groups, leaves, libraries, gateways, and consumer-owned ports. The compiler enforces the rules between them. | §5 |
+| Architecture | Systems, containers, groups, leaves, libraries, gateways, and consumer-owned ports. The compiler enforces the rules between them, and lists each path around them that it cannot check. A strict mode rejects most of those paths. | §5, §5.4d |
 | Crossing processes | Topics and remote ports between containers, with transports, dead letters, and a `topics.lock` for compatibility. | §5.5 |
 | Contracts | `requires`, `ensures`, `old()`, and struct invariants, with exact arithmetic in contract expressions. | §7 |
 | Testing | Fakes bound to port names, contract-aware fakes, and per-leaf tests. | §8 |

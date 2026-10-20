@@ -36,7 +36,8 @@ milestone 4):
 - **Keel takes the architecture rules out of review.** A rule that the compiler enforces (which
   leaf may use which, where the network and databases are reached, what a port promises) no longer
   has to be checked by a person on every change, and no later change can quietly break it. In Go
-  the same rules hold only while each writer chooses to follow them.
+  the same rules hold only while each writer chooses to follow them. §5.4d states which rules the
+  compiler proves and which paths around them it only reports.
 - **Keel rejects rule-breaking changes before review.** A change that breaks an enforced rule does
   not build, so a model that iterates against the compiler fixes it before a person sees it.
 - **Keel does not make a thorough reviewer read less code, and it does not reduce defects in
@@ -397,6 +398,10 @@ shows.
     before the ports are bound. For the same reason, the initializer of a package-level variable
     in a leaf cannot reach a port call or a publish. Leaf setup goes in a constructor, in `setup`,
     or in `startup` (§6). A library can declare `init`, as in Go (K0117).
+13. **No `linkname`.** A leaf or a library cannot contain a `//go:linkname` directive (K0122).
+    The directive lets code call an unexported function of another package with no identifier
+    that names it, so rule 1 could not see it. An imported Go package can still use it, as the
+    standard library does.
 
 ### 5.4a Libraries
 
@@ -462,7 +467,8 @@ Rules:
    variable is assigned at most once. The compiler does
    not track changes through a method or a reference (`hits.Add(1)`, `cache[k] = v`), so a library
    can still hold state that two leaves share. `keel audit` lists each library `var` whose value can
-   change through a method or a reference, so that a reviewer can check it.
+   change through a method or a reference, so that a reviewer can check it (§5.4d, path 2).
+   Strict mode rejects such a `var` (K0210).
 
    ```go
    // lib/crc
@@ -530,7 +536,7 @@ Rules:
 2. Network access follows the single rule in §5.4c, rule 1. A gateway can use any Go package,
    including an SDK for its external system or `net/http`.
 3. The compiler generates the `uses` relationships in diagrams from the gateway declarations, so
-   nobody draws them by hand. It does not check which target a gateway reaches.
+   nobody draws them by hand. It does not check which target a gateway reaches (§5.4d, G11).
 
 **Entry leaves.** Traffic that comes **into** the system, for example HTTP requests from a `person`,
 enters through an **entry leaf**. It is the mirror of a gateway:
@@ -545,13 +551,16 @@ component Web {
 
 - An entry leaf declares `entry for <Person or External>`, and it can reach network functions to
   serve requests, under the one network rule (§5.4c, rule 1).
-- The compiler does not tell serving from dialing. `keel audit` lists each entry leaf and each
-  gateway, and the network functions that each reaches.
+- In ordinary mode, the compiler does not tell serving from dialing. `keel audit` lists each
+  entry leaf and each gateway, and the network functions that each reaches. In strict mode, an
+  entry leaf can reach only the serve functions of Appendix D, and a leaf that dials must be a
+  gateway (K0125, §5.4d).
 - The compiler draws the `uses` relationship for each entry leaf, as for gateways.
 
 Why a gateway (§1.1): each rule about an external system goes in one leaf. A reviewer reads all
 traffic to that system in one location. Tests of other leaves fake a port with contracts, not HTTP.
-The compiler rejects network access in any other leaf (§5.4c, rule 1), so the reviewer does not have to find it.
+The compiler rejects each static path to a network function from any other leaf (§5.4c, rule 1).
+§5.4d lists the paths that this check does not cover, and strict mode rejects most of them.
 
 ### 5.4c Go packages
 
@@ -592,9 +601,88 @@ acquiring: [...] }`) and remove from it (`allow_network: [...]`, `allow_acquirin
 `os.Open`.
 
 **Limits.** Code that uses `syscall`, `unsafe`, `reflect` calls, or cgo can reach a resource that
-the analysis does not see. `keel audit` lists each such use, and each call to a listed function.
+the analysis does not see. `keel audit` lists each such use, and each call to a listed function
+(§5.4d, path 6). Strict mode rejects them in leaves and libraries (K0124).
 
 **Versions.** A Keel project uses Go modules (`go.mod`) to pin the versions of Go packages.
+
+### 5.4d Guarantees and modes
+
+The rules of §5.4 to §5.4c prove some properties, and leave known paths around others. This
+section lists both ([decision 2](decisions/0002-architecture-enforcement.md)). Docs, diagrams, and
+tool output state an architecture property only as this section does.
+
+**Paths around the rules.** Each path compiles in ordinary mode. `keel audit` lists each one that
+it finds, in its section "Unchecked paths", and `keel check` prints their number.
+
+1. A function value or an interface value crosses a port. The callee can then run the caller's
+   code, and a gateway can hand out a function that dials any target (§5.4c follows a function
+   value only in the two steps it names).
+2. A library `var` changes through a method or a reference, so two leaves share it (§5.4a rule 1).
+3. Two leaves share the package state of an imported Go package, for example the environment,
+   `http.DefaultServeMux`, or a metrics registry.
+4. An entry leaf dials, because ordinary mode does not tell serving from dialing (§5.4b).
+5. A gateway connects to a target other than its external system (§5.4b rule 3).
+6. Code uses `syscall`, `unsafe`, `reflect` calls, or cgo (§5.4c, Limits).
+7. Two leaves acquire the same file, environment variable, or table.
+8. `allow_network` or `allow_acquiring` removes a function from a list (§5.4c).
+
+**Guarantees.** *Proved* means that the compiler checks the property on every build, with no
+listed path around it. *Reported* means that `keel audit` lists each path. *Out of scope* means
+that no static check can decide it.
+
+| # | Property | Ordinary mode | Strict mode |
+|---|---|---|---|
+| G1 | A leaf's code and boundary never name another leaf (rules 1, 7, 13) | Proved | Proved |
+| G2 | Each required port and subscribed topic is wired once, to a matching method set (rules 4, 5) | Proved | Proved |
+| G3 | The wires of a container have no cycles (rule 8) | Proved for wires; calls can go back through path 1 | Proved for wires and calls (K0123) |
+| G4 | Types that cross a boundary come from libraries or the standard library (rule 9) | Proved | Proved |
+| G5 | Only gateway and entry leaves reach a network function (§5.4c rule 1) | Proved for static reach; paths 1, 4, 6, 8 reported | Paths 1, 4, 6 rejected (K0123, K0125, K0124); path 8 reported |
+| G6 | Only leaves reach an acquiring function (§5.4c rule 2) | Proved for static reach; paths 6, 8 reported | Path 6 rejected (K0124); path 8 reported |
+| G7 | Leaves share program memory only through ports and topics | Reported (paths 2, 3) | Path 2 rejected (K0210); known global mutators rejected (K0211); other package state reported |
+| G8 | A port contract holds at every call through the port, fakes included (§5.3, §8) | Proved; unproved implications listed (K0109) | Same |
+| G9 | Each external system has one gateway in each container (§5.4b rule 1) | Proved | Proved |
+| G10 | Containers talk only through topics and remote ports (rule 3) | Proved for wires; paths 4, 5 reported | Path 4 rejected (K0125); path 5 out of scope |
+| G11 | A gateway talks only to its own external system | Out of scope | Out of scope |
+| G12 | Leaves share no resources outside the program (path 7) | Out of scope | Out of scope |
+
+**Ordinary mode** is the default. It is every rule of §5.4 to §5.4c, with the paths reported.
+
+**Strict mode.** `config { strict: true }` turns it on for the whole system. `strict_exempt:
+["Web"]` keeps the named leaves in ordinary mode. `keel audit` lists each exempt leaf, and
+`keel doc` shows the mode of each leaf. Strict mode adds these errors, in each leaf that is not
+exempt and in each library:
+
+1. **No behavior across a boundary (K0123).** A port signature cannot carry a function type, a
+   channel type, or an interface type, other than `error`, `context.Context`, and the interfaces
+   in `config { strict_interfaces: [...] }`. Thus a call through a port never runs the caller's
+   code.
+2. **No escape hatches (K0124).** Code cannot import `unsafe` or `syscall`, use cgo, or call
+   `reflect.Value.Call`, `reflect.Value.CallSlice`, `reflect.Value.Method`, or
+   `reflect.Value.MethodByName`. Imported Go packages are not checked for this; calls through
+   `reflect` inside them stay reported.
+3. **Entry leaves serve, gateways dial (K0125).** An entry leaf can reach only the serve
+   functions of Appendix D. A leaf that reaches a dial function must be a gateway. One leaf can be
+   both.
+4. **Immutable library state (K0210).** The type of a library `var` holds no pointer, slice, map,
+   channel, function, or interface. The exceptions are `error` values and the types in
+   `config { strict_shared: [...] }`, for example `*regexp.Regexp`.
+5. **No known global mutators (K0211).** Code cannot reach a global mutator of Appendix D, or a
+   function in `config { mutators: [...] }`.
+
+`keel audit` lists each entry of `strict_interfaces`, `strict_shared`, and `mutators`.
+
+**What each mode lets the docs claim.**
+
+- *Ordinary mode:* each dependency between leaves in the source goes through a declared port,
+  topic, or library. Only gateway and entry leaves reach a network function through static calls.
+  `keel audit` lists each path that these checks do not cover.
+- *Strict mode:* each dependency between leaves, in the source and in calls, goes through a
+  declared port, topic, or library. Only gateways dial, and only entry leaves serve. No leaf
+  shares program memory with another leaf except through a port or a topic, apart from the
+  imported-package state that `keel audit` lists. Exempt leaves are listed.
+- *Neither mode* claims where a gateway connects (G11), or that leaves share no files, tables, or
+  environment (G12).
 
 ### 5.5 Crossing containers
 
@@ -1453,7 +1541,7 @@ The tools assume that one of their users is an LLM (R8):
 | `keel query <symbol>` | Looks up a symbol exactly in the symbol index of the compiler. This prevents invented APIs (R4). |
 | `keel explain <code>` | Gives a long explanation of a diagnostic, with examples. |
 | `keel doc` / `keel diagram` | Generates docs, and C4 diagrams at each level (context, container, component, code), from the source (§5.6). |
-| `keel audit` / `keel archdiff` | Audits contracts and architecture (§7, §9). |
+| `keel audit` / `keel archdiff` | Audits contracts and architecture (§7, §9), with the unchecked paths and the strict-mode exemptions of §5.4d. |
 | `keel fmt` | The one formatter. |
 | `keel test <leaf>` | Builds and runs the tests of one leaf (§8), with the race detector (§6). |
 | `keel mod <args>` | Runs `go mod <args>` over the generated Go, so `keel mod tidy` sees imports in `.keel` files (§6). |
@@ -1686,6 +1774,13 @@ TransportFile = "transport" identifier "{" "go" string_lit "}" .
 | `output` | `"system"` or `"containers"` | `"system"` | One binary for the system, or one for each container (§11) |
 | `network` | a list of full function names | empty | Additions to the network functions (Appendix D) |
 | `acquiring` | a list of full function names | empty | Additions to the acquiring functions (Appendix D) |
+| `allow_network` | a list of full function names | empty | Removals from the network functions (§5.4c) |
+| `allow_acquiring` | a list of full function names | empty | Removals from the acquiring functions (§5.4c) |
+| `strict` | `bool` | `false` | Strict mode (§5.4d) |
+| `strict_exempt` | a list of leaf names | empty | Leaves that stay in ordinary mode (§5.4d) |
+| `strict_interfaces` | a list of full interface type names | empty | Interfaces that a port signature can carry in strict mode (§5.4d, K0123) |
+| `strict_shared` | a list of full type names | empty | Types that a library `var` can have in strict mode (§5.4d, K0210) |
+| `mutators` | a list of full function names | empty | Additions to the global mutators (Appendix D, K0211) |
 | `duplicate_similarity` | percent | 90 | §9 |
 | `duplicate_min_tokens` | tokens | 50 | §9 |
 
@@ -1891,6 +1986,14 @@ that it receives does not acquire. §5.4c defines "reaches".
 | `os` | `StartProcess` |
 | `syscall` | `Socket`, `Connect`, `Bind`, `Listen`, `Accept`, `Exec`, `ForkExec`, `StartProcess`, and their variants on each target |
 
+**Serve and dial.** Strict mode (§5.4d, K0125) splits the network functions. The *serve*
+functions are `net.Listen`, `net.ListenPacket`, `net.ListenTCP`, `net.ListenUDP`, `net.ListenIP`,
+`net.ListenUnix`, `net.ListenUnixgram`, `net.ListenMulticastUDP`, `net.FileListener`,
+`(*net.ListenConfig).Listen`, `(*net.ListenConfig).ListenPacket`, `crypto/tls.Listen`, the
+`ListenAndServe`, `ListenAndServeTLS`, `Serve`, and `ServeTLS` functions and methods of `net/http`,
+and `syscall.Bind`, `syscall.Listen`, and `syscall.Accept`. Every other network function is a
+*dial* function.
+
 **Acquiring functions.** Only leaves can reach them (§5.4c, rule 2):
 
 | Package | Functions |
@@ -1904,6 +2007,21 @@ that it receives does not acquire. §5.4c defines "reaches".
 A project adds a function with its full name in `config { network: [...] }` or
 `config { acquiring: ["example.com/blob.Open"] }`, and removes one with `allow_network` or
 `allow_acquiring` (§5.4c). `keel audit` lists each change and each call to a listed function.
+
+**Global mutators.** In strict mode, only exempt leaves can reach them (§5.4d, K0211). They change
+package state of the standard library that every leaf in the process shares:
+
+| Package | Functions |
+|---|---|
+| `os` | `Setenv`, `Unsetenv`, `Clearenv`, `Chdir` |
+| `net/http` | `Handle`, `HandleFunc` |
+| `expvar` | `Publish`, `NewInt`, `NewFloat`, `NewMap`, `NewString` |
+| `flag` | `Parse`, `Set`, and each function that defines a flag on `flag.CommandLine` |
+| `log` | `SetOutput`, `SetFlags`, `SetPrefix` |
+| `log/slog` | `SetDefault`, `SetLogLoggerLevel` |
+| `runtime/debug` | `SetGCPercent`, `SetMemoryLimit`, `SetMaxThreads`, `SetMaxStack` |
+
+A project adds a function with `config { mutators: [...] }`.
 
 ## Appendix E: Diagnostics
 
@@ -1944,6 +2062,10 @@ the long form.
 | K0119 | E | A `uses` line names an unknown node | App. B |
 | K0120 | E | A port contract names an identifier of its own leaf | App. F |
 | K0121 | E | Two leaves in the system have the same name | §5.3 |
+| K0122 | E | A leaf or a library contains a `//go:linkname` directive | §5.4 r13 |
+| K0123 | E | Strict mode: a port signature carries a function, a channel, or an interface type that is not allowed | §5.4d |
+| K0124 | E | Strict mode: code imports `unsafe` or `syscall`, uses cgo, or calls a `reflect` call function | §5.4d |
+| K0125 | E | Strict mode: an entry leaf reaches a dial function, or a leaf that is not a gateway dials | §5.4d |
 | **K02** | | **Libraries, packages, and resources** | |
 | K0201 | E | A library declares a port or a topic | §5.4a r1 |
 | K0202 | E | A library `var` is assigned after startup | §5.4a r1 |
@@ -1954,6 +2076,8 @@ the long form.
 | K0207 | E | Two gateway leaves for one external system in one container | §5.4b |
 | K0208 | E | A leaf or a library imports a transport package | §5.5.1 |
 | K0209 | E | A dependency is not in `go.sum` (fix-it: `keel mod tidy`) | §6 |
+| K0210 | E | Strict mode: the type of a library `var` holds a mutable reference | §5.4d |
+| K0211 | E | Strict mode: code reaches a global mutator | §5.4d, App. D |
 | **K03** | | **Topics, transports, and remote ports** | |
 | K0301 | E | A subscribed topic has no handler or more than one, a handler has no subscribed topic, or a handler's parameters do not match | §5.5.0 |
 | K0302 | E | A handler is not `idempotent`, and its transport can redeliver | §5.5 |
