@@ -5,16 +5,11 @@ without the history of the sessions that produced it.
 
 ## Name
 
-The language is **Vulcan** (decided 2026-10-19). Earlier working names were Keel and Domí. The
-spec, the primer, and the experiments still say "Keel", `.keel`, the `keel` command, and the
-runtime path `keel.dev/keel`. These are open:
-
-1. The file extension (now `.keel`).
-2. The command name (now `keel`).
-3. The runtime module path (now `keel.dev/keel`, an invented path).
-
-When these are decided, rename them in `docs/spec.md` and `docs/guide.md` in one change. The
-experiment files are records; leave their old names.
+The language is **Vulcan** (decided 2026-10-19). Earlier working names were Keel and Domí.
+[Decision 5](decisions/0005-names-and-reproducibility.md) (2026-10-20) set the extension
+`.vulcan`, the command `vulcan`, and the runtime module `github.com/robot-accomplice/vulcan/vulcan`.
+The spec and the primer use these names. The experiment files are records: they keep "Keel",
+`.keel`, and `keel`.
 
 ## What the spec is
 
@@ -80,7 +75,7 @@ until accepted.
 1. **Go or no go.** Decide whether the spec gives enough value over plain Go to build the
    language, and whether its first principles are sound. The planned way: run `/abort` on the
    spec.
-2. **Decide the open names** above, then rename in the spec and the primer.
+2. **Names.** Done: decision 5, and the rename of the spec and the primer.
 3. **Optional review 10.** Reviews 8 and 9 changed much text. The trend is 55, then 29 findings,
    mostly implementation detail.
 4. **Finish test 3**, or replace it with the build test below.

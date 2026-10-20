@@ -1,22 +1,22 @@
-# Keel primer (`keel guide`)
+# Vulcan primer (`vulcan guide`)
 
-Keel is Go with an enforced architecture and contracts. **Function bodies are plain Go**: write
-them exactly as you would in Go. This primer lists only what Keel adds. Budget: 4,000 tokens.
+Vulcan is Go with an enforced architecture and contracts. **Function bodies are plain Go**: write
+them exactly as you would in Go. This primer lists only what Vulcan adds. Budget: 4,000 tokens.
 
 ## 1. Project layout
 
 ```
-system.keel                 architecture: containers, wires, config
-api/orders/component.keel   boundary of the leaf Orders
-api/orders/*.keel           code of Orders (plain Go)
-lib/money/library.keel      shared types and reusable code
+system.vulcan                 architecture: containers, wires, config
+api/orders/component.vulcan   boundary of the leaf Orders
+api/orders/*.vulcan           code of Orders (plain Go)
+lib/money/library.vulcan      shared types and reusable code
 transports/kafka/           a transport
 ```
 
-- A **leaf** is a directory of code with one `component.keel`. A leaf never imports another leaf.
+- A **leaf** is a directory of code with one `component.vulcan`. A leaf never imports another leaf.
   It uses another leaf only through a port it needs, a topic, or a library.
 - A **container** is one process. Most systems have one container.
-- A **library** is a Go package that holds shared types and code: a `library.keel` with
+- A **library** is a Go package that holds shared types and code: a `library.vulcan` with
   `library money {}`, plus Go files. It has no ports or topics, its package-level `var` is set once
   at startup, and it never chooses a file or a network target (`os.Open`, `sql.Open`, `http.Get`):
   only leaves do. It can use a handle that its caller gives it (an `io.Reader`, a `*sql.DB`).
@@ -25,7 +25,7 @@ transports/kafka/           a transport
 - Import any Go package. Only a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf
   (`entry for Customer`) can reach a network function: dial, listen, send an HTTP request,
   `sql.Open`, `exec.Command`, also inside an SDK. The diagnostic shows the call path.
-- Never write `//go:linkname` in a leaf or a library. `keel audit` lists each path around the
+- Never write `//go:linkname` in a leaf or a library. `vulcan audit` lists each path around the
   architecture rules (callbacks through ports, shared library state). `config { strict: true }`
   rejects most of them: then port methods take no function, channel, or interface types except
   `error` and `context.Context`, library `var`s hold no references, and only gateways dial.
@@ -40,7 +40,7 @@ transports/kafka/           a transport
 ## 2. Boundaries and wiring
 
 ```go
-// api/orders/component.keel
+// api/orders/component.vulcan
 import ("shop/lib/money"; "shop/lib/events")
 
 component Orders {
@@ -60,7 +60,7 @@ component Orders {
   or comes from a library. Topic and remote types must come from a library.
 
 ```go
-// system.keel
+// system.vulcan
 system Shop {
     container Api {
         Web{ Addr: flag("web-addr", default: ":8080") }, Orders, Billing, StripeGateway
@@ -113,10 +113,10 @@ pure func Positive(x int) bool { return x > 0 }   // contracts call only pure fu
   fields): `len(xs) > 0 && xs[0] > 0`, `requires a != nil`. `old(x)` needs a type with no
   references: `old(len(xs))`.
 - A `pure` function has no effects: it writes only values that it created, and calls only `pure`
-  functions. Its body is plain Go. Use `keel.All(xs, Positive)` for a rule over a collection.
+  functions. Its body is plain Go. Use `vulcan.All(xs, Positive)` for a rule over a collection.
 - Contracts run in every build. A failed contract panics with a report. It undoes nothing:
   check before you commit (`defer tx.Rollback()`, checks, then `return tx.Commit()`), and store an
-  idempotency key with each retryable change (`keel.DeliveryID(ctx)` in a handler).
+  idempotency key with each retryable change (`vulcan.DeliveryID(ctx)` in a handler).
 - Deferred calls and `recover` cannot hide a broken contract: when a deferred call can change a
   result or recover a panic, `ensures` and the invariant are checked again after it. A deferred
   call in a method cannot write the struct's fields. A panic that leaves a method with its
@@ -136,7 +136,7 @@ idempotent handle Shipped(ctx context.Context, m events.ShipmentSent) error {
 
 - An error or a panic in a handler means the message is not acknowledged; the transport retries,
   then sends it to the wire's `deadletters` route: a topic declared
-  `subscribes DeadPlaced topic[keel.DeadLetter[events.OrderPlaced]]`, with fields `Message`,
+  `subscribes DeadPlaced topic[vulcan.DeadLetter[events.OrderPlaced]]`, with fields `Message`,
   `Error`, `Attempts`, `Wire`, `Time`. A message that fails its invariant goes there at once.
 - `direct` delivers at least once, so every handler on it, including a dead-letter handler, is
   `idempotent`. It promises no order.
@@ -152,32 +152,33 @@ idempotent handle Shipped(ctx context.Context, m events.ShipmentSent) error {
   value passes the invariant. A rename, a type change, a `limit` change, or an invariant change
   needs a new type.
 - `needs remote port Stock { func Level(sku stock.SKU) (int, error) timeout 200 * time.Millisecond }`.
-  The last result is `error`; it can also be `keel.Unavailable`, `keel.Timeout`, or
-  `keel.RemotePanic`. The runtime never retries a call. An error crosses as text; declare it with
-  `keel.NewError("stock.unknown-sku", "unknown SKU")` so that `errors.Is` matches on the caller.
+  The last result is `error`; it can also be `vulcan.Unavailable`, `vulcan.Timeout`, or
+  `vulcan.RemotePanic`. The runtime never retries a call. An error crosses as text; declare it with
+  `vulcan.NewError("stock.unknown-sku", "unknown SKU")` so that `errors.Is` matches on the caller.
 
 ## 5. Tests
 
-Tests are Go tests in `*_test.keel`. The runtime package is `import "keel.dev/keel"`. A fake is any type that satisfies the port.
+Tests are Go tests in `*_test.vulcan`. The runtime package is `import
+"github.com/robot-accomplice/vulcan/vulcan"`. A fake is any type that satisfies the port.
 
 ```go
 type CheckoutOK struct{}
 func (CheckoutOK) Pay(c money.CustomerID, a money.Money) (money.Receipt, error) { return money.Receipt{Amount: a}, nil }
 
 func TestPlace(t *testing.T) {
-    keel.Bind(t, &Checkout, CheckoutOK{})          // this test only; not with t.Parallel
+    vulcan.Bind(t, &Checkout, CheckoutOK{})          // this test only; not with t.Parallel
     if err := Place(o); err != nil { t.Fatal(err) }
-    if got := keel.Published(t, Placed); len(got) != 1 { t.Fatalf("got %d", len(got)) }
-    if err := keel.Deliver(t, Shipped, events.ShipmentSent{OrderID: "o-1"}); err != nil { t.Fatal(err) }
+    if got := vulcan.Published(t, Placed); len(got) != 1 { t.Fatalf("got %d", len(got)) }
+    if err := vulcan.Deliver(t, Shipped, events.ShipmentSent{OrderID: "o-1"}); err != nil { t.Fatal(err) }
 }
 ```
 
-A fake must meet the port's contract. `keel test` runs the race detector; a race fails the test.
+A fake must meet the port's contract. `vulcan test` runs the race detector; a race fails the test.
 
 ## 6. Commands
 
-`keel mod tidy` (not `go mod tidy`, which cannot see `.keel` imports), `keel check`, `keel build`,
-`keel test <leaf>`, `keel context <leaf>` (what to read before an edit),
-`keel query <symbol>` (never guess an API), `keel explain <code>`, `keel fake <Port>`, `keel audit`
-(warnings on Go code, escape hatches, unproved claims), `keel archdiff`, `keel diagram`,
-`keel doc`, `keel trace <id>`.
+`vulcan mod tidy` (not `go mod tidy`, which cannot see `.vulcan` imports), `vulcan check`, `vulcan
+build`, `vulcan test <leaf>`, `vulcan context <leaf>` (what to read before an edit), `vulcan query
+<symbol>` (never guess an API), `vulcan explain <code>`, `vulcan fake <Port>`, `vulcan audit`
+(warnings on Go code, escape hatches, unproved claims), `vulcan archdiff`, `vulcan diagram`, `vulcan
+doc`, `vulcan trace <id>`.

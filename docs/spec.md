@@ -1,16 +1,17 @@
-# Keel: Language Specification (Draft 0)
+# Vulcan: Language Specification (Draft 0)
 
-> **Working name: Keel.** The name is a placeholder (Q1). The source file extension is `.keel`.
+> **Name:** Vulcan. Source files end in `.vulcan` ([decision 5](decisions/0005-names-and-reproducibility.md)).
+> Drafts before 2026-10-20 used the working name Keel.
 > Status: brainstorming draft, 2026-09-28. Nothing in this document is implemented.
 
 ## 1. Purpose
 
-Keel is a compiled, garbage-collected, statically typed language. Humans and LLMs use it to write
+Vulcan is a compiled, garbage-collected, statically typed language. Humans and LLMs use it to write
 software *together*.
 
-The thesis of Keel: most failures in human/AI co-development come from missing structure. The
+The thesis of Vulcan: most failures in human/AI co-development come from missing structure. The
 model cannot see the architecture. It invents APIs, it duplicates code instead of reusing it, and it
-masks errors. The human cannot review what the model wrote. Keel puts that structure in the
+masks errors. The human cannot review what the model wrote. Vulcan puts that structure in the
 language. Then the compiler can see the structure, enforce it, draw it, and teach it.
 
 ### 1.1 Premise
@@ -27,20 +28,20 @@ In all three tasks, predictable structure, architectural legibility, and compile
 They make tasks 2 and 3 shorter, so that the developer can spend more time on task 1 and do it
 faster. Each design decision in this spec serves that goal.
 
-**How Keel makes validation shorter (hypotheses).** Two experiments with a model writing and
-reviewing code in Go and in Keel (2026-09-29) suggested where the gain is, and where it is not.
-Their data is lost, the Keel side had no compiler, and each had one writer. Thus the statements
+**How Vulcan makes validation shorter (hypotheses).** Two experiments with a model writing and
+reviewing code in Go and in Vulcan (2026-09-29) suggested where the gain is, and where it is not.
+Their data is lost, the Vulcan side had no compiler, and each had one writer. Thus the statements
 below are hypotheses, not findings. A compiler-based experiment must test them (development plan,
 milestone 4):
 
-- **Keel takes the architecture rules out of review.** A rule that the compiler enforces (which
+- **Vulcan takes the architecture rules out of review.** A rule that the compiler enforces (which
   leaf may use which, where the network and databases are reached, what a port promises) no longer
   has to be checked by a person on every change, and no later change can quietly break it. In Go
   the same rules hold only while each writer chooses to follow them. §5.4d states which rules the
   compiler proves and which paths around them it only reports.
-- **Keel rejects rule-breaking changes before review.** A change that breaks an enforced rule does
+- **Vulcan rejects rule-breaking changes before review.** A change that breaks an enforced rule does
   not build, so a model that iterates against the compiler fixes it before a person sees it.
-- **Keel does not make a thorough reviewer read less code, and it does not reduce defects in
+- **Vulcan does not make a thorough reviewer read less code, and it does not reduce defects in
   logic that no rule covers.** Order-state logic, races, and design choices still need review.
 
 If these hold, the gain is a smaller and more reliable review: a reviewer checks the logic and
@@ -56,7 +57,7 @@ use the same terms.
 | **System** | The whole software product. The root node of the architecture tree. |
 | **Container** | A node that runs as one process. Most systems have one container, so they compile to one binary. For more containers, the project chooses one binary with a mode per container, or one binary per container (§11). (The C4 meaning. It is not a Docker container.) |
 | **Group** | An optional node inside a container that groups leaves, for zoom levels in diagrams. |
-| **Composite** | A system, container, or group. A section of `system.keel`, with no code. |
+| **Composite** | A system, container, or group. A section of `system.vulcan`, with no code. |
 | **Leaf** | A `component` node: one flat directory of code. |
 | **Library** | A node that holds shared types and reusable code, with no ports and no topics. Its package-level variables cannot be reassigned after startup. It can use an I/O resource but never acquire one. |
 | **Gateway** | The one leaf in a container that talks to a given external system. |
@@ -67,20 +68,20 @@ use the same terms.
 | **Remote port** | A method port that crosses containers, declared `needs remote port`: a synchronous call. Events between containers use topics, which are not ports. |
 | **Publisher / subscriber** | A leaf that declares `publishes X topic[T]` / a leaf that declares `subscribes X topic[T]` and handles it. |
 | **Handler** | The function, marked `handle`, that processes the messages of one subscribed topic. |
-| **Wire** | A line in `system.keel` that connects a required port or a subscribed topic to a provider. |
+| **Wire** | A line in `system.vulcan` that connects a required port or a subscribed topic to a provider. |
 | **Transport** | A node kind that carries topic messages and remote calls between containers, named on a wire with `via`. |
 | **Dead-letter topic** | Where a subscription sends a message that it cannot handle. |
 | **Acknowledge** | Mark a message as handled. It occurs when its handler returns `nil`. |
 | **Error** | An ordinary value that reports a failure the code expects and handles. |
 | **Contract** | A `requires`, `ensures`, or `invariant` clause. |
-| **Audit** | The `keel audit` report of each escape hatch, override, and unproved claim. |
+| **Audit** | The `vulcan audit` report of each escape hatch, override, and unproved claim. |
 
 ## 2. Design principles
 
-| Principle | Meaning in Keel |
+| Principle | Meaning in Vulcan |
 |---|---|
 | Compiled, GC | Native binaries and a tracing GC. No manual memory management and no borrow checker. |
-| Go ergonomics | Function bodies are Go, unchanged. Keel adds the architecture, contracts, and tools around them (§4, §6). |
+| Go ergonomics | Function bodies are Go, unchanged. Vulcan adds the architecture, contracts, and tools around them (§4, §6). |
 | Competitive performance | Resource use and speed must be competitive with Go, Java, C++, and Rust. §11.3 states the targets and the costs. |
 | Mechanism, not policy | The language gives mechanisms and overridable defaults. Operational policy (delivery, retries, queues, build output) is the developer's decision. A default that the language sets must be one that a setting can change. |
 | Compiler first | If the compiler can check a rule, the compiler checks it. Each rule that depends on convention, review, or runtime is a candidate to move into the compiler. This is the most direct way to make tasks 2 and 3 of §1.1 shorter. |
@@ -94,29 +95,29 @@ use the same terms.
 
 ## 3. Evidence behind the design
 
-This table shows how LLMs fail when they write applications with humans, and what Keel does about
+This table shows how LLMs fail when they write applications with humans, and what Vulcan does about
 each failure. Appendix A lists the sources.
 
-| # | Observed failure | Keel's answer | Section |
+| # | Observed failure | Vulcan's answer | Section |
 |---|---|---|---|
-| R1 | Agents get lost in large codebases. Quality drops as the context grows. | Leaves are small, self-contained units with explicit ports. `keel context` emits a minimal context pack. | §5, §10 |
-| R2 | Duplication is up 81%. Reuse (cross-file calls) is down 35%. | The compiler finds near-duplicate code. Ports in each `component.keel` and all wires in `system.keel` make the available capabilities easy to find. | §9 |
+| R1 | Agents get lost in large codebases. Quality drops as the context grows. | Leaves are small, self-contained units with explicit ports. `vulcan context` emits a minimal context pack. | §5, §10 |
+| R2 | Duplication is up 81%. Reuse (cross-file calls) is down 35%. | The compiler finds near-duplicate code. Ports in each `component.vulcan` and all wires in `system.vulcan` make the available capabilities easy to find. | §9 |
 | R3 | Error-masking constructs are up 47%. | The tools warn on each unhandled or masked error, with a fix-it, and the audit lists them. | §6, §9 |
 | R4 | Models invent packages (about 20% of the time) and APIs. | The compiler serves an exact symbol index that tools can query. There are no implicit imports. | §10 |
 | R5 | About 94% of compile errors in typed languages are type errors. | Go's static types. The compiler's type information works on incomplete programs, so tools can guide generation by type. | §6, §10 |
 | R6 | AI code is harder to review. It "looks right but isn't". | Contracts in the code that reviewers can audit, and diffs at the architecture level. | §7, §9 |
 | R7 | Developers feel faster than they measure. | Fast verification: incremental builds and per-leaf tests. | §8 |
-| R8 | A new language has no training data, so LLM quality drops steeply. | Syntax close to Go, so the model can use what it knows. A primer (`keel guide`) with a hard budget of 4,000 tokens; the full spec is reference. Tools that instruct the model. | §4, §10 |
+| R8 | A new language has no training data, so LLM quality drops steeply. | Syntax close to Go, so the model can use what it knows. A primer (`vulcan guide`) with a hard budget of 4,000 tokens; the full spec is reference. Tools that instruct the model. | §4, §10 |
 
 ## 4. Syntax
 
 **Function bodies are Go, unchanged (§6).** A Go programmer, or a model trained on Go, reads and
-writes Keel code as Go. Keel's changes are all around the code: the architecture, contracts, and
+writes Vulcan code as Go. Vulcan's changes are all around the code: the architecture, contracts, and
 tests. This spec must justify each change and list it in this table:
 
 | Addition to Go | Reason |
 |---|---|
-| Declaration files: `system.keel` (containers, groups, `person`, `external`, `uses`, every wire, `via` with transport settings, `config { }`), `component.keel` (`needs port`, `needs remote port` with `timeout`, `publishes`, `subscribes`, `gateway for`, `entry for`), `library.keel`, `transport.keel`. They can use `flag("...")` and constant `time.Duration` expressions | Architecture as a first-class construct (§5) |
+| Declaration files: `system.vulcan` (containers, groups, `person`, `external`, `uses`, every wire, `via` with transport settings, `config { }`), `component.vulcan` (`needs port`, `needs remote port` with `timeout`, `publishes`, `subscribes`, `gateway for`, `entry for`), `library.vulcan`, `transport.vulcan`. They can use `flag("...")` and constant `time.Duration` expressions | Architecture as a first-class construct (§5) |
 | A leaf never imports another leaf; it uses a port, a topic, or a library. A port call is an ordinary function call | Enforced, legible boundaries (§5.3, §5.4) |
 | Library rules: no ports or topics, package-level `var` set once, no resource-acquiring calls | Libraries do not hide state or I/O decisions (§5.4a) |
 | Only gateway and entry leaves reach a network function | Enforced network access (§5.4b, §5.4c) |
@@ -124,14 +125,14 @@ tests. This spec must justify each change and list it in this table:
 | `limit` bounds on variable-size fields | A transport can require bounded messages (§5.5.1) |
 | `requires`, `ensures`, `invariant`, `pure`, and `result`, `old(x)`, `=>` inside contracts; only its own methods write the fields of a struct with an invariant | Contracts in the code (§7) |
 | Functions named `setup` and `startup`, found by their names as Go finds `init`; `main` is generated | The architecture decides how a process starts (§6) |
-| `*_test.keel` files; `keel.Bind` and `keel.Published` in Go tests | Testability by design (§8) |
+| `*_test.vulcan` files; `vulcan.Bind` and `vulcan.Published` in Go tests | Testability by design (§8) |
 
 All other syntax and behavior follow Go. Appendix B gives the grammar, and Appendix F shows how each
 addition becomes Go.
 
 ### 4.1 Keywords
 
-Keel reserves no word that Go does not. Each new word is a keyword only where the grammar expects
+Vulcan reserves no word that Go does not. Each new word is a keyword only where the grammar expects
 it: at the start of a declaration (`needs port`, `pure func`, `handle X(`), after a
 field type (`limit`), after a signature or a struct (`requires`, `ensures`, `invariant`,
 `timeout`), inside a contract (`result`, `old`), and inside a declaration file. Everywhere else it can be an identifier.
@@ -146,7 +147,7 @@ port := 8080                   // an identifier
 needs port Payments { ... }    // keywords: they start a declaration
 ```
 
-`keel guide` prints the list.
+`vulcan guide` prints the list.
 
 ## 5. Architecture model
 
@@ -172,36 +173,36 @@ has no directory of its own declarations and no code: it is a section of the arc
 
 | Kind | Declared in | Holds | Code? |
 |---|---|---|---|
-| `system` | `system.keel` | containers, `person` and `external` declarations, all wires | no |
-| `container` | a section of `system.keel` | groups and leaves | no |
-| `group` | a section of `system.keel` | leaves; a label for diagrams only | no |
-| `component` | `component.keel` in the leaf directory | the boundary of the leaf | yes, in the same directory |
-| `library` | `library.keel` in the library directory | shared types and reusable code | yes, but no ports, topics, or mutable state (§5.4a) |
+| `system` | `system.vulcan` | containers, `person` and `external` declarations, all wires | no |
+| `container` | a section of `system.vulcan` | groups and leaves | no |
+| `group` | a section of `system.vulcan` | leaves; a label for diagrams only | no |
+| `component` | `component.vulcan` in the leaf directory | the boundary of the leaf | yes, in the same directory |
+| `library` | `library.vulcan` in the library directory | shared types and reusable code | yes, but no ports, topics, or mutable state (§5.4a) |
 
 ### 5.2 Layout
 
-- **`system.keel`**, at the root, is the architecture file. It declares the containers and groups,
+- **`system.vulcan`**, at the root, is the architecture file. It declares the containers and groups,
   the leaves in each, the people, the external systems, and **every wire**.
-- **Each leaf is a directory** with one `component.keel` and its source files. `component.keel`
+- **Each leaf is a directory** with one `component.vulcan` and its source files. `component.vulcan`
   declares the **boundary** of the leaf: each port that it needs, each topic that it publishes or
   subscribes to, and its `gateway for` or `entry for` line.
 - **Directories mirror containers and leaves**: `api/orders/`, `worker/picking/`. Groups are only
-  labels in `system.keel`, so they are not directories and not part of any path. The compiler checks
-  that the directories and `system.keel` agree.
+  labels in `system.vulcan`, so they are not directories and not part of any path. The compiler
+  checks that the directories and `system.vulcan` agree.
 - Libraries are in `lib/`. Transports are in `transports/`, one directory each, with a
-  `transport.keel` declaration.
+  `transport.vulcan` declaration.
 
-Thus each thing has one location: the wires in `system.keel`, a boundary in its `component.keel`,
-and code next to its boundary.
+Thus each thing has one location: the wires in `system.vulcan`, a boundary in its
+`component.vulcan`, and code next to its boundary.
 
 ### 5.3 Declarations
 
 **A port is declared once, by the leaf that requires it.** This is the Go idiom: the consumer
-defines the interface where it uses it. A leaf declares its boundary in `component.keel`: each
+defines the interface where it uses it. A leaf declares its boundary in `component.vulcan`: each
 port that it requires, with its methods and contracts.
 
 ```go
-// api/orders/component.keel
+// api/orders/component.vulcan
 import "shop/lib/money"
 
 component Orders {
@@ -219,7 +220,7 @@ exported type of a leaf whose method set matches the port can satisfy it, as wit
 The provider never names its consumers.
 
 ```go
-// api/billing/payer.keel (ordinary code)
+// api/billing/payer.vulcan (ordinary code)
 // Payer charges a customer's stored payment method.
 type Payer struct { ... }
 
@@ -232,33 +233,33 @@ If two consumers need different methods with the same name, the provider exports
 example `Payer` and `SubscriptionPayer`, as in ordinary Go.
 
 A consumer does not know which leaf serves it. A provider does not know which leaves use it. Only
-`system.keel` knows both.
+`system.vulcan` knows both.
 
 **Inside a leaf, each required port is a package-level name**, the name of the port itself. Code
 calls it like a Go package: `Checkout.Pay(c, amt)`. The wiring binds the name at startup, and the
 binding cannot change after that. A test binds fakes to the same names (§8). A leaf appears once in
 the tree; reuse of code goes through libraries (§5.4a).
 
-**A port call is an ordinary function call.** Keel does not invent a new way for components to
+**A port call is an ordinary function call.** Vulcan does not invent a new way for components to
 communicate. Inside one container, a port call runs on the caller's own task, usually the same
 thread, with no queue, no copy to bytes, and no hidden goroutine. Arguments pass by value or by
 reference, exactly as in Go. On the Go backend, a port call is a Go interface call: one dynamic
-dispatch, because each leaf compiles alone against its own port declaration (§11.2). The
-generated wrapper that checks the contract calls the provider directly (Appendix F). The LLVM
-backend can use the fixed wiring to make it a direct call. What Keel adds at the boundary is **enforcement and
-instrumentation of the contract**: the port signature, its `requires` and `ensures`, and the
-record of the boundary in diagrams and in the audit. Topics and transports (§5.5) exist only for
-separate processes.
+dispatch, because each leaf compiles alone against its own port declaration (§11.2). The generated
+wrapper that checks the contract calls the provider directly (Appendix F). The LLVM backend can use
+the fixed wiring to make it a direct call. What Vulcan adds at the boundary is **enforcement and
+instrumentation of the contract**: the port signature, its `requires` and `ensures`, and the record
+of the boundary in diagrams and in the audit. Topics and transports (§5.5) exist only for separate
+processes.
 
 **The architecture file wires the leaves.** A wire connects a required port to a providing type.
 Inside a container section, a wire names leaves by name. A wire between containers names each leaf
 by its path: `Container/Leaf`. Groups are not part of paths, so regrouping for a diagram never
 changes a wire. Every wire reads `needer: supplier`: the left side needs what the right side
-supplies, a method for a port and messages for a topic. `keel query` lists the subscribers of a
+supplies, a method for a port and messages for a topic. `vulcan query` lists the subscribers of a
 topic in one command.
 
 ```go
-// system.keel
+// system.vulcan
 // Shop is the online store.
 system Shop {
     person   Customer "Buys goods through the web store"
@@ -310,14 +311,14 @@ as `Orders.Placed`, and the leaf argument of each command, name one leaf.
 - **Configuration** comes through one optional settings struct, filled at the wire from literals or
   startup flags, as for transports: `StripeGateway.NewCards{ APIKey: flag("stripe-key") }`, which fills the exported settings struct
   of `NewCards`. A leaf's own settings, for its `setup` and `startup` functions (§6), come only
-  from the container list of `system.keel`: `Web{ Addr: flag("web-addr", default: ":8080") }`.
+  from the container list of `system.vulcan`: `Web{ Addr: flag("web-addr", default: ":8080") }`.
   They are separate from the settings of any constructor in the leaf.
 - **A constructor can fail.** It can return `(T, error)`. A failure stops the process at startup
   with a report.
 - **One instance for each constructor and settings value, in each process.** Two wires to the
   same constructor with the same settings share one instance. Two settings are the same when their
-  source text is identical after `keel fmt`.
-- **A secret stays out of source.** A settings field with the tag `keel:"secret"` accepts only a
+  source text is identical after `vulcan fmt`.
+- **A secret stays out of source.** A settings field with the tag `vulcan:"secret"` accepts only a
   `flag`. A literal in it is a compile error (K0605).
 
 **Flags.** `flag("name")` in a declaration file is a value that the process reads when it starts
@@ -334,7 +335,7 @@ as `Orders.Placed`, and the leaf argument of each command, name one leaf.
   or maxima are a compile error (K0602).
 - **Options.** `default: v` gives a value when neither source has one. A flag without a default
   is required. `max: n` bounds a size, as §5.5.1 requires for queue settings.
-- **Audit.** `keel audit` lists each flag, with its type, its default, and each setting it fills.
+- **Audit.** `vulcan audit` lists each flag, with its type, its default, and each setting it fills.
 
 **Checks at each wire.**
 
@@ -344,13 +345,13 @@ as `Orders.Placed`, and the leaf argument of each command, name one leaf.
    checks `requires` before the call and `ensures` after it. If the providing method also declares
    its own contract, the compiler checks that the port's `requires` implies the method's `requires`,
    and that the method's `ensures` implies the port's `ensures`. If it disproves an implication, it
-   is a compile error (K0109). If it cannot prove one, `keel audit` lists it; no extra check is
+   is a compile error (K0109). If it cannot prove one, `vulcan audit` lists it; no extra check is
    generated, because each side already checks its own clauses at each call.
 
 If no type has the right methods, write an adapter: an ordinary leaf with a type that satisfies the
-port, and that calls another port. Keel has no special adapter construct.
+port, and that calls another port. Vulcan has no special adapter construct.
 
-Keel does not wire external systems with ports. The language does not control them, and they use
+Vulcan does not wire external systems with ports. The language does not control them, and they use
 their own protocols. Instead, one **gateway leaf** in each container talks to each external system
 (§5.4b). The compiler draws each relationship with a person or an external system from the entry
 and gateway declarations. A `uses` line is needed only for a relationship that no declaration
@@ -361,7 +362,7 @@ shows.
 1. **Ports only.** Code in a leaf can use another leaf **only** through a port that the leaf
    needs, a topic that it publishes or subscribes to, or an imported library (§5.4a). Any other reference to another leaf is a
    compile error.
-2. **Code only in leaves and libraries.** `system.keel` holds no code. A leaf directory holds no
+2. **Code only in leaves and libraries.** `system.vulcan` holds no code. A leaf directory holds no
    child leaves.
 3. **Container boundaries.** A wire between leaves in different containers must be a topic or a
    `needs remote port` (§5.5). A method port inside one container must not be `remote`, and a
@@ -369,31 +370,30 @@ shows.
    adds no boundary.
 4. **Complete wiring.** A `deadletters:` setting wires a `DeadLetter[T]` topic, and rule 3 does not
    apply to it. A subscribed `DeadLetter[T]` topic needs at least one `deadletters:` route.
-   Otherwise, `system.keel` wires each required port and each subscribed topic of each leaf
+   Otherwise, `system.vulcan` wires each required port and each subscribed topic of each leaf
    exactly once. A published topic is never wired by itself (§5.5).
 5. **Satisfied ports.** Each wire names a providing type whose method set matches the port.
 6. **Compatible wiring.** Each wire passes the port-compatibility check in §5.3.
 7. **Boundary ownership.** A leaf declares each port that it requires, once, in its own
-   `component.keel`. The code and the boundary of a leaf never name another leaf. Only
-   `system.keel` names two leaves together, in a wire.
+   `component.vulcan`. The code and the boundary of a leaf never name another leaf. Only
+   `system.vulcan` names two leaves together, in a wire.
 8. **No cycles.** The graph of wires between the leaves of one container has no cycles.
-9. **Private types.** A type is private to its leaf. Only `system.keel` can name an exported type
+9. **Private types.** A type is private to its leaf. Only `system.vulcan` can name an exported type
     of a leaf, in a wire. A type that crosses a boundary (in a port signature, a topic message, or a
     remote method) must be a predeclared Go type, a type of the Go standard library, or a type from
     a library (§5.4a). In a topic message and in a remote signature, each named type must be
-    declared in a library, or be `keel.DeadLetter[T]` for a library type `T`; predeclared types,
+    declared in a library, or be `vulcan.DeadLetter[T]` for a library type `T`; predeclared types,
     `error`, `time.Time`, and `time.Duration` are also allowed. Thus each container compiles the
     same type (K0112). This costs a
     library for each shared type, which is the price of leaves that never import each other. The
     compiler reduces it: when a boundary uses a leaf-private type, the fix-it moves the type
     to a library (new or existing) and updates the imports.
-10. **Leaf size (audit).** `keel audit` reports the size of each leaf: its `component.keel` and
-    its non-test source, in non-blank, non-comment lines. A leaf over the project's
-    `context_budget` (set in the `config { }` section of `system.keel`) gets a warning, with a hint
-    that tells where to split it. It is not a compile error, so one more line never forces a
-    split.
+10. **Leaf size (audit).** `vulcan audit` reports the size of each leaf: its `component.vulcan` and
+    its non-test source, in non-blank, non-comment lines. A leaf over the project's `context_budget`
+    (set in the `config { }` section of `system.vulcan`) gets a warning, with a hint that tells
+    where to split it. It is not a compile error, so one more line never forces a split.
 11. **Fixed names.** A port name and a topic name are bound once (§6). Code cannot assign to one
-    or take its address; only `keel.Bind` in a test changes a port binding (K0116).
+    or take its address; only `vulcan.Bind` in a test changes a port binding (K0116).
 12. **No `init` in leaves.** A leaf cannot declare a Go `init` function, because it would run
     before the ports are bound. For the same reason, the initializer of a package-level variable
     in a leaf cannot reach a port call or a publish. Leaf setup goes in a constructor, in `setup`,
@@ -410,22 +410,22 @@ must be the *same* type on both sides, so it cannot belong to either leaf. It go
 **library**. A library is a node that holds shared types and reusable code. It is not part of the
 architecture at runtime.
 
-A library is a Go package. Its directory holds one `library.keel`, which declares it, and ordinary
+A library is a Go package. Its directory holds one `library.vulcan`, which declares it, and ordinary
 Go code files. Code imports it by its Go import path, as any Go package, and uses its package name
 as the qualifier.
 
 ```go
-// lib/money/library.keel
+// lib/money/library.vulcan
 // Money represents amounts in minor currency units.
 library money {
 }
 
-// lib/money/money.keel
+// lib/money/money.vulcan
 package money
 
 type Money int64
 
-// api/billing/billing.keel
+// api/billing/billing.vulcan
 package billing
 
 import "shop/lib/money"      // the module path from go.mod, then the directory
@@ -433,11 +433,11 @@ import "shop/lib/money"      // the module path from go.mod, then the directory
 func total(xs []money.Money) money.Money { ... }
 ```
 
-A `component.keel` imports libraries the same way, at its top, so its port signatures can use
+A `component.vulcan` imports libraries the same way, at its top, so its port signatures can use
 their types:
 
 ```go
-// api/orders/component.keel
+// api/orders/component.vulcan
 import "shop/lib/money"
 
 component Orders {
@@ -462,13 +462,12 @@ func Withdraw(a *Account, amt Money) (Money, error)
 Rules:
 
 1. A library has **no ports and no topics**. A package-level `var` in a library is set once, at
-   startup, and never assigned again; the compiler rejects each later assignment. "At startup"
-   means in the variable's initializer or in an `init` function of the same library, where each
-   variable is assigned at most once. The compiler does
-   not track changes through a method or a reference (`hits.Add(1)`, `cache[k] = v`), so a library
-   can still hold state that two leaves share. `keel audit` lists each library `var` whose value can
-   change through a method or a reference, so that a reviewer can check it (§5.4d, path 2).
-   Strict mode rejects such a `var` (K0210).
+   startup, and never assigned again; the compiler rejects each later assignment. "At startup" means
+   in the variable's initializer or in an `init` function of the same library, where each variable
+   is assigned at most once. The compiler does not track changes through a method or a reference
+   (`hits.Add(1)`, `cache[k] = v`), so a library can still hold state that two leaves share. `vulcan
+   audit` lists each library `var` whose value can change through a method or a reference, so that a
+   reviewer can check it (§5.4d, path 2). Strict mode rejects such a `var` (K0210).
 
    ```go
    // lib/crc
@@ -498,7 +497,7 @@ Rules:
 3. A library can import other libraries. It cannot import leaves or composites. Library imports
    have no cycles.
 4. Any leaf can import any library.
-5. `keel diagram` shows libraries as shared dependencies. `keel audit` lists the leaves that use
+5. `vulcan diagram` shows libraries as shared dependencies. `vulcan audit` lists the leaves that use
    each library.
 
 Libraries compile before the leaves that import them. Leaves compile against the library
@@ -511,19 +510,19 @@ external system into an ordinary type that satisfies a port. Other leaves requir
 they contain no network code.
 
 ```go
-// api/stripegateway/component.keel
+// api/stripegateway/component.vulcan
 // StripeGateway charges cards through Stripe.
 component StripeGateway {
     gateway for Stripe
 }
-// api/stripegateway/cards.keel: type Cards, with a Charge method that calls Stripe
+// api/stripegateway/cards.vulcan: type Cards, with a Charge method that calls Stripe
 
-// api/billing/component.keel
+// api/billing/component.vulcan
 component Billing {
     needs port CardNetwork { func Charge(...) (cards.Receipt, error) } // no network code
 }
 
-// system.keel
+// system.vulcan
 Billing.CardNetwork: StripeGateway.NewCards{ APIKey: flag("stripe-key") }
 ```
 
@@ -542,7 +541,7 @@ Rules:
 enters through an **entry leaf**. It is the mirror of a gateway:
 
 ```go
-// api/web/component.keel
+// api/web/component.vulcan
 component Web {
     entry for Customer          // serves requests from the person Customer
     needs port Checkout { ... }
@@ -551,7 +550,7 @@ component Web {
 
 - An entry leaf declares `entry for <Person or External>`, and it can reach network functions to
   serve requests, under the one network rule (§5.4c, rule 1).
-- In ordinary mode, the compiler does not tell serving from dialing. `keel audit` lists each
+- In ordinary mode, the compiler does not tell serving from dialing. `vulcan audit` lists each
   entry leaf and each gateway, and the network functions that each reaches. In strict mode, an
   entry leaf can reach only the serve functions of Appendix D, and a leaf that dials must be a
   gateway (K0125, §5.4d).
@@ -564,7 +563,7 @@ The compiler rejects each static path to a network function from any other leaf 
 
 ### 5.4c Go packages
 
-Keel code is Go code, so a leaf or a library imports Go packages directly, as Go does. Importing a
+Vulcan code is Go code, so a leaf or a library imports Go packages directly, as Go does. Importing a
 package is never an error. Two architecture rules apply to the functions that code **reaches**.
 
 Code reaches a function when it calls the function, uses it as a value, or calls a function of an
@@ -597,14 +596,14 @@ Each diagnostic shows the call path.
 
 **The lists are defaults.** The project can add to either list (`config { network: [...],
 acquiring: [...] }`) and remove from it (`allow_network: [...]`, `allow_acquiring: [...]`).
-`keel audit` lists each change. A method is written `(*net/http.Client).Do`, and a function
+`vulcan audit` lists each change. A method is written `(*net/http.Client).Do`, and a function
 `os.Open`.
 
 **Limits.** Code that uses `syscall`, `unsafe`, `reflect` calls, or cgo can reach a resource that
-the analysis does not see. `keel audit` lists each such use, and each call to a listed function
+the analysis does not see. `vulcan audit` lists each such use, and each call to a listed function
 (§5.4d, path 6). Strict mode rejects them in leaves and libraries (K0124).
 
-**Versions.** A Keel project uses Go modules (`go.mod`) to pin the versions of Go packages.
+**Versions.** A Vulcan project uses Go modules (`go.mod`) to pin the versions of Go packages.
 
 ### 5.4d Guarantees and modes
 
@@ -612,8 +611,8 @@ The rules of §5.4 to §5.4c prove some properties, and leave known paths around
 section lists both ([decision 2](decisions/0002-architecture-enforcement.md)). Docs, diagrams, and
 tool output state an architecture property only as this section does.
 
-**Paths around the rules.** Each path compiles in ordinary mode. `keel audit` lists each one that
-it finds, in its section "Unchecked paths", and `keel check` prints their number.
+**Paths around the rules.** Each path compiles in ordinary mode. `vulcan audit` lists each one that
+it finds, in its section "Unchecked paths", and `vulcan check` prints their number.
 
 1. A function value or an interface value crosses a port. The callee can then run the caller's
    code, and a gateway can hand out a function that dials any target (§5.4c follows a function
@@ -628,7 +627,7 @@ it finds, in its section "Unchecked paths", and `keel check` prints their number
 8. `allow_network` or `allow_acquiring` removes a function from a list (§5.4c).
 
 **Guarantees.** *Proved* means that the compiler checks the property on every build, with no
-listed path around it. *Reported* means that `keel audit` lists each path. *Out of scope* means
+listed path around it. *Reported* means that `vulcan audit` lists each path. *Out of scope* means
 that no static check can decide it.
 
 | # | Property | Ordinary mode | Strict mode |
@@ -649,8 +648,8 @@ that no static check can decide it.
 **Ordinary mode** is the default. It is every rule of §5.4 to §5.4c, with the paths reported.
 
 **Strict mode.** `config { strict: true }` turns it on for the whole system. `strict_exempt:
-["Web"]` keeps the named leaves in ordinary mode. `keel audit` lists each exempt leaf, and
-`keel doc` shows the mode of each leaf. Strict mode adds these errors, in each leaf that is not
+["Web"]` keeps the named leaves in ordinary mode. `vulcan audit` lists each exempt leaf, and
+`vulcan doc` shows the mode of each leaf. Strict mode adds these errors, in each leaf that is not
 exempt and in each library:
 
 1. **No behavior across a boundary (K0123).** A port signature cannot carry a function type, a
@@ -670,17 +669,17 @@ exempt and in each library:
 5. **No known global mutators (K0211).** Code cannot reach a global mutator of Appendix D, or a
    function in `config { mutators: [...] }`.
 
-`keel audit` lists each entry of `strict_interfaces`, `strict_shared`, and `mutators`.
+`vulcan audit` lists each entry of `strict_interfaces`, `strict_shared`, and `mutators`.
 
 **What each mode lets the docs claim.**
 
 - *Ordinary mode:* each dependency between leaves in the source goes through a declared port,
   topic, or library. Only gateway and entry leaves reach a network function through static calls.
-  `keel audit` lists each path that these checks do not cover.
+  `vulcan audit` lists each path that these checks do not cover.
 - *Strict mode:* each dependency between leaves, in the source and in calls, goes through a
   declared port, topic, or library. Only gateways dial, and only entry leaves serve. No leaf
   shares program memory with another leaf except through a port or a topic, apart from the
-  imported-package state that `keel audit` lists. Exempt leaves are listed.
+  imported-package state that `vulcan audit` lists. Exempt leaves are listed.
 - *Neither mode* claims where a gateway connects (G11), or that leaves share no files, tables, or
   environment (G12).
 
@@ -709,7 +708,7 @@ One keyword with two behaviors would mislead humans and models trained on Go (R8
 keeps its Go behavior for concurrency inside one process.
 
 ```go
-// api/orders/component.keel. Topics are boundary entries, not ports.
+// api/orders/component.vulcan. Topics are boundary entries, not ports.
 import "shop/lib/events"         // message types come from a library (§5.4, rule 9)
 
 component Orders {
@@ -717,7 +716,7 @@ component Orders {
     subscribes Shipped topic[events.ShipmentSent]
 }
 
-// worker/picking/component.keel
+// worker/picking/component.vulcan
 import "shop/lib/events"
 
 component Picking {
@@ -725,7 +724,7 @@ component Picking {
     publishes  Shipped topic[events.ShipmentSent]
 }
 
-// In system.keel. Each subscriber names its source; the wire names the transport and settings.
+// In system.vulcan. Each subscriber names its source; the wire names the transport and settings.
 Worker/Picking.Placed: Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
 Analytics/Ingest.Placed:           Api/Orders.Placed via direct{ deadletters: Worker/Alerts.DeadPlaced }
 Api/Orders.Shipped: Worker/Picking.Shipped via direct{ deadletters: Worker/Alerts.DeadShipped }
@@ -749,7 +748,7 @@ These rules are part of the language, for every transport:
   queue is full, so a slow subscriber can slow the publisher.** A developer who wants the publisher
   never to wait chooses a drop policy for that wire, or bounds the wait with `maxWait`. A publish
   that is still waiting when the process stops panics.
-- **Zero, one, or many subscribers.** `system.keel` wires topics one at a time, from the
+- **Zero, one, or many subscribers.** `system.vulcan` wires topics one at a time, from the
   subscriber side. Each subscribed topic is wired exactly once, to one published topic of the same message type. A
   published topic is never wired by itself: its subscribers are the subscribed topics wired to it, zero or
   more. Thus a new subscriber adds one wire, and the wiring of the publisher does not change.
@@ -762,7 +761,7 @@ These rules are part of the language, for every transport:
 - **A state change and a publish are not atomic.** In `orders.Save(o); Placed.Publish(m)`, the
   process can stop between the two lines, and the event is then lost. Keeping them together is the
   developer's decision: for example, the transactional outbox pattern (write the event to the same
-  database transaction, and publish it from there). Keel does not hide this risk.
+  database transaction, and publish it from there). Vulcan does not hide this risk.
 - **A read model is an alternative to a synchronous read.** The owner publishes change events. The
   reader subscribes, keeps a local copy, and answers queries from that copy. This is
   "event-carried state transfer". Reads can be slightly stale, and each reader stores its own copy.
@@ -778,9 +777,9 @@ These rules are part of the language, for every transport:
   }
   ```
 
-- **No raw network calls between containers.** A leaf cannot call another container over the
-  network by hand, because only gateway and entry leaves can reach the network (§5.4c, rule 1). `keel audit`
-  lists each `external` system with its gateway, so a reviewer can find an `external` that is
+- **No raw network calls between containers.** A leaf cannot call another container over the network
+  by hand, because only gateway and entry leaves can reach the network (§5.4c, rule 1). `vulcan
+  audit` lists each `external` system with its gateway, so a reviewer can find an `external` that is
   really a container of the same system.
 - **Ownership.** Each side owns only its end of each topic. Only message values cross, as copies.
   The two sides share no memory and no references.
@@ -799,7 +798,7 @@ These rules are part of the language, for every transport:
 - **Idempotency is declared.** A transport states, in its interface, whether it can deliver a
   message more than once. If it can, a subscriber's handler must be marked `idempotent`. Without
   the marker, the code does not compile. The compiler cannot prove the claim, but the marker makes
-  a hidden assumption visible. It appears in `keel context`, `keel doc`, and `keel audit`.
+  a hidden assumption visible. It appears in `vulcan context`, `vulcan doc`, and `vulcan audit`.
 
 #### 5.5.0 Publishing and handling
 
@@ -836,11 +835,11 @@ idempotent handle Shipped(m events.ShipmentSent) error {
   cannot forget to acknowledge a message, and it cannot acknowledge a message too early.
 - **A contract failure in a handler is not retried by default.** A contract failure is a bug, so
   a retry usually fails again and repeats the effects that the handler made before the check.
-  When a handler panics with a `*keel.ContractFailure`, the runtime sends the message to its
+  When a handler panics with a `*vulcan.ContractFailure`, the runtime sends the message to its
   dead-letter route at once, with the failure report in `DeadLetter.Error`. A transport setting,
   `retryContractFailures`, applies the normal retry policy instead. A dead-letter handler that
   fails a contract is counted and reported, with no retry (§7.4).
-- **A delivery ID.** `keel.DeliveryID(ctx)` returns an ID of the message for one subscriber wire.
+- **A delivery ID.** `vulcan.DeliveryID(ctx)` returns an ID of the message for one subscriber wire.
   It stays the same across redeliveries of that message, and it is different for each message. A
   transport that can redeliver must supply it. A handler uses it as an idempotency key, stored in
   the same transaction as its effects (§7.4).
@@ -856,13 +855,13 @@ declares:
 
 - **A typed settings struct.** Each wire passes settings with `via name{ ... }`. The compiler
   type-checks the settings like any struct literal. Tags on its fields tell the compiler more
-  (Appendix C): `keel:"required"`, `keel:"topic"` (topic wires only), `keel:"call"` (call wires
-  only), `keel:"size"` (needs `max` from a flag, and counts in the memory limit), and
-  `keel:"secret"`. `required` together with `topic` or `call` means required on that kind of wire
+  (Appendix C): `vulcan:"required"`, `vulcan:"topic"` (topic wires only), `vulcan:"call"` (call
+  wires only), `vulcan:"size"` (needs `max` from a flag, and counts in the memory limit), and
+  `vulcan:"secret"`. `required` together with `topic` or `call` means required on that kind of wire
   only. A field of type `transport.Route` is a dead-letter route. A missing required setting is a
   compile error.
 - **Setting names.** A setting's name is the field's name with its first letter in lower case
-  (`Capacity` is `capacity`), or the name in a `keel:"name=..."` tag. An enum value is written the
+  (`Capacity` is `capacity`), or the name in a `vulcan:"name=..."` tag. An enum value is written the
   same way: `dropOldest` is the exported constant `DropOldest` of the field's type.
 - **Process settings.** A second struct holds the settings of the transport for the whole process,
   for example its listen address. Each field comes from the flag `--transport.<name>.<setting>`,
@@ -873,16 +872,16 @@ declares:
 - **Its policy.** Durability, retries, dead letters, capacity, full-queue behavior, expiry,
   tracing, and delivery guarantees belong to the transport, not to the language.
 
-**The developer chooses.** Each wire names its transport and its settings. The `config { }` section of `system.keel` can
-set a default transport and default settings. A default setting tagged `topic` applies only to
-topic wires, and one tagged `call` only to call wires. A required setting cannot come from
-`config`. Addresses and credentials should come from startup flags, and a `secret` field accepts
-nothing else (§5.3). `keel audit` lists the transport and the settings of each wire.
+**The developer chooses.** Each wire names its transport and its settings. The `config { }` section
+of `system.vulcan` can set a default transport and default settings. A default setting tagged
+`topic` applies only to topic wires, and one tagged `call` only to call wires. A required setting
+cannot come from `config`. Addresses and credentials should come from startup flags, and a `secret`
+field accepts nothing else (§5.3). `vulcan audit` lists the transport and the settings of each wire.
 
-**The built-in transport, `direct`.** Keel ships one transport, so that a small system with two
-containers needs no broker. It sends from the publisher straight to each subscriber. Its package
-is `keel.dev/keel/transport/direct`, and it needs no `transport` declaration. It redelivers, keeps
-no order, requires bounded messages, and supports calls.
+**The built-in transport, `direct`.** Vulcan ships one transport, so that a small system with two
+containers needs no broker. It sends from the publisher straight to each subscriber. Its package is
+`github.com/robot-accomplice/vulcan/vulcan/transport/direct`, and it needs no `transport`
+declaration. It redelivers, keeps no order, requires bounded messages, and supports calls.
 
 - **One queue for each subscriber wire.** The queue is in the publisher's process, so a publish
   does not need the subscriber to be up. A slow or failing subscriber fills only its own queue.
@@ -902,7 +901,7 @@ no order, requires bounded messages, and supports calls.
 - **Process settings:** `--transport.direct.listen` (the address this container serves; default
   `:7400`), `--transport.direct.peers` (each other container's address,
   `worker=10.0.0.7:7400,api=10.0.0.6:7400`), and `--transport.direct.dir` (the directory of durable
-  queues; default `./keel-queues`).
+  queues; default `./vulcan-queues`).
 - **Delivery:** at least once, unordered. Thus `idempotent` is required on its handlers. The
   publisher sends each message to the subscriber's container over TCP, and removes it from the
   queue when the handler returns `nil`. While the subscriber's container cannot be reached, the
@@ -916,19 +915,19 @@ no order, requires bounded messages, and supports calls.
   strings of at most 64 bytes), `Stock map[string]int limit 100, 32` (100 entries, keys of at most
   32 bytes). An element that is a struct uses its own field limits. The limits bound the memory,
   and the compiler calculates the memory limit of each queue: capacity × maximum message
-  size. `keel audit` shows each limit and the total.
+  size. `vulcan audit` shows each limit and the total.
 - **Dead letters:** a message that fails all its retries, or expires, goes to the dead-letter
   route. A drop under `dropOldest` or `dropNewest` is counted, not dead-lettered.
 - **A dead-letter route is a subscribed topic** of type `DeadLetter[T]` in some leaf, declared as
-  `subscribes DeadPlaced topic[keel.DeadLetter[events.OrderPlaced]]`. `keel.DeadLetter[T]` is a type of
-  the runtime package `keel`, with the fields `Message T`, `Error string limit 4096`,
+  `subscribes DeadPlaced topic[vulcan.DeadLetter[events.OrderPlaced]]`. `vulcan.DeadLetter[T]` is a
+  type of the runtime package `vulcan`, with the fields `Message T`, `Error string limit 4096`,
   `Attempts int`, `Wire string limit 1024`, and `Time time.Time`. The type is bounded, so the
   `direct` rule holds for it: `Message` has the limits of `T`. `Wire` holds the text of a wire, and
   a wire longer than 1,024 bytes is a compile error (K0316). The limit is fixed, not taken from the
-  system, so that two builds agree on it. The runtime does not check `Message` against the
-  invariant and limits of `T`, because a message that failed them must still reach its route.
-  The wire settings name it, and it can receive from any number of wires whose message type is
-  `T`. `Error` is cut to 4,096 bytes.
+  system, so that two builds agree on it. The runtime does not check `Message` against the invariant
+  and limits of `T`, because a message that failed them must still reach its route. The wire
+  settings name it, and it can receive from any number of wires whose message type is `T`. `Error`
+  is cut to 4,096 bytes.
 - **The dead-letter hop.** When a transport gives up on a message, it calls the runtime's `dead`
   function in the process that holds the message (for `direct`, the publisher's). That runtime
   builds the `DeadLetter[T]` and sends it through the source wire's transport, with a
@@ -941,7 +940,7 @@ no order, requires bounded messages, and supports calls.
   the wire, and the time. Thus "why did this message dead-letter?" has an answer without
   tracing.
 - **Tracing** is off by default. The setting `trace: true` records each step of each message, and
-  `keel trace <id>` shows them.
+  `vulcan trace <id>` shows them.
 
 ```go
 Worker/Picking.Placed: Api/Orders.Placed via direct{
@@ -955,8 +954,8 @@ a library. A transport is declared `transport kafka { go "..." }` and named in l
 wire (`via kafka{ ... }`). It is part of the runtime, not of the architecture, and it is the second
 kind of node that can import Go packages. It is exempt from the library rules (§5.4a, §5.4c): it
 can acquire network resources, hold connections, and keep queues. No leaf or library can import it;
-only a `via` in `system.keel` can name it. It implements the transport interface of Appendix C.
-`keel audit` lists each transport.
+only a `via` in `system.vulcan` can name it. It implements the transport interface of Appendix C.
+`vulcan audit` lists each transport.
 
 #### 5.5.2 Message evolution
 
@@ -965,7 +964,7 @@ message types can differ. The holistic check (§11.2) sees only one build. So th
 compares each message type with the last committed schema, in `topics.lock`. It cannot see the
 deployed build; the lock stands for it.
 
-- **The compiler owns the wire format.** Keel does not invent one: it uses the binary encoding of
+- **The compiler owns the wire format.** Vulcan does not invent one: it uses the binary encoding of
   Protocol Buffers (proto3), with the field numbers from the lock. The wire carries the number, not
   the name. A field number is never used again. Each type has one encoding, so two compilers
   produce the same bytes:
@@ -994,7 +993,7 @@ deployed build; the lock stands for it.
   text file, so a diff shows each schema change in review:
 
   ```
-  # topics.lock: generated by keel check. Commit it. Do not edit it.
+  # topics.lock: generated by vulcan check. Commit it. Do not edit it.
   type shop/lib/events.Line
     1 SKU  string  limit 32
     2 Qty  int
@@ -1013,7 +1012,7 @@ deployed build; the lock stands for it.
   ```
 
   The last line is a hash of the lines before it, so a hand edit is a compile error (K0321). When
-  no lock exists, `keel check` creates one. A type is named by its Go import path. Types and ports
+  no lock exists, `vulcan check` creates one. A type is named by its Go import path. Types and ports
   are in name order, and fields are in
   number order. A field shows its number, name, type,
   and limit. A limit shows its value, so a named constant appears as its number. An
@@ -1024,7 +1023,7 @@ deployed build; the lock stands for it.
   numbers of removed fields, which are never used again. A
   removed message type stays as a `retired type`, and its name cannot be used again, because a
   deployed build can still send it.
-- **`keel check` compares the current types with the lock in the last commit.** It reads
+- **`vulcan check` compares the current types with the lock in the last commit.** It reads
   `topics.lock` from Git `HEAD`, or from the disk when the project is not in Git. Thus two local
   edits to one new field are one change. A compatible change passes, and the compiler writes the
   new lock to the disk. A breaking change is a compile error. `DeadLetter` types are not in the
@@ -1039,7 +1038,7 @@ deployed build; the lock stands for it.
 | Change the type of a field | Breaking. |
 | Change a `limit` (raise or lower) | Breaking. Both sides check limits, so a change in either direction rejects messages in one deploy order. |
 | Change a remote method's signature or contract | Breaking. |
-| Add a method to a remote port | Compatible. A call that reaches a callee build without the method returns `keel.Unavailable`, so deploy the provider first. |
+| Add a method to a remote port | Compatible. A call that reaches a callee build without the method returns `vulcan.Unavailable`, so deploy the provider first. |
 | Remove a method from a remote port | Compatible. |
 | Add or remove a first `context.Context` parameter | Compatible: it does not cross as a value. |
 
@@ -1050,7 +1049,7 @@ deployed build; the lock stands for it.
   newer publisher.
 - **Any deploy order works.** Because each change in the lock is compatible in both directions,
   the containers can deploy in any order. The one exception is a new remote method, which returns
-  `keel.Unavailable` until its provider deploys.
+  `vulcan.Unavailable` until its provider deploys.
 
 #### 5.5.3 Remote method ports
 
@@ -1069,15 +1068,15 @@ qty, err := Stock.Level(sku)    // err can also be Unavailable, Timeout, or Remo
 ```
 
 - **Transport errors.** The last result of each method of a remote port must be `error` (K0315).
-  It can also be `keel.Unavailable`, `keel.Timeout`, or `keel.RemotePanic`, which `errors.Is`
+  It can also be `vulcan.Unavailable`, `vulcan.Timeout`, or `vulcan.RemotePanic`, which `errors.Is`
   matches.
 - **Errors cross as text and a code.** A non-`nil` error from the callee reaches the caller as a
-  `*keel.RemoteError` with its `Error()` text and its code. A library declares an error that keeps
-  its identity across containers with `keel.NewError("stock.unknown-sku", "unknown SKU")`. Such an
+  `*vulcan.RemoteError` with its `Error()` text and its code. A library declares an error that keeps
+  its identity across containers with `vulcan.NewError("stock.unknown-sku", "unknown SKU")`. Such an
   error crosses as its code, and on the caller `errors.Is(err, stock.ErrUnknownSKU)` matches it.
   Any other error crosses as text only. `error` is allowed here although §5.5 forbids interfaces in
   messages.
-- **Each call has a timeout.** The `config { }` section of `system.keel` sets a default timeout. A
+- **Each call has a timeout.** The `config { }` section of `system.vulcan` sets a default timeout. A
   method of a remote port can override it with `timeout`; `timeout` on a method of a port that is
   not remote is a compile error (K0318). If no timeout resolves, the code does not compile.
 - **A timeout means the outcome is unknown.** The call can have run or not. The runtime never
@@ -1111,57 +1110,90 @@ developer decides for each boundary.
 
 ### 5.6 Diagrams
 
-`keel diagram --level context|container|component|code [--focus <node>]` draws each C4 level from
-`system.keel` and the `component.keel` files. Composites hold no code. Thus a diagram at any zoom
-level shows where all behavior is. A container or a group cannot hide logic.
+`vulcan diagram --level context|container|component|code [--focus <node>]` draws each C4 level from
+`system.vulcan` and the `component.vulcan` files. Composites hold no code. Thus a diagram at any
+zoom level shows where all behavior is. A container or a group cannot hide logic.
 
 ## 6. Code: Go, unchanged
 
 **Function bodies are Go.** Types, generics, errors, `nil`, zero values, integers, slices, maps,
 goroutines, channels, locks, `panic`, and `recover` all have exactly Go's syntax and Go's behavior.
-Each Go construct compiles in Keel and runs as it runs in Go. Keel never changes what a body
+Each Go construct compiles in Vulcan and runs as it runs in Go. Vulcan never changes what a body
 means. It adds checks that reject some bodies: contracts (§7), the boundary rules (§5.4: a body
 cannot refer to another leaf, or assign a port name), the library rules (§5.4a: no assignment to a
 library `var` after startup), the rules on reached functions (§5.4c), and the invariant rules
 (§7.2: no field write from outside a struct's methods).
 
-What Keel adds is around the code, not in it: the architecture (§5), contracts (§7), tests (§8),
+What Vulcan adds is around the code, not in it: the architecture (§5), contracts (§7), tests (§8),
 and the tools (§9, §10).
 
 **Checks on Go code are warnings.** The tools report common Go faults as warnings with fix-its. A
-warning never stops a build, and `keel audit` lists them. Three warnings follow established Go
+warning never stops a build, and `vulcan audit` lists them. Three warnings follow established Go
 analysis tools: `errcheck` (K0701), Uber's `nilaway` (K0703), and Go's race detector (K0704).
-Error masking (K0702) is Keel's own, and this section defines it.
+Error masking (K0702) is Vulcan's own, and this section defines it.
 
 - an unhandled error: an `error` result that the code drops without assigning it (as `errcheck`
   reports). An explicit `_ = f()` is a visible, deliberate discard: it is not a warning, and
-  `keel audit` lists each one.
+  `vulcan audit` lists each one.
 - error masking: a branch that receives an error and never reads the error value. Any read
   handles it: a return, a wrap, a log, an inspection (`errors.Is`), or a pass to another call, for
   example into an HTTP response. Whether a response should show an error is a question for review,
   not a check.
 - a possible `nil` dereference (as `nilaway` reports)
-- a data race, as the race detector reports. `keel test` runs every test with the race detector
-  by default; `keel test --race=false` turns it off, and `keel audit` lists each such run. A race
-  fails the test, as in Go, and `keel audit` also lists it. Keel does no static race analysis.
+- a data race, as the race detector reports. `vulcan test` runs every test with the race detector by
+  default; `vulcan test --race=false` turns it off, and `vulcan audit` lists each such run. A race
+  fails the test, as in Go, and `vulcan audit` also lists it. Vulcan does no static race analysis.
+  On a host where Go cannot run the race detector (on Windows, it needs cgo and a C compiler),
+  `vulcan test` runs without it, warns (K0705), and `vulcan audit` lists the run. A project that
+  relies on race detection runs it in CI on a host that has it.
 
-Each Keel version pins the version of each analysis tool, so a warning depends only on the code
-and the Keel version.
+Each Vulcan version pins the version of each analysis tool, so a warning depends only on the code
+and the Vulcan version.
 
-**The runtime package.** Code imports the runtime package as `keel.dev/keel`, which provides
-`keel.DeadLetter`, `keel.Bind`, and `keel.Published`. Appendix C gives its API. It holds only
-types and test helpers, and it reaches no network function. The transports, `direct` included,
-are separate packages that only the generated `main` imports (§5.5.1). Thus the network rule
-(§5.4c) has no exception for the runtime. `keel check` needs `go.sum`, as `go build` does, to
-resolve the Go dependencies that the rules of §5.4c read.
+**The runtime package.** Code imports the runtime package as
+`github.com/robot-accomplice/vulcan/vulcan`, which provides `vulcan.DeadLetter`, `vulcan.Bind`, and
+`vulcan.Published`. Appendix C gives its API. It holds only types and test helpers, and it reaches
+no network function. The transports, `direct` included, are separate packages that only the
+generated `main` imports (§5.5.1). Thus the network rule (§5.4c) has no exception for the runtime.
+`vulcan check` needs `go.sum`, as `go build` does, to resolve the Go dependencies that the rules of
+§5.4c read.
 
-**Modules.** The `go` command cannot see imports in `.keel` files, so `go mod tidy` would remove
-each dependency that only Keel code uses. `keel mod <args>` runs `go mod <args>` over the Go code
-that the compiler generates, with the project's `go.mod` and `go.sum`. Thus `keel mod tidy` adds
-each dependency that Keel code imports, and writes `go.sum`.
+**Modules.** The `go` command cannot see imports in `.vulcan` files, so `go mod tidy` would remove
+each dependency that only Vulcan code uses. `vulcan mod <args>` runs `go mod <args>` over the Go
+code that the compiler generates, with the project's `go.mod` and `go.sum`. Thus `vulcan mod tidy`
+adds each dependency that Vulcan code imports, and writes `go.sum`.
 
-**Where code starts.** The compiler generates `main` from `system.keel`; code never writes it. A
-leaf can define two plain Go functions, which Keel finds by their names, as Go finds `main` and
+**Go versions and pinning** ([decision 5](decisions/0005-names-and-reproducibility.md)).
+
+- **Supported Go versions.** Each Vulcan release supports the Go releases that the Go project
+  supports on the day of the release: the newest two. The first release supports Go 1.26 and the
+  newest release after it. The release notes name the range.
+- **Go syntax follows the compiler.** A body can use the Go syntax of the `go/types` that the
+  Vulcan release is built with (§11.1). A new Go feature works in bodies once a Vulcan release is
+  built with a Go version that has it.
+- **One `go.mod` pins everything.** The `go` line sets the language version, the `toolchain` line
+  the exact Go toolchain, and a `tool` line the exact compiler. The analysis tools are module
+  dependencies of the compiler, so the same line pins them.
+
+  ```
+  module shop
+
+  go 1.26
+  toolchain go1.26.1
+
+  tool github.com/robot-accomplice/vulcan/cmd/vulcan
+
+  require (
+      github.com/robot-accomplice/vulcan v0.1.0
+      github.com/robot-accomplice/vulcan/vulcan v0.1.0
+  )
+  ```
+
+  `go tool vulcan build` runs the pinned compiler. The runtime is its own module, so a program's
+  `go.sum` holds the runtime and its dependencies, not the compiler's.
+
+**Where code starts.** The compiler generates `main` from `system.vulcan`; code never writes it. A
+leaf can define two plain Go functions, which Vulcan finds by their names, as Go finds `main` and
 `init`:
 
 - `setup`, for work that must finish before the leaf receives anything: open a database, read
@@ -1182,7 +1214,7 @@ The generated `main` starts a container in five steps:
    leaf that needs it, and binds each port as soon as its provider exists. The wiring has no
    cycles (§5.4, rule 8), so this order exists. A constructor can call its own ports, because they
    are already bound. A remote port is bound to a client, but the other container may not serve
-   it yet, so a call can return `keel.Unavailable`. A failed constructor stops the process with a
+   it yet, so a call can return `vulcan.Unavailable`. A failed constructor stops the process with a
    report.
 3. **Set up.** `main` runs every `setup` function, all at once, and waits for them. A failed
    `setup` stops the process with a report.
@@ -1277,7 +1309,7 @@ function, or interface): a copy of a reference would show the new data, not the 
 `old(len(xs))`, not `old(xs)`. Because `old(x)` runs at entry, the facts that make it safe must
 come from the function's `requires`.
 
-Thus checking a contract never changes what a correct program does. Within that rule, Keel
+Thus checking a contract never changes what a correct program does. Within that rule, Vulcan
 permits two tiers:
 
 | Tier | Adds | Example |
@@ -1313,9 +1345,9 @@ by these rules. It cannot read a package-level `var`, use a channel, a `select`,
 each call of the `pure` function must pass, for that parameter, a `pure` function or a function
 literal that passes these same rules.
 
-A rule over a collection uses a `pure` predicate, for example `requires keel.All(xs, isPositive)`
+A rule over a collection uses a `pure` predicate, for example `requires vulcan.All(xs, isPositive)`
 (Appendix C). Its runtime cost is O(n), and contracts run in every build.
-`keel audit` lists each contract whose check costs more than O(1). When that cost is too high for
+`vulcan audit` lists each contract whose check costs more than O(1). When that cost is too high for
 a hot path, the developer states the rule as a test instead of a contract.
 
 ### 7.2 Struct invariants
@@ -1332,10 +1364,10 @@ An invariant protects a struct only if no code can go around it. Thus:
   allowed: a write through it, `p.Amount = 1`, is a field write, and the first rule covers it.
 - **Calls that receive the struct are checked.** When code passes a pointer to the struct, or a
   value that holds the struct through a pointer (`*[]T`, `*[N]T`, `*S` with a `T` field, a map of
-  `T` or `*T`), to a function that is not a method of `T`, the compiler checks the invariant of
-  each `T` that it can reach when that call returns. This applies also inside a method of `T`, for
-  example `json.Unmarshal(b, a)`. `keel audit` lists each such check with its cost, and each use of
-  `reflect` or `unsafe` on such a struct.
+  `T` or `*T`), to a function that is not a method of `T`, the compiler checks the invariant of each
+  `T` that it can reach when that call returns. This applies also inside a method of `T`, for
+  example `json.Unmarshal(b, a)`. `vulcan audit` lists each such check with its cost, and each use
+  of `reflect` or `unsafe` on such a struct.
 - **Function literals and goroutines.** A function literal inside a method counts as outside the
   method for these rules, unless the method calls it directly or with `defer`. A deferred call
   still cannot write a field (§7.3, rule 2). A `go` statement
@@ -1344,13 +1376,13 @@ An invariant protects a struct only if no code can go around it. Thus:
 - **Elements are a limit.** A slice or a map field shares its elements with each copy of it. Code
   that holds a copy can change the elements without a method, and the compiler does not track
   copies. Thus an invariant over the elements holds only while no copy leaves the struct's
-  methods. `keel audit` lists each method that returns a slice or a map field of a struct with an
+  methods. `vulcan audit` lists each method that returns a slice or a map field of a struct with an
   invariant.
 - **Construction is checked.** A struct literal, and a conversion to the struct type, are checked
   where the code creates them. If the compiler can prove the violation, it is a compile error; if
   not, the check runs at runtime.
 - **The zero value must satisfy the invariant.** Go creates zero values in many places (`var`,
-  `new`, `make`, arrays, missing map keys, closed channels, generic `var zero T`), so Keel cannot
+  `new`, `make`, arrays, missing map keys, closed channels, generic `var zero T`), so Vulcan cannot
   block them all. Thus an invariant that the zero value breaks is a compile error on the invariant
   itself: write `invariant Lo <= Hi`, not `Lo < Hi`, or use a pointer field and write
   `P != nil => ...`. For a generic struct, the compiler checks a tier-1 invariant for each
@@ -1418,12 +1450,12 @@ these paths ([decision 1](decisions/0001-contract-timing.md)).
    unlocks in a deferred call, this check runs after the unlock: a warning (K0524).
 5. **Panics that leave a method.** No result reaches the caller, so `ensures` is not checked. When
    a panic leaves an outer method call of `T` before a return check ran, the method checks the
-   invariant. If the invariant is false, the panic continues as a `*keel.ContractFailure` whose
+   invariant. If the invariant is false, the panic continues as a `*vulcan.ContractFailure` whose
    `Cause` is the original panic value (Appendix C). The panic value changes only when the
    invariant is false. This check runs after the deferred calls, so it can read the fields after a
    deferred unlock. It runs only while a panic leaves the method, so it has no warning.
-6. **Data races.** The checks assume a program without data races. Keel does no static race
-   analysis (§6); `keel test` runs the race detector.
+6. **Data races.** The checks assume a program without data races. Vulcan does no static race
+   analysis (§6); `vulcan test` runs the race detector.
 
 Thus:
 
@@ -1434,7 +1466,7 @@ Thus:
   the invariant. When a panic leaves the call with the invariant false, the panic is a contract
   failure.
 - **Limit.** A caller that recovers that contract failure, as `net/http` does for each request,
-  can still use the broken value. Keel reports the break; it does not prevent the later use.
+  can still use the broken value. Vulcan reports the break; it does not prevent the later use.
   Elements of slice and map fields stay a limit (§7.2).
 
 ```go
@@ -1457,14 +1489,14 @@ How the compiler checks contracts:
   compiler can remove a check at a call site where it proves the contract.
 - **Statically**, when the proof rule of §7.1 proves or disproves a contract.
 - **At runtime** in every build, including release builds. Contracts cannot be turned off. A contract
-  that fails at runtime panics with a `*keel.ContractFailure` (Appendix C), which reports the
+  that fails at runtime panics with a `*vulcan.ContractFailure` (Appendix C), which reports the
   contract, its source position, and the values.
 - **Port contracts bind each implementation**, including test fakes. If a fake violates the
   contract of its port, the test fails.
 
 How reviewers audit contracts:
 
-- `keel audit` lists each contract. For each contract, it shows if the compiler proved it and if
+- `vulcan audit` lists each contract. For each contract, it shows if the compiler proved it and if
   tests exercised it. It also lists each function with a check after its deferred calls (§7.3), and
   each K0524 site.
 - Contracts appear in the generated docs and diagrams.
@@ -1475,12 +1507,12 @@ A contract failure stops the code that broke the contract. It does not undo what
 already did ([decision 3](decisions/0003-contract-failure.md)).
 
 1. **Nothing is undone.** A contract failure is a Go panic. Each frame runs its deferred calls, as
-   in Go, so a deferred `tx.Rollback()` runs. Keel undoes nothing else. An effect that happened
+   in Go, so a deferred `tx.Rollback()` runs. Vulcan undoes nothing else. An effect that happened
    before the failed check stays: a committed write, a sent request, a published message.
 2. **`requires` prevents; `ensures` and the invariant detect.** Only `requires` runs before the
    body's effects. A rule that must stop an effect goes in the `requires` of the function that
    makes the effect, or in a check in the body before it. An *effect* is a call that reaches a
-   network or acquiring function (Appendix D), a port call, or a publish. `keel audit` lists each
+   network or acquiring function (Appendix D), a port call, or a publish. `vulcan audit` lists each
    `ensures` and each invariant of a function that reaches an effect before its return check, as
    "detects after effects".
 3. **An effect in a `return` (K0525).** In a function with `ensures`, or a method of a struct with
@@ -1510,10 +1542,10 @@ already did ([decision 3](decisions/0003-contract-failure.md)).
    or `exit`. With `exit`, the runtime writes the failure report to standard error and ends the
    process with exit code 3. It runs no deferred calls, and no caller can recover the failure. The
    `config` key sets the value for the system, and the flag `--on-contract-failure` sets it for
-   one process. `keel test` always uses `panic`, so that tests can check failures. With `exit`,
+   one process. `vulcan test` always uses `panic`, so that tests can check failures. With `exit`,
    the limit of §7.3 does not apply: no later request can use a broken value.
 
-**Responsibilities of the application.** Keel does not enforce these:
+**Responsibilities of the application.** Vulcan does not enforce these:
 
 - **One transaction for one change.** Write a state change, its audit line, and each event to
   publish (an outbox row) in one database transaction. Publish from the outbox after the commit.
@@ -1521,7 +1553,7 @@ already did ([decision 3](decisions/0003-contract-failure.md)).
   deferred rollback undoes the work on a failure.
 - **Idempotency keys at each retryable entry.** An HTTP `POST`, a remote method that a caller can
   retry, and each handler take a key: a client key, an operation ID in the arguments, or
-  `keel.DeliveryID(ctx)`. Store the key and the outcome with the change, in the same transaction.
+  `vulcan.DeliveryID(ctx)`. Store the key and the outcome with the change, in the same transaction.
 - **Recover the outcome on a retry.** A retry with a known key returns the stored outcome, and
   does not run the change again. This covers a reply lost after a commit.
 - **Overflow-safe arithmetic before a write.** Body arithmetic is Go arithmetic and can wrap;
@@ -1533,39 +1565,39 @@ already did ([decision 3](decisions/0003-contract-failure.md)).
 
 ## 8. Testing
 
-Tests are Go tests: `func TestX(t *testing.T)` in `*_test.keel` files in the leaf directory.
+Tests are Go tests: `func TestX(t *testing.T)` in `*_test.vulcan` files in the leaf directory.
 
 - The design makes each leaf testable in isolation: its only dependencies are the ports that it
   `needs` and the topics that it subscribes to.
 - **A fake is an ordinary type** that satisfies the port. It must meet the contract of the port,
   which is checked at each call, as for the real provider.
-- `keel.Bind(t, &Checkout, CheckoutOK{})` binds a fake to a port name for one test, and restores
-  the wiring when the test ends. A second `keel.Bind` on the same port in one test replaces the
+- `vulcan.Bind(t, &Checkout, CheckoutOK{})` binds a fake to a port name for one test, and restores
+  the wiring when the test ends. A second `vulcan.Bind` on the same port in one test replaces the
   first. When the test ends, the bindings are undone in reverse order, so the wiring is as it was
-  before the test. A port name is shared by the whole test binary, so `keel.Bind` panics in a test
+  before the test. A port name is shared by the whole test binary, so `vulcan.Bind` panics in a test
   that called `t.Parallel`, or whose parent did, as Go's `t.Setenv` does.
-- `keel.Published(t, Placed)` returns the messages that the test published on a topic. It panics
-  under `t.Parallel`, as `keel.Bind` does.
-- **An unbound port fails the test.** In a test binary, each port that no `keel.Bind` binds is
-  bound to a stub that fails the test with "port Checkout is not bound; use keel.Bind".
-- `keel.Deliver(t, Shipped, msg)` calls the handler of a subscribed topic with one message, and
+- `vulcan.Published(t, Placed)` returns the messages that the test published on a topic. It panics
+  under `t.Parallel`, as `vulcan.Bind` does.
+- **An unbound port fails the test.** In a test binary, each port that no `vulcan.Bind` binds is
+  bound to a stub that fails the test with "port Checkout is not bound; use vulcan.Bind".
+- `vulcan.Deliver(t, Shipped, msg)` calls the handler of a subscribed topic with one message, and
   returns its error. It checks the message's invariant and limits first, as a receipt does.
-- `keel fake <Port>` writes the skeleton of a fake type, with one method for each method of the
+- `vulcan fake <Port>` writes the skeleton of a fake type, with one method for each method of the
   port.
 
 ```go
 func TestPaysForAnOrder(t *testing.T) {
-    keel.Bind(t, &Checkout, CheckoutOK{})
+    vulcan.Bind(t, &Checkout, CheckoutOK{})
     if err := Place(order); err != nil {
         t.Fatal(err)
     }
-    if got := keel.Published(t, Placed); len(got) != 1 {
+    if got := vulcan.Published(t, Placed); len(got) != 1 {
         t.Fatalf("published %d, want 1", len(got))
     }
 }
 ```
 
-- `keel test Billing` builds and runs the tests of one leaf, and `keel test money` the tests of
+- `vulcan test Billing` builds and runs the tests of one leaf, and `vulcan test money` the tests of
   one library. It does not build the rest of the system.
 
 ## 9. Compiler intelligence
@@ -1597,7 +1629,7 @@ In addition to type checks, the compiler reports these problems as diagnostics w
 - **Error masking** patterns (R3).
 - **Architecture violations** (§5.4). The diagnostic gives the exact dependency edge that broke the
   rule.
-- **Architecture diffs.** `keel archdiff main..HEAD` reports added and removed ports,
+- **Architecture diffs.** `vulcan archdiff main..HEAD` reports added and removed ports,
   dependencies, and contracts. Reviewers use this report for R6.
 - Dead code and unused ports.
 
@@ -1605,7 +1637,7 @@ Each diagnostic has:
 
 - a stable code (Appendix E)
 - a message for humans
-- a *hint* that tells how to fix the problem in idiomatic Keel
+- a *hint* that tells how to fix the problem in idiomatic Vulcan
 - a machine-readable form (JSON)
 
 ## 10. Tooling that instructs the model
@@ -1614,18 +1646,18 @@ The tools assume that one of their users is an LLM (R8):
 
 | Command | Purpose |
 |---|---|
-| `keel guide` | Prints the language primer (`docs/guide.md`) and the conventions of the project. **The primer has a hard budget of 4,000 tokens**, and it must stay complete: a model that reads only the primer must be able to write correct Keel. A language change that does not fit the budget must be cut or simplified. |
-| `keel context <component>` | Emits the minimum context to work on one leaf: its `component.keel`, the wires in `system.keel` that connect it, and the method sets of the types on the other end of each wire (R1). |
-| `keel query <symbol>` | Looks up a symbol exactly in the symbol index of the compiler. This prevents invented APIs (R4). |
-| `keel explain <code>` | Gives a long explanation of a diagnostic, with examples. |
-| `keel doc` / `keel diagram` | Generates docs, and C4 diagrams at each level (context, container, component, code), from the source (§5.6). |
-| `keel audit` / `keel archdiff` | Audits contracts and architecture (§7, §9), with the unchecked paths and the strict-mode exemptions of §5.4d, and the checks that detect after effects (§7.4). |
-| `keel fmt` | The one formatter. |
-| `keel test <leaf>` | Builds and runs the tests of one leaf (§8), with the race detector (§6). |
-| `keel mod <args>` | Runs `go mod <args>` over the generated Go, so `keel mod tidy` sees imports in `.keel` files (§6). |
-| `keel fake <Port>` | Writes the skeleton of a fake type (§8). |
-| `keel trace <id>` | Shows the steps of one traced message (§5.5.1). |
-| `keel check` / `keel build` | The holistic boundary check, and the parallel build of each leaf (§11.2). |
+| `vulcan guide` | Prints the language primer (`docs/guide.md`) and the conventions of the project. **The primer has a hard budget of 4,000 tokens**, and it must stay complete: a model that reads only the primer must be able to write correct Vulcan. A language change that does not fit the budget must be cut or simplified. |
+| `vulcan context <component>` | Emits the minimum context to work on one leaf: its `component.vulcan`, the wires in `system.vulcan` that connect it, and the method sets of the types on the other end of each wire (R1). |
+| `vulcan query <symbol>` | Looks up a symbol exactly in the symbol index of the compiler. This prevents invented APIs (R4). |
+| `vulcan explain <code>` | Gives a long explanation of a diagnostic, with examples. |
+| `vulcan doc` / `vulcan diagram` | Generates docs, and C4 diagrams at each level (context, container, component, code), from the source (§5.6). |
+| `vulcan audit` / `vulcan archdiff` | Audits contracts and architecture (§7, §9), with the unchecked paths and the strict-mode exemptions of §5.4d, and the checks that detect after effects (§7.4). |
+| `vulcan fmt` | The one formatter. |
+| `vulcan test <leaf>` | Builds and runs the tests of one leaf (§8), with the race detector (§6). |
+| `vulcan mod <args>` | Runs `go mod <args>` over the generated Go, so `vulcan mod tidy` sees imports in `.vulcan` files (§6). |
+| `vulcan fake <Port>` | Writes the skeleton of a fake type (§8). |
+| `vulcan trace <id>` | Shows the steps of one traced message (§5.5.1). |
+| `vulcan check` / `vulcan build` | The holistic boundary check, and the parallel build of each leaf (§11.2). |
 
 Each command has `--json` output. An LSP server and an MCP server will give the same functions
 to editors and agents. They are deferred until the compiler's stages are measured (§11.1), and
@@ -1637,32 +1669,39 @@ they reuse stages 1 to 5.
 - **Backend: Go source first, LLVM later.** The first compiler lowers the typed Go syntax tree
   directly to Go source (§11.1, stage 6). It has no intermediate representation (IR) of its own.
   An IR comes with a second backend, which is its first test.
-  - *Go backend (first).* Keel gets the GC, goroutine scheduler, channels, and cross-compilation of
-    Go at no cost. The semantics of Keel map closely onto Go. The emitted code has `//line`
-    directives. Thus the stack traces, profilers, and debuggers of Go report positions in `.keel`
+  - *Go backend (first).* Vulcan gets the GC, goroutine scheduler, channels, and cross-compilation
+    of Go at no cost. The semantics of Vulcan map closely onto Go. The emitted code has `//line`
+    directives. Thus the stack traces, profilers, and debuggers of Go report positions in `.vulcan`
     files, not in the generated Go.
-  - *LLVM backend (deferred).* The LLVM backend needs a GC and a scheduler of Keel's own. That work
-    takes months, and it blocks nothing in the language design, so it is deferred. It starts only
-    after the language earns continued work (development plan, milestone 4), and it brings the
+  - *LLVM backend (deferred).* The LLVM backend needs a GC and a scheduler of Vulcan's own. That
+    work takes months, and it blocks nothing in the language design, so it is deferred. It starts
+    only after the language earns continued work (development plan, milestone 4), and it brings the
     IR.
 - The concurrency model follows Go (tasks like goroutines, and channels), unchanged.
 
 - **Build output is the developer's decision.** A system with one container compiles to one binary.
-  For a system with more than one container, the `config { }` section of `system.keel` chooses the output. The compiler
-  supports both forms:
+  For a system with more than one container, the `config { }` section of `system.vulcan` chooses the
+  output. The compiler supports both forms:
   - one binary for the system, with one mode for each container (`shop api`, `shop worker`)
   - one binary for each container (`shop-api`, `shop-worker`)
+- **Tested hosts.** The compiler is tested on `linux/amd64`, `linux/arm64`, `darwin/arm64`, and
+  `windows/amd64`. Other hosts that Go supports may work, and are not tested. A program can be
+  built for each target of the pinned Go toolchain.
+- **Reproducible builds.** For one commit, one Vulcan version, and one Go toolchain, the generated
+  Go is the same bytes: the compiler sorts every generated list, writes no time and no local
+  path, and builds with `-trimpath`. Go records the module versions in the binary
+  (`debug.BuildInfo`), so each binary names the Vulcan version that built it.
 
 ### 11.1 Compiler implementation
 
 The compiler is written in Go. It is a staged compiler with a cache for each package
 ([decision 4](decisions/0004-compiler-structure.md)). It reuses `go/parser` and `go/types`, so
-Keel bodies get Go's own type checker.
+Vulcan bodies get Go's own type checker.
 
 | # | Stage | Input | Output |
 |---|---|---|---|
-| 1 | Parse | `.keel` code files; declaration files | Blanked Go source with the same positions; a side table of contracts, `limit`s, `pure` and `handle` marks; declaration syntax trees |
-| 2 | Stubs | Declaration syntax trees | Go declarations for each port, topic, and handler, in reserved `keel_` names (Appendix F) |
+| 1 | Parse | `.vulcan` code files; declaration files | Blanked Go source with the same positions; a side table of contracts, `limit`s, `pure` and `handle` marks; declaration syntax trees |
+| 2 | Stubs | Declaration syntax trees | Go declarations for each port, topic, and handler, in reserved `vulcan_` names (Appendix F) |
 | 3 | Type check | Stages 1 and 2, and the export data of imported packages | `go/types` package and info; type-checked contract expressions |
 | 4 | Leaf checks | Stage 3 | Diagnostics of the leaf (§6, §7); a summary of the package: declarations, reach facts, fingerprints, effects |
 | 5 | Holistic check | Declaration syntax trees and every stage-4 summary | Diagnostics of §5.4 to §5.5.2, strict mode, near-duplicates across leaves, `topics.lock`, the audit |
@@ -1672,16 +1711,16 @@ Stages 1 to 4 run for each package, in parallel: they are the per-leaf build of 
 the holistic check. Each stage reads only the outputs of earlier stages, so each can be tested
 alone.
 
-- **Blanking.** Stage 1 is a Keel lexer. It writes Go source in which each Keel-only token
-  becomes spaces, so each position in the Go source is a position in the `.keel` file
+- **Blanking.** Stage 1 is a Vulcan lexer. It writes Go source in which each Vulcan-only token
+  becomes spaces, so each position in the Go source is a position in the `.vulcan` file
   (Appendix B.1). A handler becomes Go text: `idempotent` becomes spaces, and `handle` becomes
   `func` and two spaces. Stage 1 then renames the function in the syntax tree to
-  `keel_handle_<Name>`, which moves no position. Each contract expression is parsed with
+  `vulcan_handle_<Name>`, which moves no position. Each contract expression is parsed with
   `go/parser.ParseExpr` at its own offset.
-- **Caches.** The key of a result of stages 1 to 4 is a hash of the package's files, the Keel
+- **Caches.** The key of a result of stages 1 to 4 is a hash of the package's files, the Vulcan
   version, and the stage-4 summaries of the packages that it imports. Stage 5 caches the reach
   facts of each dependency module for each version (§5.4c). Stage 6 uses Go's build cache.
-- **Incremental computation only when measured.** The project measures the time of `keel check`
+- **Incremental computation only when measured.** The project measures the time of `vulcan check`
   after a one-line edit in one leaf, and of a full check, on a real application. When the 95th
   percentile of a one-edit check exceeds the project's target, the slowest stage gets incremental
   computation, by a new decision.
@@ -1691,10 +1730,10 @@ alone.
 
 Compilation has two separate modes. They run in parallel.
 
-| | **Holistic check** (`keel check`) | **Per-leaf build** (`keel build`) |
+| | **Holistic check** (`vulcan check`) | **Per-leaf build** (`vulcan build`) |
 |---|---|---|
 | Purpose | Enforce boundaries. Find errors that need global context. | Compile code fast. |
-| Input | All declaration files, all ports, and all signatures. Bodies only for global analyses. | One leaf directory, its `component.keel`, and the declarations of the libraries that it imports. |
+| Input | All declaration files, all ports, and all signatures. Bodies only for global analyses. | One leaf directory, its `component.vulcan`, and the declarations of the libraries that it imports. |
 | Finds | All of §5.4 (ports only, wiring, cycles, port compatibility), the library and reach rules (§5.4a, §5.4c), the topic and transport rules (§5.5 to §5.5.3), near-duplicate code across leaves and libraries (§9), architecture diffs, and the project audit. | Type errors and contract errors inside the leaf, near-duplicates inside the leaf, and the warnings on Go code (§6). |
 | Parallelism | One pass over the whole tree. | One job for each leaf. All the jobs run in parallel. |
 
@@ -1703,7 +1742,7 @@ Compilation has two separate modes. They run in parallel.
   leaf rebuilds only that leaf.
 - **Both modes must pass before linking.** The compiler makes a binary only when the holistic check
   passes and all leaves compile. Neither mode accepts the results of the other without a check.
-- **Both modes run on each build.** `keel build` starts the holistic check at the same time as the
+- **Both modes run on each build.** `vulcan build` starts the holistic check at the same time as the
   per-leaf jobs. The architecture part of the holistic check reads only declarations, so it finishes
   early. The near-duplicate part needs the fingerprints of every leaf, so it finishes after the
   slowest leaf job.
@@ -1713,7 +1752,7 @@ Compilation has two separate modes. They run in parallel.
   §11.1 says when it becomes incremental.
 
 **Why this is feasible.** Go already compiles packages in parallel. Each package compiles against
-the export data of its dependencies, which contains declarations only. The design of Keel removes
+the export data of its dependencies, which contains declarations only. The design of Vulcan removes
 the usual obstacles:
 
 - Consumer-owned ports (§5.3): a leaf compiles against its own declarations, not against the code
@@ -1732,25 +1771,25 @@ first. Then the leaves compile in parallel against the library declarations.
 
 ### 11.3 Performance
 
-Keel must be competitive with Go, Java, C++, and Rust in speed and in resource use.
+Vulcan must be competitive with Go, Java, C++, and Rust in speed and in resource use.
 
 **How the project measures it.** A benchmark suite runs in CI. It covers CPU-bound work,
 allocation-heavy work, concurrency, and a service with topics. Each benchmark has a target
 relative to Go, Java, C++, and Rust. Once the numeric targets exist (open question Q22), a change that misses a
 target fails CI.
 
-**What each safety feature costs, and how Keel reduces the cost:**
+**What each safety feature costs, and how Vulcan reduces the cost:**
 
 | Feature | Runtime cost | Reduction |
 |---|---|---|
 | Contracts (§7) | The cost of each expression, in release builds | The audit lists each contract with a collection-wide cost; the compiler removes checks that it proves |
-| Garbage collection | GC pauses and memory overhead | On the Go backend, Go's GC; the LLVM backend needs Keel's own GC |
+| Garbage collection | GC pauses and memory overhead | On the Go backend, Go's GC; the LLVM backend needs Vulcan's own GC |
 | Durable topics (§5.5.1) | A disk write for each message, on transports that keep queues on disk | The developer chooses the transport and its `durable` setting |
 | Port calls (§5.3) | An interface dispatch and the port's `requires` and `ensures` at each call | The compiler removes checks that it proves; the LLVM backend can make the call direct |
 
-**Backends.** On the Go backend, Keel performs like Go, plus contract checks and port dispatch. To close the gap
-with C++ and Rust, the LLVM backend (§11) can use proofs to remove checks and can control memory
-layout directly.
+**Backends.** On the Go backend, Vulcan performs like Go, plus contract checks and port dispatch. To
+close the gap with C++ and Rust, the LLVM backend (§11) can use proofs to remove checks and can
+control memory layout directly.
 
 ## 12. Non-goals (for now)
 
@@ -1765,7 +1804,7 @@ layout directly.
 
 | # | Question |
 |---|---|
-| Q1 | The name is Vulcan (decided 2026-10-19). Open: the file extension, the command name, and the runtime module path. The text still uses the working name Keel (see `docs/status.md`). |
+| Q1 | Closed. The name is Vulcan, the extension `.vulcan`, the command `vulcan`, and the runtime module `github.com/robot-accomplice/vulcan/vulcan` ([decision 5](decisions/0005-names-and-reproducibility.md)). |
 | Q22 | Numeric performance targets for the benchmark suite (§11.3): for each benchmark, the accepted ratio of speed and memory against Go, Java, C++, and Rust. |
 
 ## Appendix A: Sources
@@ -1796,7 +1835,7 @@ The notation is the EBNF of the Go specification. A production that this appendi
 - **`result.N`.** In a contract expression, `result` followed by `.` and a decimal integer is a
   selector, not `result` followed by a float literal.
 - **Line ends before a contract.** Go's lexer inserts a semicolon at the end of some lines, and
-  Keel's lexer does the same. The parser then ignores that semicolon in exactly three places:
+  Vulcan's lexer does the same. The parser then ignores that semicolon in exactly three places:
   1. after the `Signature` of a package-level function or method, or of a port method, when the
      next token is `requires`, `ensures`, or `timeout`;
   2. after a contract clause, when the next token is `requires`, `ensures`, `invariant`,
@@ -1812,13 +1851,13 @@ The notation is the EBNF of the Go specification. A production that this appendi
   When contract lines follow a signature, it turns them into spaces and moves the body's `{` to
   the end of the signature line. Lines, and the columns of every other token, stay the same.
 - **A contract after `Parameters`.** In Go, a function with no results can be followed by a result
-  type, so `func F(x int) requires x > 0` could read `requires` as a type. In Keel, after
+  type, so `func F(x int) requires x > 0` could read `requires` as a type. In Vulcan, after
   `Parameters`, the identifier `requires`, `ensures`, or `timeout` starts a contract, unless the
   next token is `{`, `;`, `.`, or `[`. Thus `func F() requires { … }` keeps its Go meaning (a
   result of type `requires`), and `func F(x int) requires x > 0 { … }` is a contract.
 - **A composite literal before the body.** A contract that ends with a composite literal needs
   parentheses before the body's `{`, as an `if` condition does in Go: `requires p != (T{})`.
-- **Reserved names.** Identifiers that start with `keel_` or `Keel_` are reserved for generated
+- **Reserved names.** Identifiers that start with `vulcan_` or `Vulcan_` are reserved for generated
   code (Appendix F). A declaration of one is a compile error (K0005).
 
 ### B.2 Declaration files
@@ -1932,18 +1971,18 @@ type aliases).
 
 | Package | Imported by |
 |---|---|
-| `keel.dev/keel` | code and tests |
-| `keel.dev/keel/rt` | generated code only (Appendix F); code that imports it is a compile error (K0118) |
-| `keel.dev/keel/transport` | transports and the generated `main` only (K0208) |
+| `github.com/robot-accomplice/vulcan/vulcan` | code and tests |
+| `github.com/robot-accomplice/vulcan/vulcan/rt` | generated code only (Appendix F); code that imports it is a compile error (K0118) |
+| `github.com/robot-accomplice/vulcan/vulcan/transport` | transports and the generated `main` only (K0208) |
 
 None of them reaches a network function, except through a transport that `main` gives to `rt`
 (§6).
 
-**`keel.dev/keel`.** The types are aliases of the types in `rt`, so generated code and code share
-them.
+**`github.com/robot-accomplice/vulcan/vulcan`.** The types are aliases of the types in `rt`, so
+generated code and code share them.
 
 ```go
-package keel
+package vulcan
 
 // Topics (§5.5). Each topic of a leaf is a package-level name of type *Topic[T] or
 // *Subscription[T], which the generated code creates.
@@ -1990,8 +2029,8 @@ func Deliver[T any](t testing.TB, s *Subscription[T], msg T) error
 port's interface type. The compiler checks `impl` as an assignment to the port (K0108), and wraps
 it so that the port's contract is checked (Appendix F).
 
-**`keel.dev/keel/rt`.** The generated code uses it to create topics, register handlers, and report
-contract failures:
+**`github.com/robot-accomplice/vulcan/vulcan/rt`.** The generated code uses it to create topics,
+register handlers, and report contract failures:
 
 ```go
 package rt
@@ -2006,18 +2045,18 @@ func Call(ctx context.Context, wire, method string, req []byte) ([]byte, error)
 func Fail(kind, contract, position, caller string, values ...Value) // panics with *ContractFailure
 ```
 
-**`keel.dev/keel/transport`.** A transport is a Go package that the declaration
-`transport x { go "<path>" }` names. It exports:
+**`github.com/robot-accomplice/vulcan/vulcan/transport`.** A transport is a Go package that the
+declaration `transport x { go "<path>" }` names. It exports:
 
 ```go
-type Settings struct { ... }          // the fields that `via x{ ... }` sets, with keel tags
+type Settings struct { ... }          // the fields that `via x{ ... }` sets, with vulcan tags
 type ProcessSettings struct { ... }   // filled from --transport.x.<field> flags
 func New(p ProcessSettings) (transport.Transport, error)   // called once for each process
 var Guarantees = transport.Guarantees{ ... }
 ```
 
-The tags on `Settings` fields are `keel:"required"`, `keel:"topic"`, `keel:"call"`, `keel:"size"`,
-and `keel:"secret"` (§5.5.1). The shared types:
+The tags on `Settings` fields are `vulcan:"required"`, `vulcan:"topic"`, `vulcan:"call"`,
+`vulcan:"size"`, and `vulcan:"secret"` (§5.5.1). The shared types:
 
 ```go
 package transport
@@ -2045,7 +2084,7 @@ const (
     CallWire
 )
 type Wire struct {
-    Name     string     // the text of the wire in system.keel
+    Name     string     // the text of the wire in system.vulcan
     Kind     Kind
     From, To Endpoint   // From: the publisher or the caller; To: the subscriber or the callee
     Settings any        // this wire's Settings value, after the config defaults
@@ -2075,8 +2114,8 @@ type Transport interface {
   applies its policy. A message that fails its invariant or limits at receipt makes `deliver`
   return an error that wraps `transport.ErrInvalid`; the transport then calls `dead` at once,
   without retries.
-- `Call` returns `keel.Unavailable` or `keel.Timeout`, wrapped or not. The runtime turns a callee
-  panic into `keel.RemotePanic`.
+- `Call` returns `vulcan.Unavailable` or `vulcan.Timeout`, wrapped or not. The runtime turns a
+  callee panic into `vulcan.RemotePanic`.
 
 ## Appendix D: Network and acquiring functions
 
@@ -2114,11 +2153,11 @@ and `syscall.Bind`, `syscall.Listen`, and `syscall.Accept`. Every other network 
 | `io/ioutil` | `ReadFile`, `WriteFile`, `ReadDir`, `TempFile`, `TempDir` |
 | `path/filepath` | `Walk`, `WalkDir`, `Glob`, `EvalSymlinks` |
 | `plugin` | `Open` |
-| `syscall` | `Open`, `Openat`, `Creat`, `Mkdir`, `Mkdirat`, `Rmdir`, `Unlink`, `Unlinkat`, `Rename`, `Renameat`, `Link`, `Symlink`, `Chdir`, `Chroot`, `Mount`, and their variants on each target. `keel audit` lists every other use of `syscall` (§5.4c). |
+| `syscall` | `Open`, `Openat`, `Creat`, `Mkdir`, `Mkdirat`, `Rmdir`, `Unlink`, `Unlinkat`, `Rename`, `Renameat`, `Link`, `Symlink`, `Chdir`, `Chroot`, `Mount`, and their variants on each target. `vulcan audit` lists every other use of `syscall` (§5.4c). |
 
 A project adds a function with its full name in `config { network: [...] }` or
 `config { acquiring: ["example.com/blob.Open"] }`, and removes one with `allow_network` or
-`allow_acquiring` (§5.4c). `keel audit` lists each change and each call to a listed function.
+`allow_acquiring` (§5.4c). `vulcan audit` lists each change and each call to a listed function.
 
 **Global mutators.** In strict mode, only exempt leaves can reach them (§5.4d, K0211). They change
 package state of the standard library that every leaf in the process shares:
@@ -2138,7 +2177,7 @@ A project adds a function with `config { mutators: [...] }`.
 ## Appendix E: Diagnostics
 
 Each diagnostic has a stable code (§9). A code is never reused for a different problem. **E** is
-a compile error. **W** is a warning, which never stops a build (§6). `keel explain <code>` gives
+a compile error. **W** is a warning, which never stops a build (§6). `vulcan explain <code>` gives
 the long form.
 
 | Code | | Problem | Section |
@@ -2147,9 +2186,9 @@ the long form.
 | K0001 | E | Syntax error in a declaration file or a contract | App. B |
 | K0008 | E | A Go syntax or type error in a body; the message is Go's | §6 |
 | K0002 | E | A code file outside a leaf or a library, or a leaf inside a leaf | §5.4 r2 |
-| K0003 | E | Directories and `system.keel` disagree | §5.2 |
+| K0003 | E | Directories and `system.vulcan` disagree | §5.2 |
 | K0004 | E | A `package` clause does not name its directory, or a `library` name is not its package name | §5.4a, App. B |
-| K0005 | E | A declared name starts with `keel_` or `Keel_` | App. B |
+| K0005 | E | A declared name starts with `vulcan_` or `Vulcan_` | App. B |
 | K0006 | E | Unknown key in `config { }` | App. B |
 | K0007 | E | A `transport` name is not lower case | App. B |
 | **K01** | | **Architecture** | |
@@ -2168,9 +2207,9 @@ the long form.
 | K0113 | E | A wire names a group | §5.3 |
 | K0114 | W | A leaf is larger than `context_budget` | §5.4 r10 |
 | K0115 | W | Dead code, or a port that no code calls | §9 |
-| K0116 | E | Code assigns to a port or a topic name, or takes its address, other than in `keel.Bind` | §5.4 r11 |
+| K0116 | E | Code assigns to a port or a topic name, or takes its address, other than in `vulcan.Bind` | §5.4 r11 |
 | K0117 | E | A leaf declares an `init` function | §5.4 r12 |
-| K0118 | E | Code imports `keel.dev/keel/rt` | App. C |
+| K0118 | E | Code imports `github.com/robot-accomplice/vulcan/vulcan/rt` | App. C |
 | K0119 | E | A `uses` line names an unknown node | App. B |
 | K0120 | E | A port contract names an identifier of its own leaf | App. F |
 | K0121 | E | Two leaves in the system have the same name | §5.3 |
@@ -2187,7 +2226,7 @@ the long form.
 | K0206 | E | `gateway for` names something that is not an `external`, or `entry for` names something that is not a `person` or an `external` | §5.4b |
 | K0207 | E | Two gateway leaves for one external system in one container | §5.4b |
 | K0208 | E | A leaf or a library imports a transport package | §5.5.1 |
-| K0209 | E | A dependency is not in `go.sum` (fix-it: `keel mod tidy`) | §6 |
+| K0209 | E | A dependency is not in `go.sum` (fix-it: `vulcan mod tidy`) | §6 |
 | K0210 | E | Strict mode: the type of a library `var` holds a mutable reference | §5.4d |
 | K0211 | E | Strict mode: code reaches a global mutator | §5.4d, App. D |
 | **K03** | | **Topics, transports, and remote ports** | |
@@ -2240,79 +2279,80 @@ the long form.
 | K0602 | E | One flag name is used with two types, defaults, or maxima, or two flag names give one environment variable | §5.3 |
 | K0603 | E | Settings for a leaf whose `startup` takes none, or a missing settings value | §5.3 |
 | K0604 | E | A constructor has parameters other than one settings struct, or results other than `T` or `(T, error)`; or a wire that names a type has settings | §5.3 |
-| K0605 | E | A literal in a settings field tagged `keel:"secret"` | §5.3 |
+| K0605 | E | A literal in a settings field tagged `vulcan:"secret"` | §5.3 |
 | **K07** | | **Warnings on Go code** | |
 | K0701 | W | Unhandled error | §6 |
 | K0702 | W | Error masking | §6 |
 | K0703 | W | Possible `nil` dereference | §6 |
-| K0704 | W | Data race (from `keel test`; the test also fails, as in Go) | §6 |
+| K0704 | W | Data race (from `vulcan test`; the test also fails, as in Go) | §6 |
+| K0705 | W | `vulcan test` ran without the race detector, because the host cannot run it | §6 |
 
 ## Appendix F: Lowering to Go
 
-The Go backend (§11) turns each Keel construct into Go as follows. The generated code has
-`//line` directives, so errors and stack traces point to `.keel` files. Names that start with
-`keel_` are generated.
+The Go backend (§11) turns each Vulcan construct into Go as follows. The generated code has
+`//line` directives, so errors and stack traces point to `.vulcan` files. Names that start with
+`vulcan_` are generated.
 
-**Leaves and libraries.** Each leaf and each library is one Go package. Each `.keel` code file
-becomes one `.go` file with the Keel additions removed or replaced as below.
+**Leaves and libraries.** Each leaf and each library is one Go package. Each `.vulcan` code file
+becomes one `.go` file with the Vulcan additions removed or replaced as below.
 
 **Ports.** For `needs port Checkout { ... }` in leaf `orders`, the compiler generates, in the
 package `orders`:
 
 ```go
-type keel_Checkout interface { Pay(c money.CustomerID, amt money.Money) (money.Receipt, error) }
-var Checkout keel_Checkout            // bound by main, or by keel.Bind in a test
+type vulcan_Checkout interface { Pay(c money.CustomerID, amt money.Money) (money.Receipt, error) }
+var Checkout vulcan_Checkout            // bound by main, or by vulcan.Bind in a test
 ```
 
 For each wire, the generated `main` holds a wrapper for that port and that provider type. The
 wrapper checks the port's contract and calls the provider's method directly:
 
 ```go
-type keel_wire3 struct{ impl *billing.Payer }   // Orders.Checkout: Billing.NewPayer
-func (w keel_wire3) Pay(c money.CustomerID, amt money.Money) (money.Receipt, error) {
+type vulcan_wire3 struct{ impl *billing.Payer }   // Orders.Checkout: Billing.NewPayer
+func (w vulcan_wire3) Pay(c money.CustomerID, amt money.Money) (money.Receipt, error) {
     if !(amt > 0) { rt.Fail("requires", ...) }
     r, err := w.impl.Pay(c, amt)                // a static call
     if err == nil && !(r.Amount == amt) { rt.Fail("ensures", ...) }
     return r, err
 }
-// in main: orders.Checkout = keel_wire3{impl: billing.NewPayer()}
+// in main: orders.Checkout = vulcan_wire3{impl: billing.NewPayer()}
 ```
 
 Thus a port call is one dynamic dispatch, on `Checkout` (§5.3). In a test, the compiler rewrites
-`keel.Bind(t, &Checkout, f)` to bind a wrapper generated in `orders` whose `impl` has the type
-`keel_Checkout`; that costs a second dispatch in tests only. Thus a fake meets the same contract
+`vulcan.Bind(t, &Checkout, f)` to bind a wrapper generated in `orders` whose `impl` has the type
+`vulcan_Checkout`; that costs a second dispatch in tests only. Thus a fake meets the same contract
 as the real provider (§8). A remote port binds a client wrapper that encodes each call and calls
 `rt.Call`. The callee's container registers the provider's methods with `rt.ServeMethod`.
 
 **Topics.** `publishes Placed topic[events.OrderPlaced]` becomes
-`var Placed = rt.NewTopic[events.OrderPlaced]("Orders.Placed", events.Keel_validateOrderPlaced)`,
-of type `*keel.Topic[events.OrderPlaced]`. `subscribes` becomes `rt.NewSubscription` in the same
+`var Placed = rt.NewTopic[events.OrderPlaced]("Orders.Placed", events.Vulcan_validateOrderPlaced)`,
+of type `*vulcan.Topic[events.OrderPlaced]`. `subscribes` becomes `rt.NewSubscription` in the same
 way. A message type is in a library (§5.4, rule 9), so its validation function, which checks its
-`limit`s and its invariant, is generated in that library. For `keel.DeadLetter[T]`, `rt` has one
+`limit`s and its invariant, is generated in that library. For `vulcan.DeadLetter[T]`, `rt` has one
 generic validation function, which checks `Error` and `Wire` only. A handler
 `handle Shipped(m events.ShipmentSent) error { ... }` becomes
-`func keel_handle_Shipped(keel_ctx context.Context, m events.ShipmentSent) error { ... }`; the
+`func vulcan_handle_Shipped(vulcan_ctx context.Context, m events.ShipmentSent) error { ... }`; the
 added parameter has a reserved name, so it hides no name that the body uses. The leaf's generated
-registration calls `rt.Handle(Shipped, keel_handle_Shipped)`.
+registration calls `rt.Handle(Shipped, vulcan_handle_Shipped)`.
 
-**Every generated identifier starts with `keel_` or `Keel_`** (Appendix B.1), so it cannot collide
-with a name in the code.
+**Every generated identifier starts with `vulcan_` or `Vulcan_`** (Appendix B.1), so it cannot
+collide with a name in the code.
 
 **Contracts on functions.**
 
 1. `requires` becomes a check at entry: `if !(expr) { rt.Fail(...) }`. `rt.Fail` panics with a
-   `*keel.ContractFailure` (Appendix C).
-2. `old(x)` becomes a local variable `keel_old0`, set at entry by Go assignment (§7.1).
+   `*vulcan.ContractFailure` (Appendix C).
+2. `old(x)` becomes a local variable `vulcan_old0`, set at entry by Go assignment (§7.1).
 3. `ensures` is checked at each `return`, before the function's deferred calls run (§7.2). Each
    `return e0, e1` becomes a block with typed temporaries:
 
    ```go
    {
-       var keel_t0 T0
-       var keel_t1 T1
-       keel_t0, keel_t1 = e0, e1
-       if !(ensures with result = keel_t0, err = keel_t1) { rt.Fail("ensures", ...) }
-       return keel_t0, keel_t1
+       var vulcan_t0 T0
+       var vulcan_t1 T1
+       vulcan_t0, vulcan_t1 = e0, e1
+       if !(ensures with result = vulcan_t0, err = vulcan_t1) { rt.Fail("ensures", ...) }
+       return vulcan_t0, vulcan_t1
    }
    ```
 
@@ -2321,19 +2361,19 @@ with a name in the code.
    body's scope.
 
    A function with a risky deferred call (§7.3, rule 3) runs its body in a generated closure, and
-   checks again after the closure returns. Each return check in the body also sets `keel_checked`
+   checks again after the closure returns. Each return check in the body also sets `vulcan_checked`
    and saves the state atoms of §7.3, rule 3:
 
    ```go
    func (a *Account) Deposit(f *os.File, x int) (err error) {
-       var keel_checked bool
-       var keel_s0 int                          // a.Balance, saved at the return check
-       keel_old0 := a.Balance
+       var vulcan_checked bool
+       var vulcan_s0 int                          // a.Balance, saved at the return check
+       vulcan_old0 := a.Balance
        err = func() (err error) {
            // the body, unchanged, with its deferred calls
        }()
-       if keel_checked {
-           if !(!(err != nil) || keel_s0 == keel_old0) { rt.Fail("ensures", ...) }
+       if vulcan_checked {
+           if !(!(err != nil) || vulcan_s0 == vulcan_old0) { rt.Fail("ensures", ...) }
        } else {
            // a recovered panic: ensures and the invariant on the current state (§7.3, rule 4)
        }
@@ -2350,41 +2390,41 @@ with a name in the code.
    function keeps Go arithmetic.
 6. A panic in a `pure` function while a contract runs is recovered and reported with
    `rt.Fail("panic", ...)`.
-7. The compiler removes a check that it proves, and `keel audit` shows each removal.
+7. The compiler removes a check that it proves, and `vulcan audit` shows each removal.
 
 **Struct invariants.** For a struct type `T` with an invariant, the compiler generates, in the
-package of `T`, the exported method `func (v *T) Keel_invariant()`, which does nothing for a nil
-`v` and calls `rt.Fail` when the invariant is false. It also generates `Keel_checkT` and
-`Keel_checkPtrT`. They are exported, so a leaf that uses a library type can call them.
+package of `T`, the exported method `func (v *T) Vulcan_invariant()`, which does nothing for a nil
+`v` and calls `rt.Fail` when the invariant is false. It also generates `Vulcan_checkT` and
+`Vulcan_checkPtrT`. They are exported, so a leaf that uses a library type can call them.
 
 - **Outer calls.** Each method `M` is generated twice: `M`, which checks the invariant at each
-  `return` and at a reachable end of its body, before its deferred calls run; and `keel_M`, the
+  `return` and at a reachable end of its body, before its deferred calls run; and `vulcan_M`, the
   same body without these checks. `M` also gets one generated deferred call, registered first so
   that it runs last. If a panic leaves `M` before a return check ran, it checks the invariant, and
-  when the invariant is false it panics again with a `*keel.ContractFailure` whose `Cause` is the
+  when the invariant is false it panics again with a `*vulcan.ContractFailure` whose `Cause` is the
   original value (§7.3, rule 5). Inside a method of `T`, a call whose receiver expression is the
-  method's own receiver variable, not assigned in the method, calls `keel_M`. Every other call, for
-  example `to.Deposit(x)`, calls `M` (§7.2). A method that writes no field, calls no method that
+  method's own receiver variable, not assigned in the method, calls `vulcan_M`. Every other call,
+  for example `to.Deposit(x)`, calls `M` (§7.2). A method that writes no field, calls no method that
   does, and passes no pointer to `T` to a function has no check.
-- **Literals and conversions.** `T{...}` and a conversion `T(x)` become `Keel_checkT(...)`, which
-  checks the invariant and returns the value. `&T{...}` becomes `Keel_checkPtrT(&T{...})`, which
+- **Literals and conversions.** `T{...}` and a conversion `T(x)` become `Vulcan_checkT(...)`, which
+  checks the invariant and returns the value. `&T{...}` becomes `Vulcan_checkPtrT(&T{...})`, which
   checks `*p` and returns the pointer `p`.
 - **Calls that receive `T`.** A call that passes a pointer to `T`, or a value that holds `T`
   through a pointer, to a function that is not a method of `T` is followed by a check of each `T`
   that it can reach (§7.2).
 - **The zero value.** The compiler evaluates a tier-1 invariant on the zero value at compile time
   (K0506). A tier-2 invariant runs in a generated `init` of the library or leaf, so a failure
-  stops the process before `main` starts, and `keel test` of that leaf or library reports it.
+  stops the process before `main` starts, and `vulcan test` of that leaf or library reports it.
   (§5.4, rule 12 forbids `init` that code declares, not generated `init`.) For a generic struct,
   see §7.2.
 
 **Port contracts.** The wrapper of a port is generated in `main` (see Ports). Thus a port contract
-in `component.keel` can name only predeclared identifiers, the standard library, and libraries,
+in `component.vulcan` can name only predeclared identifiers, the standard library, and libraries,
 including their `pure` functions; a name of the leaf itself is a compile error (K0120).
 
 **`pure` functions.** The compiler checks the body of a `pure` function with the rules of §7.1
-(K0505). Keel ships the list of `pure` functions of the Go standard library, for example `len`,
-`strings.HasPrefix`, `slices.Contains`, `slices.IsSorted`, and `math.Abs`. `keel query --pure`
+(K0505). Vulcan ships the list of `pure` functions of the Go standard library, for example `len`,
+`strings.HasPrefix`, `slices.Contains`, `slices.IsSorted`, and `math.Abs`. `vulcan query --pure`
 prints it.
 
 **`startup` and `main`.** The generated `main` follows the steps of §6. Each leaf gets a generated

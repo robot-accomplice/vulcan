@@ -15,5 +15,5 @@ code.
 | 2 | [Architecture enforcement](0002-architecture-enforcement.md): the guarantee matrix, and strict and ordinary modes | Accepted |
 | 3 | [Contract failure](0003-contract-failure.md): what a panic does to external effects | Accepted |
 | 4 | [Compiler structure](0004-compiler-structure.md): staged compiler or incremental query engine | Accepted |
-| 5 | Names and reproducibility: extension, command, module path, Go version, platforms | Not started |
+| 5 | [Names and reproducibility](0005-names-and-reproducibility.md): extension, command, module path, Go version, platforms | Accepted |
 | 6 | Evidence protocol: tasks, measurements, and thresholds for milestone 4 | Not started |

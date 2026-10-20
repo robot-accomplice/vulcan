@@ -10,9 +10,9 @@ together. It is Go with an enforced architecture layer, contracts, and tools aro
   build, and reviewers can audit them.
 - **The tools teach the model** how to use the language, from a primer with a fixed token budget.
 
-**Status:** specification draft. Nothing is implemented. There is no compiler yet. The spec text
-still uses the working name "Keel", the `.keel` extension, and the `keel` command. See
-[Status and handoff](docs/status.md).
+**Status:** specification draft. Nothing is implemented. There is no compiler yet. Source files
+end in `.vulcan`, and the command is `vulcan`. The experiments keep the earlier working name, Keel.
+See [Status and handoff](docs/status.md).
 
 ## Why Vulcan
 
@@ -39,7 +39,7 @@ to the feature that answers it, with sources in Appendix A.
 A leaf declares the ports that it needs, with their contracts:
 
 ```go
-// api/orders/component.keel
+// api/orders/component.vulcan
 import "shop/lib/money"
 
 component Orders {
@@ -56,7 +56,7 @@ Any ordinary Go type with a matching method set can provide the port. The provid
 its consumers. One architecture file wires the leaves together:
 
 ```go
-// system.keel
+// system.vulcan
 system Shop {
     external Stripe "Card payment processor"
 
@@ -73,7 +73,7 @@ system Shop {
 Inside `Orders`, the code calls `Checkout.Pay(c, amt)` like a Go package. A port call is an
 ordinary function call: one interface dispatch, with the contract checked at the boundary. The
 compiler rejects a reference to another leaf that does not go through a port, and a port that
-`system.keel` does not wire.
+`system.vulcan` does not wire.
 
 ## What Vulcan adds to Go
 
@@ -119,7 +119,8 @@ cd experiments/test3/base-go && go test ./...
 cd experiments/test3/work/go && go test ./...
 ```
 
-The Keel versions (`base-keel`, `work/keel`) cannot build, because no compiler exists. They were
+The Keel versions (`base-keel`, `work/keel`, written under the working name) cannot build,
+because no compiler exists. They were
 checked by hand against the spec (`base-keel/SELF-CHECK.md`).
 
 ## Contributing

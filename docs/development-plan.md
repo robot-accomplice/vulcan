@@ -40,7 +40,7 @@ Write short design decisions and update the relevant spec and primer sections to
 1. **Contract timing.** Define what postconditions and invariants guarantee when control returns
    to the caller. Cover named results, deferred mutation, deferred unlocking, panic, recovery,
    aliases, and concurrent access. The spec now checks before deferred calls run, does not check
-   a deferred change to a named result, and lists such functions in `keel audit` (§7.2, Appendix
+   a deferred change to a named result, and lists such functions in `vulcan audit` (§7.2, Appendix
    F step 3). Thus a contract can pass and the caller can still receive a value that breaks it.
    Preferred initial direction: reject deferred mutations that can invalidate a checked result
    or invariant, including indirect mutation that cannot be excluded. Validate that this
