@@ -29,10 +29,9 @@ Defer distributed topics, remote ports, custom durable transport, automatic dupl
 LLVM, self-hosting, and full editor integrations. Reject unsupported constructs explicitly.
 Their deferral does not validate their design; it isolates the first implementation experiment.
 
-The spec currently requires a custom incremental query engine from the start (§11.1). Proposed
-change: start with explicit compiler stages and reusable analysis results, and add incremental
-execution after measuring rebuild costs. This change needs a recorded decision before
-implementation.
+The spec required a custom incremental query engine from the start (§11.1). Decision 4 replaced
+it with explicit compiler stages and reusable analysis results. Incremental execution comes after
+measuring rebuild costs.
 
 ## Milestone 0: define guarantees and resolve blockers
 
@@ -180,7 +179,8 @@ mechanism. Test repeated delivery around every side-effect and acknowledgement b
 
 Revise compatibility rules: removing a remote method is not safe for an old caller merely
 because the schema remains readable. The §5.5.2 table now calls this change compatible. Specify
-staged retirement and test mixed-version callers, providers, and rollback. Bound malformed messages and dead letters as well as valid messages.
+staged retirement and test mixed-version callers, providers, and rollback. Bound malformed
+messages and dead letters as well as valid messages.
 
 Exit gate: fault-injection and mixed-version tests support each advertised delivery and
 compatibility guarantee before those guarantees appear in user-facing documentation.

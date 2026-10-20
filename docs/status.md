@@ -85,8 +85,8 @@ until accepted.
    mostly implementation detail.
 4. **Finish test 3**, or replace it with the build test below.
 5. **The compiler.** A separate sub-project that starts with its own design step. The Go backend
-   comes first (Appendix F), the compiler is written in Go and is query-based (§11.1). The final
-   test of the language is to build a real program with it.
+   comes first (Appendix F), the compiler is written in Go and is staged (§11.1, decision 4). The
+   final test of the language is to build a real program with it.
 6. **Q22** (§13): numeric performance targets against Go, Java, C++, and Rust.
 
 ## Working conventions

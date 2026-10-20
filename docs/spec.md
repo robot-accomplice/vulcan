@@ -1627,23 +1627,24 @@ The tools assume that one of their users is an LLM (R8):
 | `keel trace <id>` | Shows the steps of one traced message (§5.5.1). |
 | `keel check` / `keel build` | The holistic boundary check, and the parallel build of each leaf (§11.2). |
 
-Each command has `--json` output. An LSP server and an MCP server give the same functions to
-editors and agents.
+Each command has `--json` output. An LSP server and an MCP server will give the same functions
+to editors and agents. They are deferred until the compiler's stages are measured (§11.1), and
+they reuse stages 1 to 5.
 
 ## 11. Runtime
 
 - Native compilation and a tracing GC.
-- **Backend: Go source first, LLVM later.** The compiler lowers the code to its own intermediate
-  representation (IR). The backends read only this IR, never the syntax tree. Thus a second
-  backend needs no change to the front end.
+- **Backend: Go source first, LLVM later.** The first compiler lowers the typed Go syntax tree
+  directly to Go source (§11.1, stage 6). It has no intermediate representation (IR) of its own.
+  An IR comes with a second backend, which is its first test.
   - *Go backend (first).* Keel gets the GC, goroutine scheduler, channels, and cross-compilation of
     Go at no cost. The semantics of Keel map closely onto Go. The emitted code has `//line`
     directives. Thus the stack traces, profilers, and debuggers of Go report positions in `.keel`
     files, not in the generated Go.
   - *LLVM backend (deferred).* The LLVM backend needs a GC and a scheduler of Keel's own. That work
-    takes months, and it blocks nothing in the language design, so it is deferred. The work starts
-    when the IR is stable. "Stable" means that the self-hosted compiler (§11.1) builds on the IR
-    with no change across releases.
+    takes months, and it blocks nothing in the language design, so it is deferred. It starts only
+    after the language earns continued work (development plan, milestone 4), and it brings the
+    IR.
 - The concurrency model follows Go (tasks like goroutines, and channels), unchanged.
 
 - **Build output is the developer's decision.** A system with one container compiles to one binary.
@@ -1654,14 +1655,37 @@ editors and agents.
 
 ### 11.1 Compiler implementation
 
-- **The compiler is written in Go, and later self-hosted in Keel.** The semantics of Keel are close
-  to those of Go, so a tool can translate most of the compiler source automatically. Go took the
-  same path from C at version 1.5. The self-hosted compiler becomes the first large Keel program,
-  and it tests §5 in real use.
-- **The compiler is query-based and incremental from the start.** It is a memoized query engine,
-  not a batch pipeline. Example queries: "type of X", "ports of node Y", "context pack for Z". After
-  each edit, the LSP and the tools in §10 calculate again only what changed. Go has no equivalent
-  of the Rust library `salsa`, so the project builds this engine itself.
+The compiler is written in Go. It is a staged compiler with a cache for each package
+([decision 4](decisions/0004-compiler-structure.md)). It reuses `go/parser` and `go/types`, so
+Keel bodies get Go's own type checker.
+
+| # | Stage | Input | Output |
+|---|---|---|---|
+| 1 | Parse | `.keel` code files; declaration files | Blanked Go source with the same positions; a side table of contracts, `limit`s, `pure` and `handle` marks; declaration syntax trees |
+| 2 | Stubs | Declaration syntax trees | Go declarations for each port, topic, and handler, in reserved `keel_` names (Appendix F) |
+| 3 | Type check | Stages 1 and 2, and the export data of imported packages | `go/types` package and info; type-checked contract expressions |
+| 4 | Leaf checks | Stage 3 | Diagnostics of the leaf (§6, §7); a summary of the package: declarations, reach facts, fingerprints, effects |
+| 5 | Holistic check | Declaration syntax trees and every stage-4 summary | Diagnostics of §5.4 to §5.5.2, strict mode, near-duplicates across leaves, `topics.lock`, the audit |
+| 6 | Lower | Stages 3 and 4, when all checks pass | Go source with `//line` directives and the generated `main`; then `go build` |
+
+Stages 1 to 4 run for each package, in parallel: they are the per-leaf build of §11.2. Stage 5 is
+the holistic check. Each stage reads only the outputs of earlier stages, so each can be tested
+alone.
+
+- **Blanking.** Stage 1 is a Keel lexer. It writes Go source in which each Keel-only token
+  becomes spaces, so each position in the Go source is a position in the `.keel` file
+  (Appendix B.1). A handler becomes Go text: `idempotent` becomes spaces, and `handle` becomes
+  `func` and two spaces. Stage 1 then renames the function in the syntax tree to
+  `keel_handle_<Name>`, which moves no position. Each contract expression is parsed with
+  `go/parser.ParseExpr` at its own offset.
+- **Caches.** The key of a result of stages 1 to 4 is a hash of the package's files, the Keel
+  version, and the stage-4 summaries of the packages that it imports. Stage 5 caches the reach
+  facts of each dependency module for each version (§5.4c). Stage 6 uses Go's build cache.
+- **Incremental computation only when measured.** The project measures the time of `keel check`
+  after a one-line edit in one leaf, and of a full check, on a real application. When the 95th
+  percentile of a one-edit check exceeds the project's target, the slowest stage gets incremental
+  computation, by a new decision.
+- **Self-hosting is not planned.** It stays possible after the language earns continued work.
 
 ### 11.2 Compilation modes
 
@@ -1684,8 +1708,9 @@ Compilation has two separate modes. They run in parallel.
   early. The near-duplicate part needs the fingerprints of every leaf, so it finishes after the
   slowest leaf job.
 - **Caching.** The compiler caches the result of each leaf. The cache key is a hash of the
-  contents of the leaf directory and the declarations that the leaf depends on. The query engine
-  (§11.1) makes the holistic check incremental.
+  contents of the leaf directory and the declarations that the leaf depends on (§11.1). The
+  holistic check reads the cached summaries of the leaves, so it reads no unchanged body again.
+  §11.1 says when it becomes incremental.
 
 **Why this is feasible.** Go already compiles packages in parallel. Each package compiles against
 the export data of its dependencies, which contains declarations only. The design of Keel removes
@@ -1782,6 +1807,10 @@ The notation is the EBNF of the Go specification. A production that this appendi
   In each place, Go allows no identifier and no `{`, so no Go program changes its meaning. A field
   named `timeout` or `limit`, and a local variable named `requires`, are ordinary identifiers.
   `limit` must be on the same line as its field.
+
+  *For implementers:* the blanking lexer of §11.1 applies this rule when it writes Go source.
+  When contract lines follow a signature, it turns them into spaces and moves the body's `{` to
+  the end of the signature line. Lines, and the columns of every other token, stay the same.
 - **A contract after `Parameters`.** In Go, a function with no results can be followed by a result
   type, so `func F(x int) requires x > 0` could read `requires` as a type. In Keel, after
   `Parameters`, the identifier `requires`, `ensures`, or `timeout` starts a contract, unless the
