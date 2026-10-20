@@ -834,6 +834,16 @@ idempotent handle Shipped(m events.ShipmentSent) error {
   message is acknowledged. If it returns an error or panics, the message is not acknowledged, and
   the transport applies its policy: for example, retry and then dead-letter, or discard. Thus code
   cannot forget to acknowledge a message, and it cannot acknowledge a message too early.
+- **A contract failure in a handler is not retried by default.** A contract failure is a bug, so
+  a retry usually fails again and repeats the effects that the handler made before the check.
+  When a handler panics with a `*keel.ContractFailure`, the runtime sends the message to its
+  dead-letter route at once, with the failure report in `DeadLetter.Error`. A transport setting,
+  `retryContractFailures`, applies the normal retry policy instead. A dead-letter handler that
+  fails a contract is counted and reported, with no retry (§7.4).
+- **A delivery ID.** `keel.DeliveryID(ctx)` returns an ID of the message for one subscriber wire.
+  It stays the same across redeliveries of that message, and it is different for each message. A
+  transport that can redeliver must supply it. A handler uses it as an idempotency key, stored in
+  the same transaction as its effects (§7.4).
 
 #### 5.5.1 Transports
 
@@ -883,7 +893,9 @@ no order, requires bounded messages, and supports calls.
   (default 5), `backoff` (default 1 s) and `maxBackoff` (default 5 min) for the delay before each
   retry, which doubles from `backoff` up to `maxBackoff`, with random jitter of up to 10%,
   `deadletters` (a route; required), and `durable` (default `true`, which keeps queues on disk so
-  that no message is lost across a restart), and `trace` (default `false`). A value can come from
+  that no message is lost across a restart), `retryContractFailures` (default `false`: a contract
+  failure in a handler goes to the dead-letter route at once), and `trace` (default `false`). A
+  value can come from
   a startup flag:
   `capacity: flag("orders-cap", max: 10_000)`. A flag that sets a size must declare a maximum, and
   the compiler uses the maximum to calculate the memory limit.
@@ -1087,6 +1099,9 @@ qty, err := Stock.Level(sku)    // err can also be Unavailable, Timeout, or Remo
   The settings of `direct` are tagged `topic`, so a call wire accepts none of them (K0308).
 
 - **A panic in the callee** is recovered by the runtime (§6); the caller receives `RemotePanic`.
+  When the callee fails a contract, `RemotePanic` carries the failure report. When the caller's
+  check of the reply fails, the caller panics. In both cases the outcome is unknown, as after a
+  timeout: the callee's effects can have happened (§7.4).
 - **The schema lock covers the contracts of remote ports.** A change to a remote port's contract is a
   breaking change, as for message invariants (§5.5.2).
 
@@ -1193,7 +1208,8 @@ no entry leaf exits with code 0 when all its startup functions have returned `ni
    message whose handler did not return `nil` is not acknowledged, so the transport delivers it
    again later.
 4. **Close.** Close each transport, then exit. The exit code is 0 after a stop signal, and 1 after
-   a failed startup function, with a report.
+   a failed startup function, with a report. A process with `on_contract_failure: exit` ends with
+   exit code 3 at a contract failure, without these steps (§7.4).
 
 **Panics in handlers and served calls.** The runtime recovers a panic in a topic handler (§5.5.0)
 or in a served remote call (§5.5.3), and counts it as a failure of that message or call, with a
@@ -1453,6 +1469,68 @@ How reviewers audit contracts:
   each K0524 site.
 - Contracts appear in the generated docs and diagrams.
 
+### 7.4 Contract failures and effects
+
+A contract failure stops the code that broke the contract. It does not undo what that code
+already did ([decision 3](decisions/0003-contract-failure.md)).
+
+1. **Nothing is undone.** A contract failure is a Go panic. Each frame runs its deferred calls, as
+   in Go, so a deferred `tx.Rollback()` runs. Keel undoes nothing else. An effect that happened
+   before the failed check stays: a committed write, a sent request, a published message.
+2. **`requires` prevents; `ensures` and the invariant detect.** Only `requires` runs before the
+   body's effects. A rule that must stop an effect goes in the `requires` of the function that
+   makes the effect, or in a check in the body before it. An *effect* is a call that reaches a
+   network or acquiring function (Appendix D), a port call, or a publish. `keel audit` lists each
+   `ensures` and each invariant of a function that reaches an effect before its return check, as
+   "detects after effects".
+3. **An effect in a `return` (K0525).** In a function with `ensures`, or a method of a struct with
+   an invariant, a `return` whose expressions reach an effect gets a warning, because Go runs the
+   effect before the check. In `return n, tx.Commit()`, a failing `ensures` leaves the data
+   committed. Check first, so that a failure panics before the commit and the deferred rollback
+   runs:
+
+   ```go
+   func (s *Store) Refund(tx *sql.Tx, id OrderID, amt Money) (err error)
+       requires amt > 0
+   {
+       defer tx.Rollback()
+       a, err := s.load(tx, id)
+       if err != nil { return err }
+       if err := a.refund(amt); err != nil { return err }   // a method with ensures: checked here
+       if err := s.save(tx, a); err != nil { return err }
+       return tx.Commit()                                    // the last step; no check follows it
+   }
+   ```
+
+   The warning stays when the developer accepts the order, so that a reviewer sees it.
+4. **Handlers and remote calls.** A contract failure in a handler goes to the dead-letter route at
+   once, unless the wire sets `retryContractFailures` (§5.5.0). A remote contract failure leaves
+   the outcome unknown (§5.5.3).
+5. **Fail-stop on request.** The process setting `on_contract_failure` takes `panic` (the default)
+   or `exit`. With `exit`, the runtime writes the failure report to standard error and ends the
+   process with exit code 3. It runs no deferred calls, and no caller can recover the failure. The
+   `config` key sets the value for the system, and the flag `--on-contract-failure` sets it for
+   one process. `keel test` always uses `panic`, so that tests can check failures. With `exit`,
+   the limit of §7.3 does not apply: no later request can use a broken value.
+
+**Responsibilities of the application.** Keel does not enforce these:
+
+- **One transaction for one change.** Write a state change, its audit line, and each event to
+  publish (an outbox row) in one database transaction. Publish from the outbox after the commit.
+- **Check before the commit.** Run each check that guards a write before `Commit`, so that a
+  deferred rollback undoes the work on a failure.
+- **Idempotency keys at each retryable entry.** An HTTP `POST`, a remote method that a caller can
+  retry, and each handler take a key: a client key, an operation ID in the arguments, or
+  `keel.DeliveryID(ctx)`. Store the key and the outcome with the change, in the same transaction.
+- **Recover the outcome on a retry.** A retry with a known key returns the stored outcome, and
+  does not run the change again. This covers a reply lost after a commit.
+- **Overflow-safe arithmetic before a write.** Body arithmetic is Go arithmetic and can wrap;
+  exact arithmetic exists only in contract expressions (§7.1). Write a guard that cannot overflow
+  (`amount > charged - refunded`, not `refunded + amount > charged`), in `requires` or before the
+  write.
+- **Choose a process policy.** A container that holds money, or other state that must stay
+  consistent, should consider `on_contract_failure: exit`.
+
 ## 8. Testing
 
 Tests are Go tests: `func TestX(t *testing.T)` in `*_test.keel` files in the leaf directory.
@@ -1541,7 +1619,7 @@ The tools assume that one of their users is an LLM (R8):
 | `keel query <symbol>` | Looks up a symbol exactly in the symbol index of the compiler. This prevents invented APIs (R4). |
 | `keel explain <code>` | Gives a long explanation of a diagnostic, with examples. |
 | `keel doc` / `keel diagram` | Generates docs, and C4 diagrams at each level (context, container, component, code), from the source (§5.6). |
-| `keel audit` / `keel archdiff` | Audits contracts and architecture (§7, §9), with the unchecked paths and the strict-mode exemptions of §5.4d. |
+| `keel audit` / `keel archdiff` | Audits contracts and architecture (§7, §9), with the unchecked paths and the strict-mode exemptions of §5.4d, and the checks that detect after effects (§7.4). |
 | `keel fmt` | The one formatter. |
 | `keel test <leaf>` | Builds and runs the tests of one leaf (§8), with the race detector (§6). |
 | `keel mod <args>` | Runs `go mod <args>` over the generated Go, so `keel mod tidy` sees imports in `.keel` files (§6). |
@@ -1783,6 +1861,7 @@ TransportFile = "transport" identifier "{" "go" string_lit "}" .
 | `mutators` | a list of full function names | empty | Additions to the global mutators (Appendix D, K0211) |
 | `duplicate_similarity` | percent | 90 | §9 |
 | `duplicate_min_tokens` | tokens | 50 | §9 |
+| `on_contract_failure` | `panic` or `exit` | `panic` | What a contract failure does to the process; the flag `--on-contract-failure` overrides it (§7.4) |
 
 ### B.3 Additions to Go source
 
@@ -1863,6 +1942,10 @@ func NewError(code, text string) error        // an error that keeps its identit
 // replaced (§7.3, rule 5), or nil; Unwrap returns Cause when it is an error.
 type ContractFailure = rt.ContractFailure     // Kind, Contract, Position, Caller string; Values []Value; Cause any
 type Value = rt.Value                         // Name, Text string
+
+// The ID of the message that a handler runs for, stable across redeliveries (§5.5.0). It returns
+// "" outside a handler.
+func DeliveryID(ctx context.Context) string
 
 // Pure helpers for contracts (§7.1).
 func All[T any](xs []T, p func(T) bool) bool
@@ -2122,6 +2205,7 @@ the long form.
 | K0522 | E | A deferred call in a method of a struct with an invariant writes a field of that struct | §7.3 |
 | K0523 | E | An `ensures` conjunct reads a named result and passes state by reference to a `pure` function, in a function with a risky deferred call | §7.3 |
 | K0524 | W | The check after a recovered panic runs after a deferred unlock | §7.3 |
+| K0525 | W | A `return` reaches an effect in a function with `ensures` or in a method of a struct with an invariant; the effect runs before the check | §7.4 |
 | **K06** | | **Startup, settings, and flags** | |
 | K0601 | E | A function named `setup` or `startup` has the wrong signature | §6 |
 | K0602 | E | One flag name is used with two types, defaults, or maxima, or two flag names give one environment variable | §5.3 |

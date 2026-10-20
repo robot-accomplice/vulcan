@@ -114,7 +114,9 @@ pure func Positive(x int) bool { return x > 0 }   // contracts call only pure fu
   references: `old(len(xs))`.
 - A `pure` function has no effects: it writes only values that it created, and calls only `pure`
   functions. Its body is plain Go. Use `keel.All(xs, Positive)` for a rule over a collection.
-- Contracts run in every build. A failed contract panics with a report.
+- Contracts run in every build. A failed contract panics with a report. It undoes nothing:
+  check before you commit (`defer tx.Rollback()`, checks, then `return tx.Commit()`), and store an
+  idempotency key with each retryable change (`keel.DeliveryID(ctx)` in a handler).
 - Deferred calls and `recover` cannot hide a broken contract: when a deferred call can change a
   result or recover a panic, `ensures` and the invariant are checked again after it. A deferred
   call in a method cannot write the struct's fields. A panic that leaves a method with its
