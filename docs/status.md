@@ -67,6 +67,10 @@ Each finding was then resolved and logged.
 
 ## Open work, in order
 
+A proposed compiler-and-application validation sequence is in
+[Development plan](development-plan.md). It is a draft; it does not replace the decisions below
+until accepted.
+
 1. **Go or no go.** Decide whether the spec gives enough value over plain Go to build the
    language, and whether its first principles are sound. The planned way: run `/abort` on the
    spec.
