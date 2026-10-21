@@ -73,13 +73,12 @@ and applied to the spec. They answer audit 2's spec findings H6, H7, H10, H11, M
 H8, H9, and M7 are about distributed features, which milestone 5 takes up. L2 (line wrapping) is
 open.
 
-The [development plan](development-plan.md) is **proposed**. The owner accepts it only if it
-survives an antagonistic audit. [Audit 3](../experiments/audit-3.md) (not independent) and
-the independent audits [4](../experiments/audit-4.md) to [8](../experiments/audit-8.md) found
-blockers. This version applies their amendments and waits for the next independent audit. The plan
-answers item 1 below: milestone 0.5
-tests the rules without a compiler, and decision 6 decides by a fixed rule. **Next:** the
-independent audit; then milestone 0.5, starting with the roles of decision 6, section 3.
+The [development plan](development-plan.md) is **accepted** (2026-10-21). Audit 3 (not
+independent) and the independent audits 4 to 9 found blockers, which the plan now answers; the
+independent [audit 10](../experiments/audit-10.md) found none. The plan answers item 1 below:
+milestone 0.5 tests the rules without a compiler, and decision 6 decides by a fixed rule.
+**Next:** fix audit 10's three High findings in decision 6, then recruit the roles of decision 6,
+section 3, and start milestone 0.5.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

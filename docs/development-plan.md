@@ -1,9 +1,10 @@
 # Development plan: compiler and application proof
 
-Status: proposed, 2026-10-21. The owner accepts it only if it survives an antagonistic audit.
-[Audit 3](../experiments/audit-3.md) (not independent) and the independent audits
-[4](../experiments/audit-4.md) to [9](../experiments/audit-9.md) found blockers. This version
-applies their amendments and waits for the next independent audit.
+Status: **accepted**, 2026-10-21. The owner's condition was that the plan survive an antagonistic
+audit. [Audit 3](../experiments/audit-3.md) (not independent) and the independent audits
+[4](../experiments/audit-4.md) to [9](../experiments/audit-9.md) found blockers, which this version
+answers. The independent [audit 10](../experiments/audit-10.md) found none. Its three High findings
+(H1 to H3) are open, and are to be fixed before recruiting starts (see "Next deliverable").
 
 ## Objective
 
@@ -253,8 +254,19 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 7](../experiments/audit-7.md) | B1, B2, H1 to H6, M1 to M10, L1 to L12 | Decision 6, amendments for audit 7; this plan (gate order of milestone 0.5, outcome wording, scaled milestone-4 box, signed start dates). M11 (compiler scope) is accepted as a risk: "stopped by schedule" is a likely outcome, and the plan says so in "Recruiting, budget, and time boxes" |
 | [Audit 8](../experiments/audit-8.md) | B1, H1 to H4, M1 to M9, L1 to L7 | Decision 6, amendments for audit 8, and a sizing check run before recruiting (`experiments/sizing/`); this plan (objective, outcome wording, fixed milestone-0.5 design, its box and builder, re-plan dates, the Go version of Stockroom, two arms in milestone 4) |
 | [Audit 9](../experiments/audit-9.md) | B1, H1 to H5, M1 to M7, L1 to L11 | Decision 6, amendments for audit 9: clean success for N0 and N1, a re-run sizing check with coupled-cost, interaction, and net-cost scenarios, a cost pilot after milestone 2; this plan (outcome wording, milestone 0.5's box, the time between milestones, the cost pilot, the milestone-3 retry) |
+| [Audit 10](../experiments/audit-10.md) | No Blocker; H1 to H3, M1 to M8, L1 to L9 | Plan accepted. H1 to H3 are the next deliverable; the rest follow |
 
 ## Next deliverable
 
-An independent audit of this version. If it survives, recruiting starts (see "Recruiting, budget,
-and time boxes").
+Before recruiting starts, fix audit 10's High findings, each with a decision-6 amendment:
+
+1. **H1:** add a cost check on the ordinary tasks of milestone 4; add the cost pilot to the sizing
+   simulation and publish its error rates; require a change before the pilot's retry; describe the
+   margins as a net cost on the evaluated mix of tasks.
+2. **H2:** freeze and hash a paper Vulcan design of milestone 0.5's service, with arm R, before the
+   rules exist, and label only from it.
+3. **H3:** add a second blind grader on a sample, with an agreement limit, and compute Q2, N0, and
+   N1 under both graders' judgments.
+
+Audit 10's Medium and Low findings follow as they become relevant. Then recruiting starts (see
+"Recruiting, budget, and time boxes").

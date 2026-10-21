@@ -1,7 +1,7 @@
 # Decision 6: evidence protocol
 
-Status: accepted, 2026-10-21 (option B), as the protocol of a development plan that is itself still
-proposed. Amended by [audit 3](../../experiments/audit-3.md), then by the independent audits
+Status: accepted, 2026-10-21 (option B), as the protocol of the development plan, which is
+accepted. Amended by [audit 3](../../experiments/audit-3.md), then by the independent audits
 [4](../../experiments/audit-4.md), [5](../../experiments/audit-5.md),
 [6](../../experiments/audit-6.md), [7](../../experiments/audit-7.md),
 [8](../../experiments/audit-8.md), and [9](../../experiments/audit-9.md). See "Amendments" at the
