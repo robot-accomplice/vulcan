@@ -60,8 +60,8 @@ Each finding was then resolved and logged.
   - For the grading: audit 2 found that the Go change mixes the audit trails of different orders
     after a restart (C1), and that both changes can overflow in the refund check (H1). The writers'
     code is a record; do not fix it.
-  - The spec changed a lot after the bases were built (reviews 8 and 9). Rebuild `base-keel`
-    against the current spec before grading, or grade against the spec at commit `de1430a`.
+  - Test 3 will not be graded: milestones 0.5 and 4 of the development plan replace it. Its files
+    stay as a record.
 
 ## Open work, in order
 
@@ -75,8 +75,8 @@ open.
 
 The [development plan](development-plan.md) is **proposed**. The owner accepts it only if it
 survives an antagonistic audit. [Audit 3](../experiments/audit-3.md) (not independent) and
-[audit 4](../experiments/audit-4.md) and [audit 5](../experiments/audit-5.md) (both independent)
-found blockers. This version applies their amendments and waits for the next independent audit. The plan answers item 1 below: milestone 0.5
+the independent audits [4](../experiments/audit-4.md), [5](../experiments/audit-5.md), and
+[6](../experiments/audit-6.md) found blockers. This version applies their amendments and waits for the next independent audit. The plan answers item 1 below: milestone 0.5
 tests the rules without a compiler, and decision 6 decides by a fixed rule. **Next:** the
 independent audit; then milestone 0.5, starting with the roles of decision 6, section 3.
 

@@ -12,9 +12,9 @@ refund. It does not process real payments.
 
 It is built twice, with the same HTTP API and the same tests: once in Vulcan (strict mode), and
 once in Go. The Go version serves both Go arms of decision 6: with Vulcan's rules as static
-analyzers (Go-rules), and with the rules written down but enforced only by `go vet`, `staticcheck`,
-and a dependency linter (Go-plain). Every criterion below applies to both
-versions, unless it says "Vulcan arm". "Both arms" below means both versions.
+analyzers (arm R), and with the rules written down but not enforced beyond `go vet`,
+`staticcheck`, and the tests (arm P). Every criterion below applies to both versions, unless it
+says "Vulcan arm". "Both arms" below means both versions.
 
 ### Shape
 

@@ -97,8 +97,8 @@ system.
 | [docs/spec.md](docs/spec.md) | The specification: design, evidence, grammar (Appendix B), runtime API (C), network rules (D), diagnostics (E), and lowering to Go (F). Open questions are in §13. |
 | [docs/guide.md](docs/guide.md) | The primer that `vulcan guide` prints for a model. |
 | [docs/status.md](docs/status.md) | Where the work stands, the design rules for new decisions, and the open work in order. |
-| [docs/development-plan.md](docs/development-plan.md) | The plan (proposed): test the rules as Go analyzers first, then build a compiler and a real application, and decide by fixed rules whether the language earns its cost. |
-| [experiments/](experiments/) | Spec reviews 8 and 9 with their resolutions, audit 2 of the spec and the test 3 code, and writing test 3. |
+| [docs/development-plan.md](docs/development-plan.md) | The plan (proposed): test the rules as Go tools first, check that the final evaluation can give an answer, then build a compiler and a real application, and decide by fixed rules whether the language earns its cost. |
+| [experiments/](experiments/) | Spec reviews 8 and 9 with their resolutions, writing test 3, audit 2 of the spec and the test 3 code, and audits 3 to 6 of the development plan. |
 | [experiments/test3/](experiments/test3/) | The same shop system in Go and in Keel, the feature brief, the writers' work, and the hidden grading rules. |
 
 ## Reading order
