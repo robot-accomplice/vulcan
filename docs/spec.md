@@ -1736,7 +1736,8 @@ alone.
   version, and the stage-4 summaries of the packages that it imports. Stage 5 caches the reach
   facts of each dependency module for each version (§5.4c). Stage 6 uses Go's build cache.
 - **Incremental computation only when measured.** The project measures the time of `vulcan check`
-  after a one-line edit in one leaf, and of a full check, on a real application. When the 95th
+  after a one-line edit in one leaf, and of a full check, first on a synthetic application of fixed
+  size, then on a real application (decision 6, section 12). When the 95th
   percentile of a one-edit check exceeds the project's target, the slowest stage gets incremental
   computation, by a new decision.
 - **Self-hosting is not planned.** It stays possible after the language earns continued work.

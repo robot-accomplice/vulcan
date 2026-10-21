@@ -85,7 +85,7 @@ finding of [audit 2](../../experiments/audit-2.md) or a decision.
 |---|---|---|
 | T1 | The integration tests run against a real Postgres in CI. If the database is missing, the CI job fails. It does not skip. | M4 |
 | T2 | Fault injection covers a failure before commit, after commit and before the response, during startup, during shutdown, and across a restart. Each test checks both the response and the stored state. | Development plan, milestone 3 |
-| T3 | A load test runs a fixed mix (70% reads, 20% orders, 10% cancels and refunds) for 10 minutes with 50 clients, and reports p50 and p99 latency and throughput. It is the benchmark of decision 6 (M12). | Decision 6 |
+| T3 | A load test runs a fixed mix (70% reads, 20% orders, 10% cancels and refunds) for 10 minutes with 50 clients, and reports p50 and p99 latency and throughput. It is the benchmark of decision 6 (X11). | Decision 6 |
 | T4 | The hidden acceptance tests of decision 6 use only the HTTP API, so that the same tests grade both arms. | Decision 6 |
 | T5 | All tests pass under the race detector on a host that has it. | §6 |
 
