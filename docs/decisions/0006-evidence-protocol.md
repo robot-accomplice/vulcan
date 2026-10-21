@@ -1,11 +1,11 @@
 # Decision 6: evidence protocol
 
-Status: accepted, 2026-10-21 (option B), as the protocol of a development plan that is itself
-still proposed. Amended by [audit 3](../../experiments/audit-3.md), then by the independent audits
+Status: accepted, 2026-10-21 (option B), as the protocol of a development plan that is itself still
+proposed. Amended by [audit 3](../../experiments/audit-3.md), then by the independent audits
 [4](../../experiments/audit-4.md), [5](../../experiments/audit-5.md),
-[6](../../experiments/audit-6.md), [7](../../experiments/audit-7.md), and
-[8](../../experiments/audit-8.md). See "Amendments" at the end. Milestone 0, item 6 of the
-[development plan](../development-plan.md).
+[6](../../experiments/audit-6.md), [7](../../experiments/audit-7.md),
+[8](../../experiments/audit-8.md), and [9](../../experiments/audit-9.md). See "Amendments" at the
+end. Milestone 0, item 6 of the [development plan](../development-plan.md).
 
 ## Question
 
@@ -72,10 +72,14 @@ estimated from the untargeted tasks and reported (section 8), not tested.
   changed after the freeze.
 - **Arm C's generator** is built by the Go developer within **15 working days**, before the freeze.
   It supports every release-1 tier-1 contract form (`requires`, `ensures`, `old`, and invariants,
-  release-1/syntax.md); each form it does not support is listed in the coverage map with its
-  reason, and the run adjudicator reviews the list. Owner's decision (2026-10-21): arm R has no
-  generator. Arm C exists so that the report can say which of Vulcan's advantages a generator
-  would also deliver.
+  release-1/syntax.md); each form it does not support is listed in the coverage map with its reason,
+  and the run adjudicator reviews the list. The map also lists each contract semantic of release 1
+  (exact arithmetic, `old`, the check after deferred calls, the unwinding check, port contracts that
+  bind fakes, and the check after a call that receives the struct, spec §7) as built or not built,
+  with reasons (a) to (c) as for arm R. The generator must pass the conformance cases of
+  release-1/conformance.md for every semantic it lists as built. Owner's decision (2026-10-21): arm
+  R has no generator. Arm C exists so that the report can say which of Vulcan's advantages a
+  generator would also deliver.
 - **Arm C's contracts.** In milestone 4, before the freeze, the Go developer writes every contract
   of the frozen Vulcan application as a checked comment in arm C's labelling copy. In milestone
   0.5, after labelling, the Go developer writes there every contract that the paper labels rely on
@@ -105,23 +109,24 @@ transcripts until the runs end. These roles are mandatory, filled by people othe
 | Go developer | Reviews milestone 0.5's Go service; builds the Go version of Stockroom; writes the coverage map; builds arm R and arm C's generator, and writes arm C's contracts; for milestone 4, revises the coverage map, the configuration file, and arm C's contracts for Stockroom within 10 working days; writes the rule document and the review checklist; parity review; the person-checked acceptance criteria; signs the exit gates of milestones 1 and 2 | Up to 80 working days over the project, at least 2.5 days a week during milestone 0.5 |
 | Rule writer | Has not read the spec. Writes the hidden rules from a functional brief (section 5). A different person for each rule set (milestone 0.5, milestone 4, and a re-run under row 3). Holds no other role. | 1 to 2 days per rule set |
 | Task writer | Writes all task briefs and the FAQ from the sealed rules; tags targets; keeps the private store | 3 days per milestone |
-| Grader | Writes seeded cases, hidden and holdout tests, grading scripts, and a reference solution that keeps every rule, for each task and arm; labels rules | 10 days per milestone |
-| Blind grader | Judges, from the diff and the rule list, the rules that no hidden test can observe and every final change that does not build (section 7). Does not see run logs, arm names, or other judgments. Not the grader. | About 2 days per milestone |
+| Grader | Writes seeded cases, hidden and holdout tests, grading scripts, and a reference solution that keeps every rule, for each task and arm; labels rules; checks acceptance criterion D5 on the Go version | 15 days per milestone |
+| Blind grader | Judges, from the diff and the rule list, the rules that no hidden test can observe and every final change that does not build (section 7). Sees the diff, so the language is visible, but not run logs, other judgments, or which Go arm a diff comes from. Not the grader, the Go developer, or the run adjudicator. | About 2 days per milestone |
 | Analyst | Writes the analysis script and the frozen sizing simulation, before the freeze. Not the grader. | 5 days |
 | Run adjudicator | Exclusions, toolchain bugs, gap calls, coverage-map review, the equivalence of seeded cases across arms, arm C's contract check, replacements, milestone start dates, exit-gate and overrun signatures | 4 days per milestone |
-| Operator | Runs the harness during runs, under the operator's own model account, and stores the logs in the private store; answers agents only from the sealed FAQ | Present during runs: about 1 week in milestone 0.5, 3 weeks in milestone 4 |
-| Reviewer | Reviews and times each change submitted for review, against the sealed checklist; judges every Vulcan diagnostic in the run logs (X8). Sees the task brief of the change, and nothing else of the hidden material. Blind to which Go arm a change comes from in milestone 0.5. The role may be held by two people, each assigned changes at random within each arm. | About 15 minutes per review: about 180 hours in total at the designs of section 9 |
+| Operator | Runs the harness during runs, under the operator's own model account, and stores the logs in the private store; answers agents only from the sealed FAQ, which may point a Vulcan agent to a section of the primer | Present during runs: about 2 weeks in milestone 0.5, 4 weeks in milestone 4 |
+| Reviewer | Reviews and times each change submitted for review, against the sealed checklist; judges every Vulcan diagnostic in the run logs (X8). Sees the task brief of the change, and nothing else of the hidden material. Blind to which Go arm a change comes from in milestone 0.5. In milestone 4 the role is held by two people, each assigned changes at random within each arm. | About 15 minutes per review: about 180 hours in total at the designs of section 9 |
 | Second reviewer | Re-reviews a random 30% sample of accepted and of rejected changes from each arm, and re-judges a random 30% sample of X8 calls; reports agreement with the reviewer. Same blinding as the reviewer. | About 55 hours |
 
 Holding several roles: the rule writer, the reviewer, and the second reviewer hold no other role;
-the Go developer is neither the grader nor the run adjudicator; the grader is neither the run
-adjudicator, the analyst, nor the blind grader. Thus the evaluation needs **at least six people
-besides the owner** (rule writer, reviewer, second reviewer, Go developer, grader, run
-adjudicator), and another rule writer for each later rule set. **If a role is empty when the files
-are sealed, the evaluation does not run** (row 1 of section 10). Each person commits to their
-estimated load while recruiting, and again at the sizing gate (section 9). A person who leaves is
-replaced by someone the run adjudicator approves, who has not seen material that the role must not
-see; a rule writer cannot be replaced after the rules exist. The report names the holder of each
+the Go developer is neither the grader, the run adjudicator, nor the blind grader; the grader is
+neither the run adjudicator, the analyst, nor the blind grader; the blind grader is not the run
+adjudicator. Thus the evaluation needs **at least seven people besides the owner** (rule writer,
+reviewer, second reviewer, Go developer, grader, run adjudicator, blind grader), a second reviewer
+person in milestone 4, and another rule writer for each later rule set. **If a role is empty when
+the files are sealed, the evaluation does not run** (row 1 of section 10). Each person commits to
+their estimated load while recruiting, and again at the sizing gate (section 9). A person who leaves
+is replaced by someone the run adjudicator approves, who has not seen material that the role must
+not see; a rule writer cannot be replaced after the rules exist. The report names the holder of each
 role.
 
 ### 4. Tasks
@@ -133,7 +138,8 @@ role.
 - **Targets, preregistered and binding:** the task writer tags each tempting task with the hidden
   rules it targets. In milestone 4, **every** tempting task targets at least one rule of U\*, and
   at least one rule of S where the rules allow. In milestone 0.5, **every** tempting task targets
-  at least one rule of S, and at least one rule of U\* where the rules allow. A tempting change
+  at least one rule of S, and **at least 8** of the 12 also target a rule of U\*. If the rules do
+  not allow 8, gate 2 of section 13 does not pass. A tempting change
   has a brief that is easiest to meet by breaking a targeted rule.
 - **Reference solutions:** the grader writes, for each task and arm, a solution that keeps every
   hidden rule and passes the acceptance tests. A task without one in every arm is replaced before
@@ -161,6 +167,9 @@ role.
     and the rule is moved out of U and reported. Arm R is not patched. Thus U\* holds only rules
     that static analysis cannot decide or that need runtime checks, and that the generator does
     not cover.
+  - **Generator gap:** a rule of U that arm C misses only because a contract semantic was not
+    built within the generator's cap (reason (c) in the coverage map). The run adjudicator decides;
+    the rule is moved out of U\* and reported.
   - **G** (enforced by R, not V) and **N** (neither) are reported.
 - **Contract rules:** a rule of U is a contract rule when V rejects its seeded cases through a
   contract (spec §7). The grader records which.
@@ -169,8 +178,9 @@ role.
   with it.
 - **Integrity check:** immediately before and after the runs, the operator re-runs every seeded
   case on the frozen toolchain. Each must give the same result as at labelling.
-- **Too few rules:** in milestone 4, if U\* holds fewer than 4 rules after labelling, Q2 is
-  inconclusive and the outcome is recorded without runs.
+- **Too few rules:** in milestone 4, if U\* holds fewer than 4 rules after labelling, no rule needs
+  the language, and the outcome is recorded without runs: row 4 of section 10 if its conditions
+  hold, otherwise **stop, not judged**.
 
 ### 6. Order and runs
 
@@ -198,12 +208,13 @@ role.
 
 | # | Measurement | Definition |
 |---|---|---|
-| X1 | Task success | A run ends in an accepted change: the acceptance tests and review pass |
+| X1 | Task success | A run ends in an accepted change: the acceptance tests and review pass. Reported |
+| X1c | Clean success | A run ends in an accepted change that keeps every hidden rule its task targets, as the grader's tests and the blind grader find. On an ordinary task, the same as X1. Used by N0 and N1 in every arm |
 | X2 | Violations | The number of hidden-rule violations in the run's final change: the change submitted for review, or, if none was, the workspace when the budget ran out. By set. A final change that does not build is judged by the blind grader from its diff, in every arm alike |
 | X3 | Violations at merge | The same, in accepted changes only |
-| X4 | Working time | Agent active time plus the reviewer's minutes; queue time excluded. A failed run counts as the full budget |
+| X4 | Working time | Agent active time plus the reviewer's minutes, up to the first clean accepted change; queue time excluded. A run without a clean success counts as the full budget |
 | X5 | Review time | The reviewer's minutes per review |
-| X6 | Escaped defects | Failures of a holdout set of hidden tests in the run's final change, for every run. A final change that does not build fails every holdout test |
+| X6 | Escaped defects | Failures of a holdout set of hidden tests, per accepted change |
 | X7 | Workarounds | Exemptions and allow-list entries in final changes (allowed only where a brief asks) |
 | X8 | False positives | Vulcan diagnostics in the run logs that the reviewer judges wrong, per run |
 | X9 | Agent cost | Tokens in and out, and check-command runs |
@@ -233,18 +244,22 @@ The report gives, for each arm, the number of runs whose final change does not b
 - **Q1 passes** (milestone 0.5) when P1(R better than P) on S passes.
 - **Q2 passes** (milestone 4) when P1(V better than R) on U\* passes.
 - **Non-inferiority bounds, V against R (milestone 4):**
-  - **N0. Task success (X1):** the bound of (R minus V) is at most **12 percentage points**. N0 is
+  - **N0. Clean success (X1c):** the bound of (R minus V) is at most **12 percentage points**. N0 is
     computed with the reviewer's verdicts, and again with each verdict that the second reviewer
     disputed replaced by the second reviewer's; a reversed rejection counts as acceptance at the
-    first disputed submission, with the time up to that point. N0 passes only if both pass.
+    first disputed submission, with the time up to that point, and a reversed acceptance counts as
+    a run without a success, at the full budget. N0 passes only if both pass. If the two reviewers
+    disagree on more than 20% of the sampled verdicts, N0 is inconclusive.
   - **N1. Working time (X4):** the bound of the per-task log ratio V/R is at most log **1.15**. It
     is computed with and without the reviewer's minutes; N1 passes only if both pass.
-  - **N2. Escaped defects (X6):** the bound of (V minus R) is at most 0.1 per run.
+  - **N2. Escaped defects (X6):** over the tasks where both arms have an accepted change, the bound
+    of (V minus R) of the mean failures per accepted change is at most 0.1.
   - **N3. False positives (X8):** the bound of the per-task share of V's runs with a false positive
     is at most 0.1, computed with the reviewer's calls and again with the second reviewer's calls
     where they differ; N3 passes only if both pass.
   - **N4. Runtime overhead (X11):** ten alternating benchmark runs of each arm; the one-sided 95%
-    bound (permutation over runs) of V's p99 latency is at most 1.10 times R's, and of V's
+    bound (a permutation over runs, the one bound that is not a t-bound over tasks) of V's p99
+    latency is at most 1.10 times R's, and of V's
     throughput at least 0.90 times R's.
   - **N5. Check latency:** the targets of section 12.
 - **Reported, not tested:** violations on untargeted tasks, by set (the estimate of practical
@@ -252,40 +267,57 @@ The report gives, for each arm, the number of runs whose final change does not b
 
 ### 9. Sizing
 
-**Before recruiting** (done): `experiments/sizing/sizing.py` simulates both milestones under the
-scenarios below, with the bounds of section 8 and the parameters listed in it (task heterogeneity
-CV 1.0, run time spread 0.5, a failed run costs three times the median, base success 0.7, defects
-0.1 per run, Vulcan false positives in 2% of runs). Its results, in
-`experiments/sizing/results.md`, fix the designs:
+**Before recruiting** (done): `experiments/sizing/sizing.py` simulates both milestones with the
+tests and bounds of section 8, clean success for N0 and N1, escaped defects per accepted change,
+and the parameters listed in its docstring (task heterogeneity CV 1.0, run time spread 0.5, a run
+without a clean success costs three times the median, base success 0.7, a small task × arm
+interaction, defects 0.1 per accepted change, Vulcan false positives in 2% of runs). Its results
+are in `experiments/sizing/results.md`. It does not model reviewer disagreement, N4, or N5, each of
+which would lower P(Continue) somewhat.
 
-- **Milestone 0.5:** 16 tasks, 12 tempting, 5 runs per task and arm. P(Q1 passes \| L) is about
-  0.94 with every tempting task targeting S.
-- **Milestone 4:** at the margins of section 8 (12 points, 1.15), 28 tasks with 21 tempting at 10
-  runs gives P(Continue \| L) about 0.85 (0.82 if R's rate is 0.2), with P(Continue \| Z) and
-  P(Continue \| L+cost) at about 0. At the earlier margins (10 points, 1.10), no design up to 32
-  tasks and 10 runs reaches 0.8, so those margins were dropped. There is no widening.
-
-| Scenario | Violations per run on targeted tasks (R, V) | V against R: success, time |
+| Scenario | Violations per run on targeted tasks (R, V) | V against R |
 |---|---|---|
 | Z: no effect | r, r | equal |
 | L: large effect | r, r/8 | equal |
-| L+cost: large effect, real cost | r, r/8 | 15 points lower, 20% slower |
+| L+coupled | r, r/8 | a tempted V run (as often as R violates) is 1.3 times slower and fails 5 points more |
+| L+inter | r, r/8 | task × arm interaction sd 0.10 (success) and 0.20 (log time) |
+| L+half | r, r/8 | a net cost of half the margins: clean success 6 points lower, 7% slower |
+| L+cost | r, r/8 | a net cost of 15 points and 20% |
 
-Here r is 0.4 before recruiting, and at the sizing gate the lower of 0.4 and R's measured U\* rate
-on targeted tasks in milestone 0.5.
+Net costs are stated against R's clean success, so they are costs in the quantity that N0 and N1
+measure. Here r is 0.4 before recruiting, and at the sizing gate the lower of 0.4 and R's measured
+U\* rate on targeted tasks in milestone 0.5. Results before recruiting:
 
-**Sizing gate (end of milestone 0.5).** The analyst runs the frozen simulation again with the task
-heterogeneity measured in milestone 0.5 (CV at least 1.0), its run time spread (at least 0.5), and
-r as above. It chooses the smallest design among 24, 28, and 32 tasks (three quarters tempting) and
-8 or 10 runs that gives P(Continue \| Z) ≤ 0.05, P(Continue \| L) ≥ 0.8, and
-P(Continue \| L+cost) ≤ 0.2. If none does, the project ends as **stop, not judged**, before any
-compiler work. The report publishes every probability, with P(Stop \| L) and P(Pivot \| L).
+- **Milestone 0.5:** 16 tasks, 12 tempting, 5 runs per task and arm: P(Q1 passes \| L) about 0.93.
+  Gate 2's rate test with 8 tasks targeting U\*: a true rate of 0.4 passes 91% of the time, a true
+  rate of 0.1 passes 9%.
+- **Milestone 4:** at 28 tasks (21 tempting) × 10 runs, P(Continue) is about 0.86 to 0.89 under L,
+  0.84 to 0.88 under L+coupled, 0.84 to 0.86 under L+inter, about 0.2 under L+half, and 0 under Z
+  and L+cost, for r of 0.4 and 0.2.
+
+**Accepted limit:** a language with a real net cost of half the margins continues only about one
+time in five. The margins are the costs the owner accepts, and a bound must exclude them; a smaller
+real cost cannot be told apart from one at the margin at this size.
+
+**Sizing gate (end of milestone 0.5).** The analyst runs the frozen simulation (at least 2,000
+simulations per chosen cell) with r as above, the task heterogeneity measured in milestone 0.5 (the
+coefficient of variation of R's and P's per-task rates on targeted tasks, by the method of moments
+with the Poisson part removed, at least 1.0), and the run time spread (the pooled within-task
+standard deviation of log working time of clean runs, at least 0.5). It chooses, among 24, 28, and
+32 tasks (three quarters tempting) and 8 or 10 runs, the design with the fewest total runs (fewer
+tasks on a tie) that gives P(Continue \| Z) ≤ 0.05; P(Continue) ≥ 0.8 under each of L, L+coupled,
+and L+inter; and P(Continue \| L+cost) ≤ 0.2. If none does, the project ends as **stop, not
+judged**, before any compiler work. The report publishes every probability, including those under
+L+half, and P(Stop \| L) and P(Pivot \| L).
 
 **Re-commitment.** The simulation also gives the volunteer hours of each role and the tokens at the
 chosen design. The sizing gate passes only when each role holder commits in writing to the sized
 load, and the budget is committed. Milestone 4's time box is 8 weeks times the ratio of the sized
 number of runs to 560 (28 tasks × 10 runs × 2 arms), rounded up to whole weeks, and never less
 than 8 weeks.
+
+**Model change.** Milestone 4 uses the model version of milestone 0.5 if it is still available. If
+not, arm P runs in milestone 4 as well, Q1 is tested again there, and row 4 uses that result.
 
 ### 10. The decision rule (milestone 4)
 
@@ -295,9 +327,10 @@ Apply the rows in order. The first row that matches decides.
 |---|---|---|
 | 1 | A role is empty, the recruiting deadline passed, the budget would be exceeded, the sizing gate failed, the integrity check failed, or the evaluation ended inconclusive under section 6 | **Stop: not judged.** |
 | 2 | Q2 passes, and N0 to N5 pass | **Continue the language.** |
-| 3 | Q2 passes, N0 and N1 pass, and a bound of N2 to N5 fails | **Narrow, as a hold.** A new decision changes or drops the feature behind the failing bound. Then milestone 4 runs once more, at the sized design, with a committed budget and a time box equal to milestone 4's, a new rule writer recruited for it, new rules, and new tasks. Its result is decided by rows 1 to 5 again, except that row 3 then counts as row 5. Milestone 5 and new features wait. |
-| 4 | Q1 passed in milestone 0.5, and R's success and working time were within the margins of P's there, as point estimates | **Pivot to the rules.** Continue as a Go tool: arm R's analyzers, plus arm C's generator when Q2 would pass on U (with UC included). |
-| 5 | Any other result | **Stop** when Q2's half-bound shows that V keeps more than half of R's U\* violations; otherwise **stop, not judged**. |
+| 3 | Q2 passes, N0 and N1 pass, and a bound of N2 to N5 fails | **Narrow, as a hold.** A new decision changes or drops the feature behind the failing bound. Then milestone 4 runs once more, at the sized design, with a committed budget and a time box equal to milestone 4's, a new rule writer recruited for it, new rules, and new tasks. Its result is decided by rows 1 to 6 again, except that row 3 then counts as row 6. Milestone 5 and new features wait. |
+| 4 | Q1 passed in milestone 0.5, and R's clean success and working time were within the margins of P's there (at most 12 points lower, at most 1.15 times slower), as point estimates | **Pivot to the rules.** Continue as a Go tool: arm R's analyzers, plus arm C's generator when Q2 would pass on U (with UC included). |
+| 5 | Q2 passes, and N0 or N1 fails on its bound (not by being inconclusive) | **Stop: the language costs too much.** |
+| 6 | Any other result | **Stop** when Q2's half-bound shows that V keeps more than half of R's U\* violations; otherwise **stop, not judged**. |
 
 Every result matches exactly one row. Row 4 uses point estimates, not bounds, because a pivot
 keeps Go and commits to no new language; rows 2 and 3 commit to a language and need bounds.
@@ -312,8 +345,8 @@ keeps Go and commits to no new language; rows 2 and 3 commit to a language and n
 - **Outside timestamp:** the commit of the hashes gets a signed tag pushed to a third party, and the
   hashes are published where the owner cannot change them later.
 - **Workspaces:** each run gets a fresh workspace with only its arm's application and documents.
-- **Release:** after milestone 4, the sealed contents are copied into `experiments/m0.5/` and
-  `experiments/m4/`, and checked against the hashes.
+- **Release:** when the project ends, or after milestone 4, the sealed contents are copied into
+  `experiments/m0.5/` and `experiments/m4/`, and checked against the hashes.
 
 ### 12. Latency targets (for decision 4)
 
@@ -352,7 +385,8 @@ The gates, in order:
   tasks. If U\* holds at least **8 rules**, they show at least **5 violations**, and R's U\*
   violation rate on the tasks that target U\* is at least **0.2 per run** (the lower rate that
   section 9 sizes for), go to gate 3, whatever Q1 shows: a language may be needed even if the
-  statically checkable rules did not matter.
+  statically checkable rules did not matter. Section 9 publishes this test's false-pass and
+  false-fail rates.
 - **Gate 1 (do the rules help?):** otherwise, if Q1 passes, **pivot to the rules** (arm R's
   analyzers, plus arm C's generator for the rules of UC), when R's success and working time are
   within the margins of P's as point estimates; if they are not, **stop**. If Q1 fails and its
@@ -360,6 +394,15 @@ The gates, in order:
   does not change outcomes. If Q1 fails in any other way, or is inconclusive, **stop, not judged**.
 - **Gate 3 (can milestone 4 answer?):** the sizing gate of section 9, with re-commitment.
 - Otherwise continue to milestone 1.
+
+**Cost pilot (end of milestone 2).** Before milestone 3, the agents' cost in Vulcan is checked
+cheaply: 8 ordinary tasks on a small application, written by the task writer and sealed apart from
+milestone 4's material, 5 runs each in arms V and R. If V's clean success is more than 12 points
+below R's, or V is more than 1.15 times slower, as point estimates, milestone 2 re-plans once (a
+note in `docs/status.md`, signed by the run adjudicator), and the pilot runs again with 8 new
+tasks. If it fails again, the project ends by row 4 of section 10 if its conditions hold, and
+otherwise as **stop: the language costs too much**.
+
 
 ### 14. Records
 
@@ -388,4 +431,7 @@ every number.
 | Audit 8, H2 | Non-building final changes are judged by a blind grader for X2, fail every holdout test for X6, and are counted per arm. |
 | Audit 8, H3 | The second reviewer samples accepted and rejected changes and X8 calls; N0, N1, and N3 must hold under both reviewers' judgments and without reviewer minutes; reversal defined. |
 | Audit 8, H4 | The owner builds milestone 0.5's service; the Go developer commits at least 2.5 days a week; the plan's box follows. |
+| Audit 9, B1 | N0 and N1 use clean success (X1c): an accepted change that keeps its targeted rules, in every arm; time runs to the first clean change. The sizing check ran again with coupled-cost, interaction, and net-cost scenarios; 28 × 10 still passes L, L+coupled, and L+inter at about 0.84 or more. |
+| Audit 9, H1 to H5 | The sizing gate also requires L+coupled and L+inter, and publishes L+half as an accepted limit; a cost pilot at the end of milestone 2; X6 per accepted change; 8 U\*-targeting tasks in milestone 0.5 and published error rates for gate 2; a generator-gap rule and conformance cases for arm C. |
+| Audit 9, M1 to M7, Lows | Exact sign-flip in the sizing check up to 16 tasks, and its limits stated; loads and boxes; seven people and the blind grader's separations; a "costs too much" row; the model-change rule; reversed acceptances and a disagreement limit; the milestone-3 retry and D5 checker; defined margins of P's, N4's exception, design order, estimators, release when the project ends, the FAQ pointer. |
 | Audit 8, M1 to M9 | The grader is neither adjudicator, analyst, nor blind grader; the Go developer builds Go Stockroom; bounds are t-bounds over all tasks, and the half-bound is defined; a named blind grader; the second reviewer's blinding; U\* ≥ 8 at milestone 0.5; row 5 says "stop" only when the half-bound rules out the effect; gate 2 counts X2. Arm P runs only in milestone 0.5, and row 4 uses its result, which cuts milestone 4 to two arms. |

@@ -2,7 +2,7 @@
 
 Status: proposed, 2026-10-21. The owner accepts it only if it survives an antagonistic audit.
 [Audit 3](../experiments/audit-3.md) (not independent) and the independent audits
-[4](../experiments/audit-4.md) to [8](../experiments/audit-8.md) found blockers. This version
+[4](../experiments/audit-4.md) to [9](../experiments/audit-9.md) found blockers. This version
 applies their amendments and waits for the next independent audit.
 
 ## Objective
@@ -37,7 +37,9 @@ milestone 0.5):
   costs too much in task success or time. Continue as a Go tool (analyzers, plus a contract
   generator where it helps), not as a language.
 - **Stop:** a bound shows that the tested enforcement keeps more than half of the violations it
-  should remove. Then enforcing the rules does not change outcomes enough to matter.
+  should remove, so enforcing the rules does not change outcomes enough to matter; or the rules
+  help but cost too much (in milestone 0.5, the analyzers against plain Go; in milestone 2's cost
+  pilot or milestone 4, the language against the analyzers).
 - **Stop, not judged:** the independent roles were not filled in time, the budget would be
   exceeded, the evaluation cannot reach a useful power, the integrity check of the seeded cases
   failed, or the evaluation could not finish or gave no clear answer. Any result that matches no
@@ -82,12 +84,15 @@ box **no longer than the original box**, starting on the date of the note. If th
 the new box, the project ends as **stopped by schedule**. The run adjudicator of decision 6 signs
 each overrun and each new box.
 
+The next milestone's box starts on the day the previous gate is signed, or 4 weeks later at the
+latest, so that time between milestones counts.
+
 The compiler milestones (1 to 3) are large for one person. "Stopped by schedule" is a likely
 outcome, and an honest one.
 
 | Milestone | Box |
 |---|---|
-| 0.5 Rules without a compiler | 16 weeks, from the day the roles are filled, with the Go developer at least 2.5 days a week |
+| 0.5 Rules without a compiler | 24 weeks, from the day the roles are filled, with the Go developer at least 2.5 days a week |
 | 1 Vertical slice | 6 weeks |
 | 2 Guarantees | 10 weeks |
 | 3 Application | 8 weeks |
@@ -123,7 +128,8 @@ protocol:
   its 15-day cap.
 - A rule writer who has not read the spec writes the hidden rules. The grader labels them, using
   the release-1 diagnostics and contracts that Vulcan would apply.
-- Run arm R against arm P: 16 tasks, 12 of them tempting, 5 runs each (decision 6, section 9).
+- Run arm R against arm P: 16 tasks, 12 of them tempting (8 of those also targeting the rules
+  that need more than Go tools), 5 runs each (decision 6, section 9).
 
 Exit gate, in this order, signed by the run adjudicator (decision 6, section 13):
 
@@ -178,7 +184,9 @@ Exit gate: every case of `docs/release-1/conformance.md` passes, or is marked as
 its K0009 or "Unchecked paths" entry. A script lists both. At most 5% of the cases may be holes;
 each hole in a construct that release 1 supports needs the run adjudicator's signature, and every
 hole is listed in the milestone-4 report. The Go developer checks the list against spec §5.4d and
-§7 and signs it.
+§7 and signs it. Then the **cost pilot** of decision 6, section 13 runs: 8 ordinary tasks, Vulcan
+against the analyzers. If the agents' cost in Vulcan exceeds the margins twice, the project pivots
+or stops there, before the application is built.
 
 ## Milestone 3: build and operate a substantive application
 
@@ -192,7 +200,10 @@ that apply to it (V1 to V4 are for Vulcan only). Then a **fresh agent session**,
 repository and its README and no contact with the owner, builds and runs each version, finds the
 cause of one fault that the grader of decision 6 injects (named in a sealed file), and makes one
 small change that the grader specifies. The run adjudicator compares the result with the sealed
-file and signs the gate. The transcript is kept in `experiments/m3/`.
+file and signs the gate. If the fresh agent fails, the owner may fix the documentation once, and a
+new fresh agent tries again with a new sealed fault; a second failure fails the gate. The grader,
+not the Go developer, checks acceptance criterion D5 on the Go version. The transcripts are kept in
+`experiments/m3/`.
 
 ## Milestone 4: evaluate development and maintenance
 
@@ -239,8 +250,9 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 4](../experiments/audit-4.md) | B1 to B4, H1 to H7, M1 to M10, L1 to L6 | Answered by decision 6 as amended through audit 6, this plan, and the release-1 files, except: L2 (H-C mapping) partly; L5 (one model) stated as a limit |
 | [Audit 5](../experiments/audit-5.md) | B1, B2, H1 to H4, M1 to M6, Lows | Answered through audit 6's amendments |
 | [Audit 6](../experiments/audit-6.md) | B1, B2, H1 to H7, M1 to M11, L1 to L8 | Decision 6, amendments for audit 6; this plan (recruiting, budgets, boxes, gates, milestone 1 design, milestone 2 hole cap, milestone 5 entry) |
-| [Audit 8](../experiments/audit-8.md) | B1, H1 to H4, M1 to M9, L1 to L7 | Decision 6, amendments for audit 8, and a sizing check run before recruiting (`experiments/sizing/`); this plan (objective, outcome wording, fixed milestone-0.5 design, its box and builder, re-plan dates, the Go version of Stockroom, two arms in milestone 4) |
 | [Audit 7](../experiments/audit-7.md) | B1, B2, H1 to H6, M1 to M10, L1 to L12 | Decision 6, amendments for audit 7; this plan (gate order of milestone 0.5, outcome wording, scaled milestone-4 box, signed start dates). M11 (compiler scope) is accepted as a risk: "stopped by schedule" is a likely outcome, and the plan says so in "Recruiting, budget, and time boxes" |
+| [Audit 8](../experiments/audit-8.md) | B1, H1 to H4, M1 to M9, L1 to L7 | Decision 6, amendments for audit 8, and a sizing check run before recruiting (`experiments/sizing/`); this plan (objective, outcome wording, fixed milestone-0.5 design, its box and builder, re-plan dates, the Go version of Stockroom, two arms in milestone 4) |
+| [Audit 9](../experiments/audit-9.md) | B1, H1 to H5, M1 to M7, L1 to L11 | Decision 6, amendments for audit 9: clean success for N0 and N1, a re-run sizing check with coupled-cost, interaction, and net-cost scenarios, a cost pilot after milestone 2; this plan (outcome wording, milestone 0.5's box, the time between milestones, the cost pilot, the milestone-3 retry) |
 
 ## Next deliverable
 

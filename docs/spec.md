@@ -1501,7 +1501,8 @@ func (a *Account) Deposit(f *os.File, x int) (err error)
 How the compiler checks contracts:
 
 - **Where.** A function checks its `requires` at entry and its `ensures` at each return. The
-  compiler can remove a check at a call site where it proves the contract.
+  compiler can remove a check at a call site where it proves the contract (not in release 1, which
+  runs every check).
 - **Statically**, when the proof rule of §7.1 proves or disproves a contract.
 - **At runtime** in every build, including release builds. Contracts cannot be turned off. A contract
   that fails at runtime panics with a `*vulcan.ContractFailure` (Appendix C), which reports the

@@ -103,7 +103,7 @@ The Vulcan version passes all 32 criteria, and the Go version the 28 that apply 
 clean checkout, with documented commands. Then a fresh agent session checks each version as the
 development plan, milestone 3 describes. Three criteria need a person: D5 (each guard cannot
 overflow), V1 (the reasons for exemptions), and V2 (each K0525 warning reviewed). The Go developer
-of decision 6 checks them, not the author.
+of decision 6 checks them, not the author; on the Go version, the grader checks D5.
 
 ## Out of scope
 
