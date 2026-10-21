@@ -1,5 +1,9 @@
 # Decision 3: contract failure and external effects
 
+> Written before [decision 5](0005-names-and-reproducibility.md) renamed the language's
+> artifacts. Here, `keel` means `vulcan` and `.keel` means `.vulcan`, except in paths of the
+> test 3 experiment (`base-keel`, `work/keel`), which keep their names.
+
 Status: accepted, 2026-10-20 (option C; `on_contract_failure` defaults to `panic`). Applied in
 spec §5.5.0, §5.5.1, §5.5.3, §6, §7.4, §10, Appendices B, C, and E, and the primer. Milestone 0, item 3 of the
 [development plan](../development-plan.md). Answers [audit 2](../../experiments/audit-2.md), H1

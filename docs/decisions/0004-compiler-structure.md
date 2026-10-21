@@ -1,5 +1,9 @@
 # Decision 4: compiler structure
 
+> Written before [decision 5](0005-names-and-reproducibility.md) renamed the language's
+> artifacts. Here, `keel` means `vulcan` and `.keel` means `.vulcan`, except in paths of the
+> test 3 experiment (`base-keel`, `work/keel`), which keep their names.
+
 Status: accepted, 2026-10-20 (option B). Applied in spec §10, §11, §11.1, §11.2, and
 Appendix B.1. Milestone 0, item 4 of the
 [development plan](../development-plan.md). Answers [audit 2](../../experiments/audit-2.md), H11.

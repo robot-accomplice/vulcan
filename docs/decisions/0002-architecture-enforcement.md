@@ -1,5 +1,9 @@
 # Decision 2: architecture enforcement
 
+> Written before [decision 5](0005-names-and-reproducibility.md) renamed the language's
+> artifacts. Here, `keel` means `vulcan` and `.keel` means `.vulcan`, except in paths of the
+> test 3 experiment (`base-keel`, `work/keel`), which keep their names.
+
 Status: accepted, 2026-10-20 (option C). Applied in spec §5.4 rule 13, §5.4d, Appendices B, D,
 and E, the primer, and the README. §5.4d numbers the paths 1 to 8: path 7 here (`linkname`)
 became rule 13, so paths 8 and 9 here are paths 7 and 8 there. Milestone 0, item 2 of the

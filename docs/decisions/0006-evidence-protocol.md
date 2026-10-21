@@ -1,256 +1,290 @@
 # Decision 6: evidence protocol
 
-Status: accepted, 2026-10-21 (option B). Amended the same day by
-[audit 3](../../experiments/audit-3.md), amendments A1 to A3, A5, and A6 (see "Amendments" at
-the end). Applied in the development plan (milestones 0.5, 2, and 4), spec §1.1, and
-`docs/status.md`. Milestone 0, item 6 of the [development plan](../development-plan.md). Answers
-[audit 2](../../experiments/audit-2.md), H10, and gives decision 4 its latency target.
+Status: accepted, 2026-10-21 (option B). Amended twice on the same day: by
+[audit 3](../../experiments/audit-3.md) (A1 to A3, A5, A6) and by
+[audit 4](../../experiments/audit-4.md), an independent audit (B1 to B4, H1, H2, H4, H6). See
+"Amendments" at the end. Milestone 0, item 6 of the [development plan](../development-plan.md).
+Answers [audit 2](../../experiments/audit-2.md), H10, and gives decision 4 its latency target.
 
 ## Question
 
-How does milestone 4 decide whether Vulcan earns continued work? Which tasks, which
-measurements, and which thresholds, fixed before any result exists? What latency must the
-compiler meet (decision 4, rule 4)?
+How does the project decide whether Vulcan earns continued work as a language? Which tasks,
+measurements, statistics, roles, and thresholds, fixed before any result exists? What latency must
+the compiler meet (decision 4, rule 4)?
 
 ## Current state
 
 - Spec §1.1 states three hypotheses. Vulcan takes architecture rules out of review (H-A). It
   rejects rule-breaking changes before review (H-B). It does not make a thorough reviewer read
   less, and it does not reduce logic defects that no rule covers (H-C).
-- The development plan, milestone 4, names the task kinds, the records, and the exit gate:
-  continue, narrow, stop or pivot, or inconclusive.
-- Earlier experiments: experiments 1 and 2 lost their data. Test 3 had one writer for each
-  language, no compiler, and no finished grading. Audit 2 (H10) found that this cannot support
-  the premise.
+- Experiments 1 and 2 lost their data. Test 3 had one writer for each language, no compiler, and
+  no finished grading. Audit 2 (H10) found that this cannot support the premise.
 
 ## Lessons from test 3
 
-- **Hidden rules work.** The writers did not see `hidden/rules.md`, so the test measured what a
-  writer does without being told. Keep this.
-- **A model checker is not a compiler.** The round-1 "check" was a model reading the spec. It
-  found ambiguities, not facts. Milestone 4 uses only the real compiler.
+- **Hidden rules work.** The writers did not see the rules, so the test measured what a writer
+  does without being told. Keep this, but keep the rules out of the agents' reach (section 11).
+- **A model checker is not a compiler.** Milestone 4 uses only the real compiler.
 - **One run says nothing about variation.** The protocol needs several runs of each task.
-- **Grading must be scripted where it can be.** A script that runs the same HTTP tests and rule
-  checks on every arm does not depend on someone finding the time.
+- **Grading must be scripted where it can be.**
 
 ## Options
 
-**A. A demonstration.** Build the application, do a few changes, and judge. Cheap, and enough to
-show feasibility. It cannot support a comparison, and it repeats the weakness of test 3.
+**A. A demonstration.** Cheap, and enough to show feasibility. It cannot support a comparison.
 
-**B. A preregistered comparison (chosen).** Fix the tasks, measurements, thresholds, sample size,
-roles, and analysis in this decision, commit them before the first run, and report every run.
+**B. A preregistered comparison (chosen).** Fix the tasks, measurements, statistics, roles, and
+decision rule here, seal them before the first run, and report every run.
 
-**C. An external study.** Ask an outside group to run B. More credible, but slow and costly
-before the language has users. B can be repeated externally later with the same files.
+**C. An external study.** More credible, but slow and costly before the language has users. B
+can be repeated externally later with the same files.
 
 ## Protocol
 
-### 1. Three arms
+### 1. The question in three parts
 
-The question is not only "Vulcan or Go", but also "a language or a linter". Thus three arms:
+A language must beat its own rules delivered as a linter, or it is not worth building. Thus the
+protocol asks three questions, each a test in section 7:
 
-- **Vulcan arm:** the milestone-3 application in Vulcan, strict mode on (decision 2), with the
-  primer (`vulcan guide`) and the full spec available to the agent.
-- **Go-rules arm:** the same application in Go, with **Vulcan's rules as Go analyzers**: the
-  checks of the guarantee matrix (spec §5.4d) that need no new syntax (G1 to G7), written as
-  `golang.org/x/tools/go/analysis` analyzers and run in CI, and the contracts of the Vulcan arm
-  written as checked comments where a generator can check them. Its agent gets the rules as a
-  document of at most 4,000 tokens. This arm is also the deliverable of milestone 0.5.
-- **Go-plain arm:** the same Go code as the Go-rules arm, with the same rule document, and only a
-  dependency linter (for example `depguard`), `go vet`, and `staticcheck` in CI.
-- **The same everywhere else:** the model and its version, the agent harness, the tools, the
-  token and time budgets, the machine, and the task briefs, word for word except for the
-  language name.
+- **T1. Do the rules help?** Go with the rules against Go without them.
+- **T2. Does the language enforce rules that Go cannot?** Vulcan against Go with every rule that
+  Go can express, on the rules that only Vulcan can enforce.
+- **T3. Is the language at least as good on the rules both enforce?** Vulcan against Go with the
+  rules, on the shared rules.
 
-The two Go arms share one codebase, so the third arm costs one CI configuration, not a third
-application.
+### 2. Three arms
 
-### 2. Roles
+- **Vulcan arm (V):** the milestone-3 application in Vulcan, strict mode on (decision 2).
+- **Go-rules arm (R):** the same application in Go, with **every rule that Go code, comments, or
+  configuration can express**: the guarantee matrix G1 to G9 (spec §5.4d) as
+  `golang.org/x/tools/go/analysis` analyzers, the strict-mode checks (K0123 to K0125, K0210,
+  K0211) as analyzers, a configuration file for gateways and entry leaves, and port and struct
+  contracts as checked comments with a generator. The Go developer (section 3) signs that this
+  coverage is complete: that no rule of Vulcan that Go can express is left out.
+- **Go-plain arm (P):** the same Go code as R, with only `go vet`, `staticcheck`, and a dependency
+  linter whose configuration is sealed with a statement of what it covers.
+- **One local check command per arm.** Each arm has one command, named in every task brief, that
+  runs its checkers, builds, and runs its tests: `vulcan check && vulcan test` for V, and
+  `make check` for R and P. The agent can run it at any time, at the same cost. A change goes to
+  review only after its arm's command passes. The harness logs each run of the command.
+- **The same everywhere else:** the model and its version, the agent harness, the token and time
+  budgets, the machine, and the task briefs, word for word except for the language name. Each arm
+  gets documents of comparable size: V gets the primer and the spec; R and P get a rule document
+  and a Go guide of the same total length, which the Go developer writes or checks.
 
-No result may depend only on the judgment of someone who prefers one outcome.
+The two Go arms share one codebase.
 
-| Role | Who |
+### 3. Roles
+
+The owner builds the Vulcan arm, the compiler, and the harness, and makes **no** judgment that
+affects a result. These roles are mandatory, and each is filled by someone other than the owner:
+
+| Role | Duties |
 |---|---|
-| Owner | Builds the Vulcan arm, the compiler, and the harness. Does not judge outcomes. |
-| Go developer | A Go developer who does not work on Vulcan. Builds the Go arms, or reviews them against the acceptance criteria and signs that they are a fair baseline before the tasks are sealed. |
-| Rule writer | A person who has not read the spec. Writes the hidden rules of an order and inventory service from its acceptance criteria alone. |
-| Operator | Answers agents' questions during runs, and judges false positives (M8). Not the owner. If it must be the owner, a second person repeats each M8 judgment on a random 25% sample, and the report gives their agreement. |
-| Reviewer | Reviews accepted changes and times them (M6). Not the owner, under the same fallback as the operator. |
+| Go developer | Builds the Go version of the application, or reviews it and writes a timed list of changes that are applied before sealing. Signs the coverage of arm R. Certifies which rules Go cannot express (section 5). |
+| Rule writer | Has not read the spec. Writes the hidden rules from a functional brief (section 5). Holds no other role. |
+| Task reviewer | Reviews the task briefs and can veto any of them. Applies the filter of section 5. Labels the hidden rules with the Go developer. |
+| Run adjudicator | Decides run exclusions and whether a compiler bug blocks a run (section 6). |
+| Operator | Answers agents' questions during runs, only from an FAQ sealed before the runs. A question that the FAQ does not answer ends the run as "unanswered", for every arm alike. |
+| Reviewer | Reviews accepted changes and times them (M6). Judges false positives (M8). |
 | Second reviewer | Audits a random 30% sample for escaped defects (M7). |
 
-The report names the person in each role, and says where a fallback applied.
+One person can hold several roles, except the rule writer. **If any role is not filled when the
+files are sealed, the evaluation does not run.** The report names the person in each role.
 
-### 3. Tasks
+### 4. Tasks
 
-- **Twelve tasks**, written and committed before any run: **six tempting changes**, two new
-  features, one boundary refactor (move a responsibility between leaves), one dependency update,
-  and two failure-handling changes. A tempting change has a brief that is easiest to meet by
-  breaking an architecture rule, for example "Orders should also email the customer", where only
-  a gateway may reach the network.
-- **Hidden rules** come from the rule writer (section 2), not from the spec. The grading labels
-  each hidden rule *enforced* (a Vulcan diagnostic covers it) or *not enforced*, and reports the
-  outcomes for each label apart. Rules that only Vulcan's compiler could have suggested are not
-  allowed.
+- **Milestone 4:** fourteen tasks, written by the owner and approved by the task reviewer:
+  **eight tempting changes**, two new features, one boundary refactor, one dependency update, and
+  two failure-handling changes. A tempting change has a brief that is easiest to meet by breaking
+  an architecture rule.
 - **Follow-on tasks:** each tempting task has one follow-on task that starts from that run's
-  accepted change. The follow-on measures what a violation costs later (M14).
-- **Sealed:** the task files, the hidden rules, the analyzers of the Go-rules arm, and the linter
-  configuration of the Go-plain arm are committed with their hashes before the first run. A task
-  changes only to fix an error that makes it impossible in every arm, and the change is logged.
-- **Pilot:** two extra tasks, not among the twelve, run first to test the harness and to estimate
-  the variation. Pilot results are reported and not counted.
+  accepted change. They measure what a violation costs later (M14, reported only).
+- **Pilot:** two extra tasks, run first to test the harness and to estimate variation. Reported and
+  not counted.
 
-### 4. Runs
+### 5. Hidden rules and their labels
 
-- **Fresh state:** each run starts from the same commit of its arm, with a fresh agent context and
-  no memory of other runs.
-- **Runs per task:** at least 5 for each arm. After the pilot, the sample size is set so that the
-  primary outcomes (section 6) have 80% power to detect their threshold differences, with at most
-  10 runs per task and arm. The number is committed before the main runs.
-- **Order:** the runs of the three arms interleave, in a random order fixed by a committed seed.
-- **Human intervention:** the operator can answer an agent's question or unblock it. Each
-  intervention is logged with its time and text, and counts toward the total time.
-- **A frozen compiler.** The main runs use one tagged version of the compiler, the analyzers, and
-  the runtime. A run that a compiler bug blocks ends as a failure of the Vulcan arm. If more than
-  10% of Vulcan runs end this way, the evaluation stops; the bug is fixed under a new tag, and
-  every Vulcan run is repeated.
+- **The brief.** The rule writer gets only the functional, data-integrity, security, and resource
+  criteria of the application (F, D, S, and R in `docs/release-1/acceptance.md`) and a neutral
+  package diagram with no Vulcan terms. The rule writer gets no Vulcan document.
+- **Sealing before labels.** The rules are sealed before anyone labels them.
+- **Filter.** The task reviewer removes a rule that only someone who knows Vulcan's compiler could
+  have written, and logs each removal with its reason.
+- **Labels.** Each rule gets two labels, one for arm V and one for arm R: *enforced* (the arm's
+  checkers reject a change that breaks it) or *not enforced*. For arm V, the label comes from the
+  compiler's conformance suite; for arm R, from the analyzers. The rules then fall into four sets:
+  - **S, shared:** enforced by both V and R.
+  - **U, Vulcan-only:** enforced by V and not by R, *and* certified by the Go developer as not
+    expressible in Go code, comments, or configuration, with a written reason for each.
+  - **G, Go-only:** enforced by R and not by V. Reported.
+  - **N, neither.** Reported.
+  A rule that V enforces and R does not, but that the Go developer judges expressible in Go, is a
+  gap in arm R. Arm R is fixed before sealing.
 
-### 5. Measurements
+### 6. Runs
 
-Each measurement is defined so that a script can compute it from the logs, unless it says
-otherwise.
+- **Fresh state:** each run starts from a fresh workspace (section 11), with a fresh agent context.
+- **Runs per task:** at least 5 for each arm, at most 10. After the pilot, the number is set so
+  that each test has 80% power at its threshold, and committed before the main runs. If the cap
+  cannot reach that power, the report says so before the main runs, and the evaluation runs at the
+  cap.
+- **Order:** the runs of all arms interleave, in a random order fixed by a committed seed.
+- **A frozen toolchain.** The main runs use one tag of the compiler, the analyzers, and the runtime,
+  and record the model build of each run. A run that a compiler or analyzer bug blocks ends as a
+  failure of its arm; the run adjudicator decides. If more than 10% of an arm's runs end this way,
+  the evaluation stops, the bug is fixed under a new tag, and the whole interleaved schedule runs
+  again for every arm. This can happen once; a second time ends the evaluation as inconclusive.
+- **Exclusions:** a run counts unless its infrastructure failed (the harness, the model service, or
+  the machine), as the run adjudicator decides. Each exclusion is listed.
+
+### 7. Measurements
 
 | # | Measurement | Definition |
 |---|---|---|
-| M1 | Accepted change | The final diff passes the hidden HTTP acceptance tests, the hidden rule checks, and review |
-| M2 | Architecture violations at review | Hidden-rule violations in the diff that the agent submits for review, by label (enforced, not enforced) |
-| M3 | Architecture violations at merge | Hidden-rule violations in the accepted diff, by label |
-| M4 | Violations stopped before review | Violations that appeared in any intermediate build of a run and were gone at review, divided by all violations that appeared, by label |
-| M5 | Total time | Wall-clock time from the brief to an accepted change, including reviews, rework, and interventions |
-| M6 | Review time | Minutes that the reviewer spends on each review (human; timed) |
-| M7 | Escaped logic defects | Failures of the hidden acceptance tests after acceptance, and defects that the second reviewer finds in the 30% sample |
-| M8 | False positives | Diagnostics that the operator judges wrong after review (human; each one logged with its reason) |
-| M9 | Workarounds | `strict_exempt`, `strict_interfaces`, `strict_shared`, `allow_*` entries, escape hatches, analyzer suppressions, and K0122 to K0125 or K0210 to K0211 suppressions that a run adds |
-| M10 | Agent cost | Tokens in and out, and compiler or analyzer calls |
-| M11 | Check latency | `vulcan check` time after a one-line edit in one leaf, and a full check, on the reference host (section 8) |
-| M12 | Runtime overhead | p50 and p99 latency and throughput of the application's benchmark, Vulcan against the Go arms |
-| M13 | Maintenance | Hours spent on the compiler, the runtime, and the analyzers during milestone 4, logged apart from application work |
-| M14 | Cost of a violation | In each follow-on task: time, rework, and escaped defects, for runs whose tempting change had a violation at merge against runs whose change had none |
+| M1 | Task success | A run ends in an accepted change: the hidden HTTP tests, the hidden rule checks, and review pass |
+| M2 | Violations at review | Hidden-rule violations in the change submitted for review, by rule set (S, U, G, N) |
+| M3 | Violations at merge | Hidden-rule violations in the accepted change, by rule set |
+| M4 | Violations stopped before review | Violations that appeared in a run of the arm's check command and were gone at review, divided by all that appeared, by rule set; defined only when at least 10 appeared in that arm |
+| M5 | Working time | Agent active time plus the reviewer's measured minutes; queue time excluded. A failed run counts as the full budget |
+| M6 | Review time | Minutes that the reviewer spends on each review |
+| M7 | Escaped logic defects | Failures of the hidden HTTP tests after acceptance, and defects that the second reviewer finds in the 30% sample, per run |
+| M8 | False positives | Diagnostics that the reviewer judges wrong, with the reason |
+| M9 | Workarounds | Exemptions and allow-list entries that a run adds (`strict_exempt`, `strict_interfaces`, `strict_shared`, `allow_*`, analyzer exclusions) |
+| M10 | Agent cost | Tokens in and out, and check-command runs |
+| M11 | Check latency | Section 9 |
+| M12 | Runtime overhead | p50 and p99 latency and throughput of the application's benchmark |
+| M13 | Maintenance | Hours spent on the compiler, runtime, and analyzers during the evaluation |
+| M14 | Cost of a violation | In follow-on tasks: working time and escaped defects after a violating base against a clean base. Reported only |
 
-**Review.** The reviewer reviews all arms, in the randomized order. The language cannot be
-hidden, so the reviewer follows a written checklist, which is the same for every arm except for
-the items that its compiler or analyzers already guarantee.
+### 8. Statistics and thresholds
 
-### 6. Hypotheses and thresholds
+**Unit.** The task is the unit. For each task and arm, the rate of a measurement is its mean over
+that arm's runs of the task. A comparison of two arms uses the **paired per-task difference**.
 
-The analysis compares the arms task by task, and reports each result with a 95% bootstrap
-confidence interval, resampled by task. The primary outcomes use the six tempting tasks and the
-*enforced* label; the *not enforced* label is reported with the same statistics.
+**Test.** Each comparison is a one-sided **exact sign-flip permutation test** over the tasks (all
+2^k sign patterns), at α = 0.05, with a 95% interval for the mean paired difference found by
+inverting the test. With k tasks, the smallest p-value is 1/2^k, so a comparison needs at least 5
+informative tasks; the tempting tasks give 8.
 
-**Primary outcomes** (H-A and H-B):
+**Minimum evidence.** A violation comparison is decided only when its rule set holds at least
+**8 rules** (S) or **4 rules** (U), and both arms together show at least **10 violation events**
+at review. Below that, the comparison is **inconclusive**.
 
-- **P1.** Architecture violations at review (M2), per accepted change. Pass against an arm: the
-  Vulcan rate is at most half that arm's rate, and the upper bound of its interval is below that
-  arm's rate.
-- **P2.** Violations stopped before review (M4). Pass against an arm: Vulcan stops at least 90%,
-  and more than that arm.
+**Inconclusive counts as fail**, for every test and every bound. There is no extension.
 
-**Non-inferiority** (the costs, and H-C), each against both Go arms:
+**P1(X better than Y) on a rule set:** the test of "X has fewer violations at review than Y"
+passes, and the mean rate of X is at most half the mean rate of Y.
 
-- **N1.** Total time (M5). Pass: the Vulcan median is at most 1.10 times the arm's median, upper
-  interval bound included.
-- **N2.** Escaped logic defects (M7). Pass: the Vulcan rate is at most 1.10 times the arm's rate,
-  upper interval bound included. H-C predicts no difference. A Vulcan rate clearly below would be
-  a finding beyond the hypotheses, and is reported as such.
-- **N3.** False positives (M8). Pass: at most 1 per 10 accepted changes.
-- **N4.** Runtime overhead (M12). Pass: p99 latency and throughput within 10% of the Go arms.
-- **N5.** Check latency (M11). Pass: the targets of section 8.
+**P2(X):** X stops at least 90% of the violations that appeared (M4). When M4 is not defined for X
+(fewer than 10 appeared), P2 is not used, and the test relies on P1.
 
-Review time (M6), workarounds (M9), agent cost (M10), maintenance (M13), and the cost of a
-violation (M14) are reported with their intervals. They have no thresholds; they inform the
-decision to narrow, and M14 shows whether the violations that P1 counts matter.
+**The tests of section 1:**
 
-**Inconclusive results.** An interval too wide to decide a threshold allows one extension, up to
-the run cap of section 4. After it, an inconclusive **primary** outcome counts as a **fail**, and
-an inconclusive **non-inferiority** bound counts as a fail of that bound. Thus an unclear result
-never continues the project by default.
+- **T1 passes** when P1(R better than P) on S passes, and P2(R) passes where defined.
+- **T2 passes** when P1(V better than R) on U passes.
+- **T3 passes** when V is no worse than R on S: the upper bound of the interval of
+  (V rate minus R rate) is at most 0.05 violations per run.
 
-### 7. The decision rule
+**Non-inferiority bounds**, V against R, each by the same test on paired per-task differences:
 
-Applied once, after the main runs. "Passes against X" means P1 and P2 both pass against arm X.
+- **N0. Task success (M1):** V's success rate is at most 10 percentage points below R's.
+- **N1. Working time (M5):** the upper bound of the mean per-task log ratio V/R is at most log 1.10.
+- **N2. Escaped defects (M7):** the upper bound of (V minus R) is at most 0.1 defects per run.
+- **N3. False positives (M8):** at most 1 per 10 accepted changes in V.
+- **N4. Runtime overhead (M12):** p99 latency and throughput within 10% of R.
+- **N5. Check latency:** the targets of section 9.
 
-| Result | Decision |
-|---|---|
-| Vulcan passes against Go-rules, and N1 to N5 pass | **Continue the language.** The language adds more than its rules as a linter. |
-| Vulcan passes against Go-plain but not against Go-rules, and Go-rules passes against Go-plain | **Pivot to the rules.** The rules help, and Go analyzers deliver them. Continue as a Go tool, not as a language. |
-| Vulcan passes against Go-rules, but a non-inferiority bound fails, or most workarounds come from one feature | **Narrow.** Keep the features that carry the passing outcomes. Drop or redesign the others, by a new decision. |
-| Neither Vulcan nor Go-rules passes against Go-plain | **Stop.** Enforcing the rules does not change outcomes. |
-| M14 shows no cost for violations at merge, whatever P1 and P2 show | The report states that removing violations was not shown to matter. Any "continue" or "pivot" decision is then **narrowed** to what M14 and M7 support. |
+M2 on the sets G and N, and M6, M9, M10, M13, and M14 are reported with intervals and decide
+nothing.
 
-A run counts unless its infrastructure failed (the harness crashed, the model service failed, or
-the machine failed). Each excluded run is listed with its reason. Runs that fail for any other
-reason count as failures of their arm.
+### 9. Latency targets (for decision 4)
 
-### 8. Latency targets (for decision 4)
+On a CI runner of type `linux/amd64` with 8 cores and 16 GB of memory:
 
-On the reference host, a CI runner of type `linux/amd64` with 8 cores and 16 GB of memory, on the
-milestone-3 application:
+- **One-edit check:** `vulcan check` after a one-line edit in one leaf, p95 at most 1 second.
+- **Full check:** `vulcan check` with an empty cache, at most 10 seconds.
+- **Build:** `vulcan build` after a one-line edit, p95 at most 2 seconds more than `go build` of
+  arm R after the same edit.
 
-- **One-edit check:** `vulcan check` after a one-line edit in one leaf, p95 at most **1 second**.
-  This matches an editor's save, and it is the trigger of decision 4, rule 4.
-- **Full check:** `vulcan check` with an empty cache, at most **10 seconds**.
-- **Build:** `vulcan build` after a one-line edit, p95 at most **2 seconds** more than
-  `go build` of the Go arms after the same edit.
+Milestone 2 measures these on a synthetic application of fixed size, committed with the compiler,
+and milestone 3 measures them again on the application. A miss before milestone 4 starts the work
+of decision 4, rule 4. A miss in milestone 4 fails N5.
 
-Milestone 2 measures these on the first compiler. A miss before milestone 4 starts triggers the
-work of decision 4, rule 4. A miss in milestone 4 fails N5.
+### 10. The decision rule
 
-Q22 (§13) stays open: its targets compare against Java, C++, and Rust, which this protocol does
-not need.
+Apply the rows in order. The first row that matches decides.
 
-### 9. The reduced run of milestone 0.5
+| # | Condition | Outcome |
+|---|---|---|
+| 1 | A mandatory role is empty, or the evaluation ended as inconclusive under section 6 | **Stop: not judged.** The project does not continue on this evidence. |
+| 2 | T2 passes, T3 passes, and N0 to N5 pass | **Continue the language.** |
+| 3 | T2 passes, and T3 or a bound of N0 to N5 fails | **Narrow.** Keep the language features that enforce the rules of set U that carried T2. A new decision drops or redesigns the rest. |
+| 4 | T2 fails, T1 passes, and R meets N0 and N1 against P | **Pivot to the rules.** Continue as a Go tool (the analyzers of arm R), not as a language. |
+| 5 | Any other result | **Stop.** |
 
-Before any compiler work, the development plan runs this protocol in a reduced form, with two
-arms: **Go-rules** against **Go-plain**, on a small application (for example the test 3 shop,
-rebuilt with a database). It uses 6 tasks, 4 of them tempting, at least 3 runs per task and arm,
-the roles of section 2, and the same sealing. Its decision:
+Every combination of the three tests and the bounds matches exactly one row. A second time-box
+overrun of a milestone (development plan) also ends the project, as **stopped by schedule**.
 
-- If Go-rules does not pass P1 and P2 against Go-plain, **stop**: enforcing the rules does not
-  change outcomes, so a language that enforces them will not either.
-- Otherwise, continue to milestone 1. The analyzers become the Go-rules arm of milestone 4.
+### 11. Sealing and isolation
 
-### 10. Records
+- **A private store.** Task briefs, hidden rules, hidden tests, labels, FAQ, seed, analyzer and
+  linter configurations, and grading scripts are kept in a private store outside this repository
+  until the runs end. The repository holds only their SHA-256 hashes.
+- **An outside timestamp.** The commit of the hashes gets a signed tag that is pushed to a third
+  party, and the hashes are also published where the owner cannot change them later (for example,
+  a public post).
+- **Agent workspaces.** Each run gets a fresh workspace that holds only its arm's application code
+  and its arm's documents. It has no access to this repository's `experiments/`, to the private
+  store, or to the other arms.
+- **Release after the runs.** After the runs, the sealed contents are copied into
+  `experiments/m0.5/` or `experiments/m4/`, and their hashes are checked against the tag.
 
-- All files go in `experiments/m0.5/` and `experiments/m4/`: the sealed tasks and their hashes,
-  the hidden rules, the analyzers and linter configuration, the seed, the harness, each run's
-  prompt, transcript, commits, compiler or analyzer version, logs, and grading output, the review
-  notes, the role list, the exclusion list, and the analysis script.
-- The analysis script runs on the raw files and produces every number in the report, so that
-  another person can repeat it.
-- The report states each threshold, each result with its interval, the sample size, the roles,
-  and the decision, including failures and inconclusive results.
+### 12. The reduced run of milestone 0.5
+
+Before any compiler work, the development plan runs this protocol in a reduced form, on a small
+application (for example the test 3 shop, rebuilt with a database):
+
+- **Arms:** R and P only. There is no compiler, so set U is defined from the spec: a rule that the
+  spec says Vulcan enforces, and that the Go developer certifies Go cannot express. The task
+  reviewer and the Go developer make this call together, and record each reason.
+- **Tasks:** eight, **six of them tempting**; at least 3 runs per task and arm. All roles of
+  section 3. All sealing of section 11.
+- **Gate 1 (do the rules help?):** if T1 fails, **stop**.
+- **Gate 2 (is a language needed?):** count the violations at review, in both arms, of rules in set
+  U. If set U holds fewer than 4 rules, or these violations number fewer than 5 events, **pivot to
+  the rules** without building the compiler: the analyzers already deliver everything that Go can
+  express, and there is too little left that only a language could enforce.
+- Otherwise continue to milestone 1. Arm R's analyzers become arm R of milestone 4.
+
+### 13. Records
+
+The report states each threshold, each result with its interval and p-value, the sample size, the
+roles and their holders, every excluded or unanswered run, and the outcome row. The analysis script
+runs on the released raw files and produces every number, so that another person can repeat it.
 
 ## Open points
 
-- **The thresholds are judgments.** Half the violation rate, 90% stopped, and 10% non-inferiority
-  margins are proposals fixed now. Changing them after the first main run is not allowed.
-- **The Go-rules arm sets the bar for the language.** Its analyzers are sealed before the runs,
-  and the Go developer of section 2 checks that they are a fair effort, not a weak one.
-- **Finding people.** The roles of section 2 need two to four people besides the owner. If they
-  cannot be found, the report says so on its first page, and its decision is marked as not
-  independently judged.
+- **The thresholds are judgments.** Margins and minimums are fixed now; changing them after the
+  first main run is not allowed.
+- **Finding people.** Section 3 needs at least three people besides the owner (the rule writer,
+  the Go developer, and one more for the other roles). Without them, row 1 applies and the project
+  stops. The development plan sets a recruiting deadline.
+- **One model.** All results bind to one model version. The report says so.
 
 ## Amendments
 
-Audit 3 (2026-10-21) found that the first version could not tell a language from a linter, that
-its primary outcomes passed by construction, and that the owner judged the results. These changes
-answer it:
-
-| Amendment | Change |
+| Source | Change |
 |---|---|
-| A1 | Three arms: Vulcan, Go-rules, Go-plain (section 1). A "pivot to the rules" outcome (section 7). |
-| A2 | Hidden rules from a person who has not read the spec, labelled enforced or not; six of twelve tasks tempting; follow-on tasks and M14 (sections 3, 5, 7). |
-| A3 | Named roles, with the owner kept out of judging (section 2). |
-| A5 | Inconclusive results count as fails (section 6). |
-| A6 | A frozen compiler, and a rule for blocking bugs (section 4). |
-| A4, part | The reduced run of milestone 0.5 (section 9). |
+| Audit 3, A1 | Three arms, and a "pivot to the rules" outcome. |
+| Audit 3, A2 | Hidden rules from a person who has not read the spec; follow-on tasks. |
+| Audit 3, A3 | Named roles. |
+| Audit 3, A5 | Inconclusive counts as fail. |
+| Audit 3, A6 | A frozen toolchain. |
+| Audit 4, B1 | Arm R holds every rule that Go can express; rules are labelled per arm into sets S, U, G, and N; the language must win on U (T2) and tie on S (T3). |
+| Audit 4, B2 | Paired per-task differences with an exact permutation test; minimum rule and event counts; P2 undefined below 10 events; eight tempting tasks in milestone 4 and six in milestone 0.5. |
+| Audit 4, B3 | Mandatory non-owner roles with no escape clause; a task reviewer and a run adjudicator; an operator who answers only from a sealed FAQ. |
+| Audit 4, B4 | Gate 2 of milestone 0.5: pivot without a compiler when too little needs a language. |
+| Audit 4, H1 | One local check command per arm; review only after it passes. |
+| Audit 4, H2 | A functional brief for the rule writer, sealed before labelling. |
+| Audit 4, H4 | A complete, ordered decision table, with "not judged" and "stopped by schedule". |
+| Audit 4, H6 | A private store, an outside timestamp, and isolated workspaces. |

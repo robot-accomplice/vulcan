@@ -13,7 +13,7 @@ The spec and the primer use these names. The experiment files are records: they 
 
 ## What the spec is
 
-- `docs/spec.md`: about 21,000 words. Sections 1 to 13, Appendix A (sources), B (grammar), C
+- `docs/spec.md`: about 25,000 words. Sections 1 to 13, Appendix A (sources), B (grammar), C
   (runtime API), D (network and acquiring functions), E (diagnostics), F (lowering to Go).
 - `docs/guide.md`: the primer, about 2,400 tokens of a hard 4,000-token budget (§10).
 - Function bodies are plain Go. Vulcan adds the architecture (§5), contracts (§7), tests (§8), and
@@ -73,12 +73,12 @@ and applied to the spec. They answer audit 2's spec findings H6, H7, H10, H11, M
 H8, H9, and M7 are about distributed features, which milestone 5 takes up. L2 (line wrapping) is
 open.
 
-The [development plan](development-plan.md) is accepted (2026-10-21).
-[Audit 3](../experiments/audit-3.md) found three blockers in its first version; amendments A1 to A11 answer them. Audit 3 was not
-independent. The plan answers item 1 below: milestone 0.5 tests the rules without a compiler, and
-milestone 4 decides continue, pivot, narrow, or stop by the fixed rule of decision 6. **Next:**
-milestone 0.5, starting with finding the rule writer and the Go developer of decision 6,
-section 2.
+The [development plan](development-plan.md) is **proposed**. The owner accepts it only if it
+survives an antagonistic audit. [Audit 3](../experiments/audit-3.md) (not independent) and
+[audit 4](../experiments/audit-4.md) (independent) found blockers. This version applies their
+amendments and waits for the next independent audit. The plan answers item 1 below: milestone 0.5
+tests the rules without a compiler, and decision 6 decides by a fixed rule. **Next:** the
+independent audit; then milestone 0.5, starting with the roles of decision 6, section 3.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

@@ -1,5 +1,9 @@
 # Decision 1: contract timing
 
+> Written before [decision 5](0005-names-and-reproducibility.md) renamed the language's
+> artifacts. Here, `keel` means `vulcan` and `.keel` means `.vulcan`, except in paths of the
+> test 3 experiment (`base-keel`, `work/keel`), which keep their names.
+
 Status: accepted, 2026-10-20 (option C, with rule 5). Applied in spec §7.3, Appendices C, E,
 and F, and the primer. Milestone 0, item 1 of the
 [development plan](../development-plan.md). Answers [audit 2](../../experiments/audit-2.md), H6
@@ -190,7 +194,13 @@ deferred call that tells a recovered panic from a running one, which Go cannot d
 ## Open points
 
 - Rule 5 changes the panic value that a recovering caller sees, but only when the invariant is
-  false. Confirm that this is acceptable under design rule 4.
+  false. **Closed (2026-10-21):** acceptable, because it happens only when a contract is false,
+  which design rule 4 allows.
+- **A written exception to design rule 4 (2026-10-21).** In a function with a risky deferred call,
+  the generated closure changes the caller's name that `runtime.Caller` and `runtime.FuncForPC`
+  report (see "Limit" above). This is the one place where a correct body behaves differently from
+  Go. It is accepted because no lowering without the closure exists. Spec §7.3 states it, and
+  conformance case D12 pins it.
 - Treating each deferred call through a function value as risky is safe, but it adds the closure
   to many functions (`defer cancel()`). A later refinement can exclude function values whose
   source is known, such as the result of `context.WithTimeout`.

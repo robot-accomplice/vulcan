@@ -46,9 +46,11 @@ milestone 4):
 
 If these hold, the gain is a smaller and more reliable review: a reviewer checks the logic and
 trusts the compiler for the architecture. [Decision 6](decisions/0006-evidence-protocol.md) tests
-the first two hypotheses with its primary outcomes P1 (architecture violations that reach review)
-and P2 (violations stopped before review), and the third with its non-inferiority bounds N1 (total
-time) and N2 (escaped logic defects). Each has a threshold that was fixed before any run.
+the first two hypotheses in three steps: whether the rules help at all (T1), whether Vulcan enforces
+rules that Go cannot express, and whether that changes outcomes (T2), and whether Vulcan is as good
+as Go with its rules on everything else (T3). Its bound N2 tests the defect part of the third
+hypothesis; the reading part (review time) is measured and not tested. Each threshold was fixed
+before any run.
 
 ### 1.2 Terms
 
