@@ -2,17 +2,16 @@
 
 Status: proposed, 2026-10-21. The owner accepts it only if it survives an antagonistic audit.
 [Audit 3](../experiments/audit-3.md) (not independent) and the independent audits
-[4](../experiments/audit-4.md), [5](../experiments/audit-5.md), [6](../experiments/audit-6.md), and
-[7](../experiments/audit-7.md) found blockers. This version applies their amendments and waits for
-the next independent audit.
+[4](../experiments/audit-4.md) to [8](../experiments/audit-8.md) found blockers. This version
+applies their amendments and waits for the next independent audit.
 
 ## Objective
 
 Find out, at the lowest cost that gives a real answer, whether Vulcan merits continued
 development as a language. Build a compiler and use it to build and maintain a substantive
-application, but only after cheaper tests show three things: that the rules Vulcan enforces
-change outcomes, that some of them need more than Go's tools can give, and that the final
-evaluation can give an answer at all.
+application, but only after cheaper tests show two things: that some rules Vulcan enforces need
+more than Go's tools can give, and are broken often enough to matter (or, failing that, whether the
+rules help at all as Go tools); and that the final evaluation can give an answer.
 
 The lack of a compiler is the reason to run this experiment, not evidence against the project.
 The existing writing experiments inform the design but do not establish its benefit. The
@@ -37,11 +36,14 @@ milestone 0.5):
 - **Pivot to the rules:** the rules help, but either Go tools deliver them, or the language
   costs too much in task success or time. Continue as a Go tool (analyzers, plus a contract
   generator where it helps), not as a language.
-- **Stop:** enforcing the rules does not change outcomes, or nothing above applies.
+- **Stop:** a bound shows that the tested enforcement keeps more than half of the violations it
+  should remove. Then enforcing the rules does not change outcomes enough to matter.
 - **Stop, not judged:** the independent roles were not filled in time, the budget would be
   exceeded, the evaluation cannot reach a useful power, the integrity check of the seeded cases
-  failed, or the evaluation could not finish or gave no clear answer.
-- **Stopped by schedule:** a milestone overran its time box twice.
+  failed, or the evaluation could not finish or gave no clear answer. Any result that matches no
+  row above ends here too.
+- **Stopped by schedule:** a milestone overran its box by more than half, and then overran its new
+  box (see "Time boxes").
 
 Decision 6's question Q2 shows that an effect exists on tasks built to tempt agents. Its size in
 ordinary work is estimated and reported, not tested.
@@ -68,25 +70,28 @@ not validate their design; it isolates the first implementation experiment.
 **Recruiting comes first.** Fill the roles of decision 6, section 3, and get each person's
 commitment to the estimated load listed there. The deadline is **8 weeks** from the plan's
 acceptance. If the roles are not filled by then, the project ends as "stop, not judged". The
-budget of milestone 0.5 (volunteer hours and tokens) is committed at the same time. The budget of
-milestone 4 comes from decision 6's sizing gate.
+budget of milestone 0.5 (volunteer hours and tokens, for its fixed design of 16 tasks, 5 runs, and
+2 arms) is committed at the same time. The budget of milestone 4 comes from decision 6's sizing
+gate. The design sizes were checked before recruiting by simulation
+([experiments/sizing/results.md](../experiments/sizing/results.md)).
 
 **Time boxes** are in calendar weeks, counted from each milestone's start date in `docs/status.md`,
 which the run adjudicator of decision 6 signs. When a milestone runs over its box by more than half,
 work stops for a re-plan: a note in `docs/status.md` that says why and what changes, with one new
-box **no longer than the original box**. If the milestone overruns the new box, the project ends as
-**stopped by schedule**. The run adjudicator of decision 6 signs each overrun and each new box.
+box **no longer than the original box**, starting on the date of the note. If the milestone overruns
+the new box, the project ends as **stopped by schedule**. The run adjudicator of decision 6 signs
+each overrun and each new box.
 
 The compiler milestones (1 to 3) are large for one person. "Stopped by schedule" is a likely
 outcome, and an honest one.
 
 | Milestone | Box |
 |---|---|
-| 0.5 Rules without a compiler | 10 weeks, from the day the roles are filled |
+| 0.5 Rules without a compiler | 16 weeks, from the day the roles are filled, with the Go developer at least 2.5 days a week |
 | 1 Vertical slice | 6 weeks |
 | 2 Guarantees | 10 weeks |
 | 3 Application | 8 weeks |
-| 4 Evaluation | 8 weeks, scaled by decision 6's sizing gate |
+| 4 Evaluation | 8 weeks at 560 runs, scaled by decision 6's sizing gate |
 
 ## Milestone 0: define guarantees and resolve blockers (done)
 
@@ -100,8 +105,8 @@ spec and the primer.
    responsibilities (spec §7.4).
 4. Compiler structure: six cached stages that reuse `go/parser` and `go/types` (spec §11.1).
 5. Names and reproducibility (spec §6, §11, Q1 closed).
-6. Evidence protocol: three run arms and a generator check, independent roles, fixed thresholds,
-   a sizing gate, and a fixed decision rule.
+6. Evidence protocol: two run arms in each milestone, a generator check, independent roles, fixed
+   thresholds, designs sized before recruiting, a sizing gate, and a fixed decision rule.
 
 Exit gate (met): every implemented guarantee has a precise rule and an acceptance or rejection
 example. No decision silently weakens a promise while keeping its stronger description.
@@ -112,21 +117,22 @@ H-A and H-B (spec §1.1) are claims about rules, not about syntax. So test the r
 cheapest form, and find out whether a language is needed at all. Decision 6, section 13 gives the
 protocol:
 
-- The Go developer builds a small order service in Go (the test 3 shop, rebuilt with a database is
-  enough), writes the coverage map, builds arm R (static analyzers and one configuration file) and
-  arm C's contract generator, each within its 15-day cap.
+- The owner builds a small order service in Go (the test 3 shop, rebuilt with a database is
+  enough), and the Go developer reviews it. The Go developer writes the coverage map, and builds
+  arm R (static analyzers and one configuration file) and arm C's contract generator, each within
+  its 15-day cap.
 - A rule writer who has not read the spec writes the hidden rules. The grader labels them, using
   the release-1 diagnostics and contracts that Vulcan would apply.
-- Run arm R against arm P, at the size that decision 6, section 13 sets before the runs (at least
-  eight tasks, three quarters of them tempting).
+- Run arm R against arm P: 16 tasks, 12 of them tempting, 5 runs each (decision 6, section 9).
 
 Exit gate, in this order, signed by the run adjudicator (decision 6, section 13):
 
-1. **Is a language needed?** If at least 4 rules need more than Go's analyzers and a contract
-   generator, and they show at least 5 violations, go to step 3.
+1. **Is a language needed?** If at least 8 rules need more than Go's analyzers and a contract
+   generator, they show at least 5 violations, and arm R breaks them at least 0.2 times per run on
+   the tasks that target them, go to step 3.
 2. **Do the rules help?** Otherwise: if they help, **pivot to the rules** without building a
-   compiler (or **stop**, if arm R costs too much against arm P). If the runs show that the rules
-   do not help, **stop**. If they show neither, **stop, not judged**.
+   compiler (or **stop**, if arm R costs too much against arm P). If a bound shows that the
+   analyzers keep more than half of the violations, **stop**. Otherwise, **stop, not judged**.
 3. **Can milestone 4 give an answer?** The sizing gate of decision 6, section 9, including each
    role holder's commitment to the sized load. If no design reaches the required power within the
    caps, **stop, not judged**.
@@ -177,9 +183,9 @@ hole is listed in the milestone-4 report. The Go developer checks the list again
 ## Milestone 3: build and operate a substantive application
 
 Build Stockroom, the order and inventory service of
-[release-1/acceptance.md](release-1/acceptance.md), in Vulcan with the compiler, and in Go for arms
-R and P of decision 6. The Go developer builds the Go version, or reviews it and writes a list of
-changes that are applied before the freeze, and reviews both versions for parity.
+[release-1/acceptance.md](release-1/acceptance.md), in Vulcan with the compiler (by the owner), and
+in Go for arm R of decision 6 (by the Go developer). The Go developer reviews both versions for
+parity.
 
 Exit gate: the Vulcan version passes all 32 acceptance criteria, and the Go version passes the 28
 that apply to it (V1 to V4 are for Vulcan only). Then a **fresh agent session**, with only the
@@ -190,12 +196,12 @@ file and signs the gate. The transcript is kept in `experiments/m3/`.
 
 ## Milestone 4: evaluate development and maintenance
 
-Run [decision 6](decisions/0006-evidence-protocol.md) at the size that its sizing gate fixed: arms
-V, R, and P, with arm C's labels; hidden rules from a second rule writer; tasks written by a
-non-owner task writer from those sealed rules; rules labelled for each arm by seeded cases; a
-toolchain, harness, and analysis frozen before the rules exist; mandatory independent roles; exact
-permutation tests on paired per-task differences; the committed budget; and sealed material kept
-from the owner and the agents, with an outside timestamp.
+Run [decision 6](decisions/0006-evidence-protocol.md) at the size that its sizing gate fixed: arms V
+and R, with arm C's labels (arm P ran in milestone 0.5, whose result row 4 uses); hidden rules from
+a second rule writer; tasks written by a non-owner task writer from those sealed rules; rules
+labelled for each arm by seeded cases; a toolchain, harness, and analysis frozen before the rules
+exist; mandatory independent roles; exact permutation tests on paired per-task differences; the
+committed budget; and sealed material kept from the owner and the agents, with an outside timestamp.
 
 Exit gate: the run adjudicator applies the decision rule of decision 6, section 10. Inconclusive
 counts as fail. The result is one of the outcomes above.
@@ -233,6 +239,7 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 4](../experiments/audit-4.md) | B1 to B4, H1 to H7, M1 to M10, L1 to L6 | Answered by decision 6 as amended through audit 6, this plan, and the release-1 files, except: L2 (H-C mapping) partly; L5 (one model) stated as a limit |
 | [Audit 5](../experiments/audit-5.md) | B1, B2, H1 to H4, M1 to M6, Lows | Answered through audit 6's amendments |
 | [Audit 6](../experiments/audit-6.md) | B1, B2, H1 to H7, M1 to M11, L1 to L8 | Decision 6, amendments for audit 6; this plan (recruiting, budgets, boxes, gates, milestone 1 design, milestone 2 hole cap, milestone 5 entry) |
+| [Audit 8](../experiments/audit-8.md) | B1, H1 to H4, M1 to M9, L1 to L7 | Decision 6, amendments for audit 8, and a sizing check run before recruiting (`experiments/sizing/`); this plan (objective, outcome wording, fixed milestone-0.5 design, its box and builder, re-plan dates, the Go version of Stockroom, two arms in milestone 4) |
 | [Audit 7](../experiments/audit-7.md) | B1, B2, H1 to H6, M1 to M10, L1 to L12 | Decision 6, amendments for audit 7; this plan (gate order of milestone 0.5, outcome wording, scaled milestone-4 box, signed start dates). M11 (compiler scope) is accepted as a risk: "stopped by schedule" is a likely outcome, and the plan says so in "Recruiting, budget, and time boxes" |
 
 ## Next deliverable

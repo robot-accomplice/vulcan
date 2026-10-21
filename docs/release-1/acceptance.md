@@ -11,10 +11,9 @@ An operator manages stock and reads the audit trail. An internal ledger records 
 refund. It does not process real payments.
 
 It is built twice, with the same HTTP API and the same tests: once in Vulcan (strict mode), and
-once in Go. The Go version serves both Go arms of decision 6: with Vulcan's rules as static
-analyzers (arm R), and with the rules written down but not enforced beyond `go vet`,
-`staticcheck`, and the tests (arm P). Every criterion below applies to both versions, unless it
-says "Vulcan arm". "Both arms" below means both versions.
+once in Go. The Go version is arm R of decision 6, with Vulcan's rules as static analyzers, and its
+labelling copy is arm C. (Arm P runs only in milestone 0.5, on a smaller service.) Every criterion
+below applies to both versions, unless it says "Vulcan arm". "Both arms" below means both versions.
 
 ### Shape
 
@@ -84,7 +83,7 @@ finding of [audit 2](../../experiments/audit-2.md) or a decision.
 | ID | Criterion | From |
 |---|---|---|
 | T1 | The integration tests run against a real Postgres in CI. If the database is missing, the CI job fails. It does not skip. | M4 |
-| T2 | Fault injection covers a failure before commit, after commit and before the response, during startup, during shutdown, and across a restart. Each test checks both the response and the stored state. | Development plan, milestone 3 |
+| T2 | Fault injection covers a failure before commit, after commit and before the response, during startup, during shutdown, and across a restart. Each test checks both the response and the stored state. | Audit 2 (H2); decision 3 |
 | T3 | A load test runs a fixed mix (70% reads, 20% orders, 10% cancels and refunds) for 10 minutes with 50 clients, and reports p50 and p99 latency and throughput. It is the benchmark of decision 6 (X11). | Decision 6 |
 | T4 | The hidden acceptance tests of decision 6 use only the HTTP API, so that the same tests grade both arms. | Decision 6 |
 | T5 | All tests pass under the race detector on a host that has it. | §6 |

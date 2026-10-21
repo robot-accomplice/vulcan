@@ -32,7 +32,7 @@ Below, **Accept** means the project builds with no diagnostic except the listed 
 | S01 | A method with three contract lines between its signature and a `{` on its own line | Accept (milestone 2), or K0009 at the first `requires` (milestone 1). A type error later in the body reports its true line and column. |
 | S02 | `func F() requires { … }`: a result of a type named `requires` | Accept. Go meaning (Appendix B.1). |
 | S03 | A struct field named `limit`, a local variable named `requires`, a parameter named `timeout` | Accept. |
-| S04 | `limit` on the line after its field | K0001 at the `limit`. |
+| S04 | `limit` on the line after its field | K0009 at the `limit` in release 1, which defers `limit`. When `limit` is supported: K0001 at the `limit`. |
 | S05 | A declared name `vulcan_x` | K0005 at the name. |
 | S06 | A body with a Go type error, inside a file with contracts above it | K0008 at the true `.vulcan` position. |
 | S07 | A panic in a body at a known line | The stack trace names the `.vulcan` file and line (`//line`). |
