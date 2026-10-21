@@ -105,6 +105,9 @@ Build a conformance suite with both valid programs and deliberate violations:
 Use differential tests against Go for supported ordinary Go bodies. Add parser fuzzing and
 malformed-input tests. Run race detection in a configured CI environment even if a local host
 cannot run it. Record instrumentation overhead and build time without claiming targets met.
+Measure check and build latency against the targets of
+[decision 6](decisions/0006-evidence-protocol.md), section 7. A miss starts the incremental work of
+decision 4, rule 4.
 
 Exit gate: the supported subset has executable conformance tests, and known holes are either
 rejected or accurately exposed. No missing compiler feature is replaced with manual checking.
@@ -161,7 +164,11 @@ Keep prompts, commits, compiler versions, raw logs, failures, and grading result
 experiments directory. Use independent or blinded grading where practical. Report variation
 and sample size; a single successful task does not establish a productivity advantage.
 
-Exit gate: evaluate against the thresholds agreed in milestone 0. Continue if the implementation
+[Decision 6](decisions/0006-evidence-protocol.md) fixes the arms, the twelve tasks, the
+measurements, the thresholds, the sample size rule, and the decision rule. Commit its sealed files
+in `experiments/m4/` before the first run.
+
+Exit gate: evaluate against the thresholds of decision 6. Continue if the implementation
 is trustworthy and repeated tasks show enough practical benefit to justify the measured burden.
 Narrow the language if only some features earn their cost. Stop or pivot if ordinary Go achieves
 the same outcomes with materially less total effort. Treat inconclusive results as inconclusive.
@@ -204,7 +211,8 @@ The findings below come from an external audit of the project; its report is not
 
 ## Immediate next deliverable
 
-Produce the milestone-0 decision packet and compiler design, including the supported syntax,
-guarantee matrix, first conformance cases, and application acceptance criteria. Estimate the
-implementation after this scope is concrete. Do not attach a full-language delivery date to the
-current specification.
+The milestone-0 decision packet is complete: [decisions 1 to 6](decisions/README.md), accepted
+on 2026-10-20 and 2026-10-21, with the guarantee matrix in spec §5.4d. Still to produce before
+milestone 1: the supported syntax of the first release, the first conformance cases, and the
+application acceptance criteria. Estimate the implementation after this scope is concrete. Do not
+attach a full-language delivery date to the current specification.

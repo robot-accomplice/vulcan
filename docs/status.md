@@ -66,7 +66,13 @@ Each finding was then resolved and logged.
 ## Open work, in order
 
 [Audit 2](../experiments/audit-2.md) (2026-10-20) lists the findings against the spec and test 3,
-with a remediation roadmap. Its spec findings belong in the milestone-0 decision packet.
+with a remediation roadmap.
+
+The milestone-0 decision packet is complete: [decisions 1 to 6](decisions/README.md) are accepted
+and applied to the spec. They answer audit 2's spec findings H6, H7, H10, H11, M6, L1, and L3.
+H8, H9, and M7 are about distributed features, which milestone 5 takes up. L2 (line wrapping) is
+open. The evidence protocol (decision 6) is the planned answer to item 1 below: milestone 4 of the
+development plan decides go, narrow, or stop by its fixed thresholds.
 
 A proposed compiler-and-application validation sequence is in
 [Development plan](development-plan.md). It is a draft; it does not replace the decisions below
