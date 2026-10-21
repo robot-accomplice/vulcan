@@ -3,8 +3,10 @@
 Status: **accepted**, 2026-10-21. The owner's condition was that the plan survive an antagonistic
 audit. [Audit 3](../experiments/audit-3.md) (not independent) and the independent audits
 [4](../experiments/audit-4.md) to [9](../experiments/audit-9.md) found blockers, which this version
-answers. The independent [audit 10](../experiments/audit-10.md) found none; its three High findings
-(H1 to H3) were fixed on the same day, and a fresh independent audit checks the fixes.
+answers. The independent [audit 10](../experiments/audit-10.md) found none. Its High findings were
+fixed, and two further independent audits, [11](../experiments/audit-11.md) and
+[12](../experiments/audit-12.md), each confirmed that the fixes so far added no Blocker. Audit 12's
+two High findings are open.
 
 ## Objective
 
@@ -262,6 +264,7 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 9](../experiments/audit-9.md) | B1, H1 to H5, M1 to M7, L1 to L11 | Decision 6, amendments for audit 9: clean success for N0 and N1, a re-run sizing check with coupled-cost, interaction, and net-cost scenarios, a cost pilot after milestone 2; this plan (outcome wording, milestone 0.5's box, the time between milestones, the cost pilot, the milestone-3 retry) |
 | [Audit 10](../experiments/audit-10.md) | No Blocker; H1 to H3, M1 to M8, L1 to L9 | Plan accepted. H1 to H3 fixed in decision 6; the rest stay open |
 | [Audit 11](../experiments/audit-11.md) | No Blocker; H1, H2, M1 to M9, Lows | Confirms that audit 10's fixes added no Blocker. H1 and H2 fixed in decision 6 (amendments for audit 11); the rest stay open |
+| [Audit 12](../experiments/audit-12.md) | No Blocker; H1, H2, M1 to M7, Lows | Confirms that audit 11's fixes added no Blocker. H1 (the cost pilot's run rules) and H2 (the agreement floor's bias and sizing) are open |
 
 ## Next deliverable
 
@@ -274,4 +277,8 @@ The independent [audit 11](../experiments/audit-11.md) confirmed that these fixe
 Blocker. Its two High findings are fixed in decision 6 (see its amendments for audit 11): the
 second blind grader now re-judges every judged violation, with agreement measured on positives
 (H1), and the cost pilot has an application, staff, a budget, a signer, its own box, and a pooled
-second try (H2). Next, recruiting starts (see "Recruiting, budget, and time boxes").
+second try (H2). The independent [audit 12](../experiments/audit-12.md) confirmed that these fixes
+added no Blocker, and found two High findings, which are open: the cost pilot has no run rules
+(toolchain bugs, the second reviewer's role, an unfinished try), and the blind graders' agreement
+floor overstates agreement and is not sized for milestone 0.5. Next: fix them, or accept them, and
+start recruiting (see "Recruiting, budget, and time boxes").
