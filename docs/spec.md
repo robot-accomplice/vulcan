@@ -85,7 +85,7 @@ use the same terms.
 |---|---|
 | Compiled, GC | Native binaries and a tracing GC. No manual memory management and no borrow checker. |
 | Go ergonomics | Function bodies are Go, unchanged. Vulcan adds the architecture, contracts, and tools around them (§4, §6). |
-| Competitive performance | Resource use and speed must be competitive with Go, Java, C++, and Rust. §11.3 states the targets and the costs. |
+| Competitive performance | A goal, with no current test: resource use and speed competitive with Go, Java, C++, and Rust. Today only the comparison with Go is measured (§11.3). |
 | Mechanism, not policy | The language gives mechanisms and overridable defaults. Operational policy (delivery, retries, queues, build output) is the developer's decision. A default that the language sets must be one that a setting can change. |
 | Compiler first | If the compiler can check a rule, the compiler checks it. Each rule that depends on convention, review, or runtime is a candidate to move into the compiler. This is the most direct way to make tasks 2 and 3 of §1.1 shorter. |
 | Rust-grade compiler intelligence | Diagnostics explain *why* and propose fixes. The tools find duplication, error masking, and common Go faults, as warnings. |
@@ -687,6 +687,11 @@ exempt and in each library:
   environment (G12).
 
 ### 5.5 Crossing containers
+
+> **Deferred.** Release 1 does not support §5.5 to §5.5.3: it rejects topics, remote ports,
+> transports, and a second container with K0009 ([release 1](release-1/syntax.md)). These
+> sections are a design, not a commitment. The development plan, milestone 5, says when they can
+> come back, and audit 2 (H8, H9, M7) lists known problems in them.
 
 Containers are separate processes. Two mechanisms cross from one container to another, and the
 developer chooses one for each boundary:
@@ -1471,6 +1476,11 @@ Thus:
 - **Limit.** A caller that recovers that contract failure, as `net/http` does for each request,
   can still use the broken value. Vulcan reports the break; it does not prevent the later use.
   Elements of slice and map fields stay a limit (§7.2).
+- **Limit: the caller's name.** In a function with a risky deferred call, the body runs in a
+  generated closure (Appendix F). `runtime.Caller` and `runtime.FuncForPC` then name the closure,
+  for example `pkg.F.func1` instead of `pkg.F`, and code that walks the stack sees one more frame.
+  The line stays right. Go gives no way to hide the frame, so this is a stated difference from
+  Go, pinned by a conformance case.
 
 ```go
 func (a *Account) Deposit(f *os.File, x int) (err error)
@@ -1774,7 +1784,10 @@ first. Then the leaves compile in parallel against the library declarations.
 
 ### 11.3 Performance
 
-Vulcan must be competitive with Go, Java, C++, and Rust in speed and in resource use.
+**A goal, with no current test.** Vulcan aims to be competitive with Go, Java, C++, and Rust in
+speed and in resource use. Today only the comparison with Go is measured (decision 6, N4). The
+comparison with Java, C++, and Rust needs Q22's targets and, for C++ and Rust, the deferred LLVM
+backend. Until then, no document may claim it.
 
 **How the project measures it.** A benchmark suite runs in CI. It covers CPU-bound work,
 allocation-heavy work, concurrency, and a service with topics. Each benchmark has a target

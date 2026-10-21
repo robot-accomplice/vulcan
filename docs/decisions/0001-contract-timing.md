@@ -105,8 +105,8 @@ outcome. Close case 4 with one compile error. Report case 3 at the panic, and st
    `errors.As` return. The original panic value changes only when the invariant is false. This
    check can run after a deferred unlock. It runs only on a panic path, so it has no warning:
    K0524 would otherwise fire on almost every method that locks. **Limit:** a caller that
-   recovers this panic, for example `net/http`, can still use the broken value. Vulcan reports the break. It
-   does not prevent the later use.
+   recovers this panic, for example `net/http`, can still use the broken value. Vulcan reports the
+   break. It does not prevent the later use.
 6. **Concurrent access.** The guarantees hold for programs without data races. A check runs where
    the method returns, under the locks it then holds. Vulcan does no static race analysis (§6). The
    race detector runs in `keel test`. K0521 stays.
@@ -155,6 +155,13 @@ last. It does nothing when the return check ran.
 
 Cost: one closure call and one flag, only in functions with a risky deferred call. Milestone 2
 measures it.
+
+**Limit (added after audit 3, L1).** The closure changes what `runtime.Caller` and
+`runtime.FuncForPC` report: a body that names its caller sees `pkg.F.func1` instead of `pkg.F`,
+and code that walks the stack sees one more frame. The line stays right through `//line`. Go gives
+user code no way to hide a frame. A lowering without the closure would need one generated
+deferred call that tells a recovered panic from a running one, which Go cannot do without calling
+`recover` itself. Spec §7.3 states the limit, and conformance case D12 pins it.
 
 ## Examples
 

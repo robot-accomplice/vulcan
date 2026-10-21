@@ -71,23 +71,22 @@ with a remediation roadmap.
 The milestone-0 decision packet is complete: [decisions 1 to 6](decisions/README.md) are accepted
 and applied to the spec. They answer audit 2's spec findings H6, H7, H10, H11, M6, L1, and L3.
 H8, H9, and M7 are about distributed features, which milestone 5 takes up. L2 (line wrapping) is
-open. The evidence protocol (decision 6) is the planned answer to item 1 below: milestone 4 of the
-development plan decides go, narrow, or stop by its fixed thresholds.
+open.
 
-A proposed compiler-and-application validation sequence is in
-[Development plan](development-plan.md). It is a draft; it does not replace the decisions below
-until accepted.
+The [development plan](development-plan.md) is accepted (2026-10-21).
+[Audit 3](../experiments/audit-3.md) found three blockers in its first version; amendments A1 to A11 answer them. Audit 3 was not
+independent. The plan answers item 1 below: milestone 0.5 tests the rules without a compiler, and
+milestone 4 decides continue, pivot, narrow, or stop by the fixed rule of decision 6. **Next:**
+milestone 0.5, starting with finding the rule writer and the Go developer of decision 6,
+section 2.
 
-1. **Go or no go.** Decide whether the spec gives enough value over plain Go to build the
-   language, and whether its first principles are sound. The planned way: run `/abort` on the
-   spec.
+1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
 3. **Optional review 10.** Reviews 8 and 9 changed much text. The trend is 55, then 29 findings,
    mostly implementation detail.
-4. **Finish test 3**, or replace it with the build test below.
-5. **The compiler.** A separate sub-project that starts with its own design step. The Go backend
-   comes first (Appendix F), the compiler is written in Go and is staged (§11.1, decision 4). The
-   final test of the language is to build a real program with it.
+4. **Test 3.** Replaced by milestones 0.5 and 4. Its records stay as they are.
+5. **The compiler.** Milestones 1 and 2, after milestone 0.5 passes. Staged, in Go
+   (§11.1, decision 4), to the scope of `docs/release-1/`.
 6. **Q22** (§13): numeric performance targets against Go, Java, C++, and Rust.
 
 ## Working conventions

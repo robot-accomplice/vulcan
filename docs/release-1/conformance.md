@@ -111,6 +111,7 @@ Below, **Accept** means the project builds with no diagnostic except the listed 
 | D09 | A recovered-panic check after `defer mu.Unlock()` | K0524. |
 | D10 | `defer cancel()` from `context.WithTimeout` in a function with `ensures` | Accept; the second check point exists; `vulcan audit` lists it. |
 | D11 | A method of a struct with an invariant that unlocks without `defer` | K0521. |
+| D12 | A function with a risky deferred call whose body logs `runtime.FuncForPC` of `runtime.Caller(0)` | `run` output names `pkg.F.func1` and the right `.vulcan` line: the stated limit of §7.3. A change to the lowering that fixes it updates this case. |
 
 ## Effects (milestone 2, decision 3)
 
