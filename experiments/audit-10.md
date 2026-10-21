@@ -216,3 +216,16 @@ None are needed for the plan to survive, because no Blocker remains. Before recr
    - Add a second blind grader on a sample, with an agreement limit, and compute Q2, N0, and N1 under both.
    - Report the share of U\* violations that a judge decided.
 4. **M1 and M2:** apply the reaching-test rule to milestone 4. Fix the run budget and who sets it, and check it at the sizing gate.
+
+## Resolution
+
+Audit 10 found no Blocker, and the owner accepted the plan. The owner then asked for its three High
+findings to be fixed, on 2026-10-21, in the commit that adds this resolution:
+
+| Finding | Change |
+|---|---|
+| H1 | Decision 6 adds N6, a point-estimate cost check on the ordinary tasks of milestone 4, required for "continue" and "narrow"; its failure means "the language costs too much". Half of the tasks are now tempting. The sizing check ran again with N6, a raw-cost scenario (L+raw: a cost equal to the margins on every task), and the cost pilot. Before recruiting, 32 tasks × 10 runs gives P(Continue) of 0.85 to 0.90 under L, 0.84 to 0.88 with coupled cost, 0.81 to 0.86 with interaction, 0.05 to 0.12 under L+raw, and about 0 under Z and a 15-point net cost. The sizing gate now also requires P(Continue \| L+raw) ≤ 0.2. The pilot's pass rates are published (96% at no cost, 51% at the margins, within two tries), and its retry needs a named change. The plan describes the margins as a net cost on the evaluated mix, plus a cost check on ordinary work. |
+| H2 | Milestone 0.5 has a paper Vulcan design (declarations and contracts), written by the owner, reviewed for parity, and frozen and hashed with arm R before the rules exist. Labels come only from it, and arm C's contracts are its contracts. |
+| H3 | A second blind grader re-judges 30% of the blind grader's judgments. Every test and bound that uses judged violations (Q1, Q2, gate 2, N0, N1, N6) must pass under both graders' judgments; more than 20% disagreement makes them inconclusive. The report gives the share of U\* violations decided by judgment. The evaluation now needs at least eight people besides the owner. |
+
+The Medium and Low findings stay open, to be handled as they become relevant.

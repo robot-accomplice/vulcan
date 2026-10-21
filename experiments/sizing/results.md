@@ -20,21 +20,32 @@ Gate 2's rate test, P(estimate of R's U* rate >= 0.2), at 5 runs (1000 simulatio
 | 6 | 0.12 | 0.46 | 0.87 |
 | 8 | 0.09 | 0.51 | 0.91 |
 
+## Cost pilot (end of milestone 2)
+
+8 ordinary tasks, 5 runs per arm, point estimates against the margins (12 points, 1.15). P(pass), 3,000 simulations per cell:
+
+| V's raw cost (success, time) | One try | Within two tries |
+|---|---|---|
+| 0 points, 0% | 0.81 | 0.96 |
+| 6 points, 7% | 0.54 | 0.81 |
+| 12 points, 15% | 0.30 | 0.51 |
+| 20 points, 30% | 0.07 | 0.14 |
+
 ## Milestone 4: P(Continue) by scenario (600 simulations per cell)
 
-Three quarters of the tasks are tempting. Scenarios: Z no effect; L large effect (V's rate one eighth of R's); L+coupled, tempted V runs 1.3 times slower and 5 points more failures; L+half, a net cost of half the margins (6 points, 7%); L+inter, task x arm interaction sd 0.10 (success) and 0.20 (log time); L+cost, a net cost of 15 points and 20%. Net costs are stated against R's clean success.
+Half of the tasks are tempting. Scenarios: Z no effect; L large effect (V's rate one eighth of R's); L+coupled, tempted V runs 1.3 times slower and 5 points more failures; L+inter, task x arm interaction sd 0.10 (success) and 0.20 (log time); L+half, a net cost of half the margins (6 points, 7%); L+cost, a net cost of 15 points and 20%; L+raw, a raw cost equal to the margins (12 points, 15%) on every task. Net costs are stated against R's clean success. Continue includes the ordinary-task check N6.
 
-| Tasks | Runs | r | Z | L | L+coupled | L+half | L+inter | L+cost |
-|---|---|---|---|---|---|---|---|---|
-| 24 | 8 | 0.4 | 0.00 | 0.74 | 0.77 | 0.15 | 0.70 | 0.00 |
-| 24 | 8 | 0.2 | 0.00 | 0.71 | 0.68 | 0.12 | 0.65 | 0.00 |
-| 24 | 10 | 0.4 | 0.00 | 0.84 | 0.79 | 0.21 | 0.83 | 0.00 |
-| 24 | 10 | 0.2 | 0.01 | 0.83 | 0.78 | 0.16 | 0.77 | 0.00 |
-| 28 | 8 | 0.4 | 0.00 | 0.83 | 0.80 | 0.19 | 0.79 | 0.00 |
-| 28 | 8 | 0.2 | 0.00 | 0.78 | 0.77 | 0.16 | 0.74 | 0.00 |
-| 28 | 10 | 0.4 | 0.00 | 0.86 | 0.88 | 0.22 | 0.86 | 0.00 |
-| 28 | 10 | 0.2 | 0.00 | 0.89 | 0.84 | 0.21 | 0.84 | 0.00 |
-| 32 | 8 | 0.4 | 0.00 | 0.84 | 0.86 | 0.21 | 0.80 | 0.00 |
-| 32 | 8 | 0.2 | 0.01 | 0.84 | 0.85 | 0.17 | 0.79 | 0.00 |
-| 32 | 10 | 0.4 | 0.00 | 0.94 | 0.92 | 0.28 | 0.89 | 0.00 |
-| 32 | 10 | 0.2 | 0.00 | 0.91 | 0.90 | 0.22 | 0.87 | 0.00 |
+| Tasks | Runs | r | Z | L | L+coupled | L+inter | L+half | L+cost | L+raw |
+|---|---|---|---|---|---|---|---|---|---|
+| 28 | 8 | 0.4 | 0.00 | 0.75 | 0.76 | 0.69 | 0.16 | 0.00 | 0.07 |
+| 28 | 8 | 0.2 | 0.01 | 0.68 | 0.62 | 0.60 | 0.14 | 0.00 | 0.04 |
+| 28 | 10 | 0.4 | 0.00 | 0.86 | 0.83 | 0.78 | 0.23 | 0.00 | 0.09 |
+| 28 | 10 | 0.2 | 0.01 | 0.81 | 0.81 | 0.70 | 0.21 | 0.00 | 0.05 |
+| 32 | 8 | 0.4 | 0.00 | 0.82 | 0.81 | 0.78 | 0.17 | 0.00 | 0.09 |
+| 32 | 8 | 0.2 | 0.01 | 0.77 | 0.80 | 0.70 | 0.17 | 0.00 | 0.05 |
+| 32 | 10 | 0.4 | 0.00 | 0.90 | 0.88 | 0.86 | 0.22 | 0.00 | 0.12 |
+| 32 | 10 | 0.2 | 0.01 | 0.85 | 0.84 | 0.81 | 0.23 | 0.00 | 0.05 |
+| 36 | 8 | 0.4 | 0.00 | 0.85 | 0.85 | 0.83 | 0.22 | 0.00 | 0.10 |
+| 36 | 8 | 0.2 | 0.01 | 0.84 | 0.80 | 0.77 | 0.20 | 0.00 | 0.05 |
+| 36 | 10 | 0.4 | 0.00 | 0.92 | 0.91 | 0.88 | 0.27 | 0.00 | 0.12 |
+| 36 | 10 | 0.2 | 0.01 | 0.91 | 0.90 | 0.86 | 0.25 | 0.00 | 0.05 |

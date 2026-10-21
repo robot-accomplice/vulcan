@@ -3,8 +3,8 @@
 Status: **accepted**, 2026-10-21. The owner's condition was that the plan survive an antagonistic
 audit. [Audit 3](../experiments/audit-3.md) (not independent) and the independent audits
 [4](../experiments/audit-4.md) to [9](../experiments/audit-9.md) found blockers, which this version
-answers. The independent [audit 10](../experiments/audit-10.md) found none. Its three High findings
-(H1 to H3) are open, and are to be fixed before recruiting starts (see "Next deliverable").
+answers. The independent [audit 10](../experiments/audit-10.md) found none; its three High findings
+(H1 to H3) were fixed on the same day, and a fresh independent audit checks the fixes.
 
 ## Objective
 
@@ -29,8 +29,9 @@ The plan ends in one of six ways. The first five come from the fixed rules of
 milestone 0.5):
 
 - **Continue the language:** Vulcan enforces rules that neither Go's static analyzers nor a Go
-  contract generator can enforce, that changes outcomes on tasks built to test it, and it costs no
-  more than the agreed margins in task success and working time.
+  contract generator can enforce, that changes outcomes on tasks built to test it. Its net cost on
+  the evaluated mix of tasks stays within the agreed margins (12 points of clean success, 1.15
+  times the working time), and its point-estimate cost on ordinary, untempting work does too.
 - **Narrow, as a hold:** as above, but a secondary bound fails (defects, false positives, runtime,
   or latency). A new decision changes the feature behind it, and the bound is measured again.
   Nothing else proceeds meanwhile.
@@ -97,7 +98,7 @@ outcome, and an honest one.
 | 1 Vertical slice | 6 weeks |
 | 2 Guarantees | 10 weeks |
 | 3 Application | 8 weeks |
-| 4 Evaluation | 8 weeks at 560 runs, scaled by decision 6's sizing gate |
+| 4 Evaluation | 8 weeks at 640 runs, scaled by decision 6's sizing gate |
 
 ## Milestone 0: define guarantees and resolve blockers (done)
 
@@ -258,15 +259,8 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 
 ## Next deliverable
 
-Before recruiting starts, fix audit 10's High findings, each with a decision-6 amendment:
-
-1. **H1:** add a cost check on the ordinary tasks of milestone 4; add the cost pilot to the sizing
-   simulation and publish its error rates; require a change before the pilot's retry; describe the
-   margins as a net cost on the evaluated mix of tasks.
-2. **H2:** freeze and hash a paper Vulcan design of milestone 0.5's service, with arm R, before the
-   rules exist, and label only from it.
-3. **H3:** add a second blind grader on a sample, with an agreement limit, and compute Q2, N0, and
-   N1 under both graders' judgments.
-
-Audit 10's Medium and Low findings follow as they become relevant. Then recruiting starts (see
+Audit 10's High findings are fixed in decision 6 (see its amendments for audit 10): a cost check on
+ordinary work (N6) and a sized cost pilot whose retry needs a named change (H1); a paper design of
+milestone 0.5's Vulcan side, frozen before the rules (H2); and a second blind grader (H3). Audit
+10's Medium and Low findings follow as they become relevant. Next, recruiting starts (see
 "Recruiting, budget, and time boxes").

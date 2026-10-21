@@ -77,8 +77,8 @@ The [development plan](development-plan.md) is **accepted** (2026-10-21). Audit 
 independent) and the independent audits 4 to 9 found blockers, which the plan now answers; the
 independent [audit 10](../experiments/audit-10.md) found none. The plan answers item 1 below:
 milestone 0.5 tests the rules without a compiler, and decision 6 decides by a fixed rule.
-**Next:** fix audit 10's three High findings in decision 6, then recruit the roles of decision 6,
-section 3, and start milestone 0.5.
+Audit 10's three High findings are fixed in decision 6. **Next:** recruit the roles of decision
+6, section 3 (at least eight people besides the owner), and start milestone 0.5.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

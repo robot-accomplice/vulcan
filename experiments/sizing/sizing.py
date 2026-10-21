@@ -5,7 +5,8 @@ designs in decision 6's search space. It is a feasibility check run before recru
 frozen simulation that the analyst writes later.
 
 Model:
-- Tasks: three quarters are tempting; every tempting task targets the tested set (binding rule).
+- Tasks: half are tempting in milestone 4 (three quarters in milestone 0.5); every tempting task
+  targets the tested set (binding rule).
 - Violations: a task has a heterogeneity factor g ~ Gamma(mean 1, CV), shared by both arms. A run
   has Poisson(rate * g) violations of the targeted rules. Ordinary tasks have none.
 - Success: a task has base success p ~ Beta(mean 0.7, sd about 0.15), shared, plus a per-arm task
@@ -21,6 +22,11 @@ Model:
   that many points below R's on the same task, and V's clean runs are that much slower. A cost is
   thus stated in the quantity that N0 and N1 measure, after R's rule-breaking runs are counted as
   failures.
+- Raw costs (scenario L+raw): V's base success is that many points lower and its runs that much
+  slower on every task, before R's rule-breaking runs are counted.
+- Ordinary-task check (N6): on the untargeted tasks alone, the point estimates of V's success gap
+  and of the ratio of mean working times are within the margins.
+- Cost pilot: 8 ordinary tasks, 5 runs per arm, the same point estimates, one retry after a change.
 - Escaped defects: Poisson(0.1) holdout failures per accepted change, in every arm; N2 compares
   per-task means over tasks where both arms have an accepted change.
 - False positives: 2% of V's runs.
@@ -90,7 +96,8 @@ def gamma_factor(n):
 
 
 def milestone4(tasks, runs, tempting, sc):
-    rate_r, rate_v, cost_s, cost_t, coupled, inter_s, inter_t = sc
+    rate_r, rate_v, cost_s, cost_t, coupled, inter_s, inter_t = sc[:7]
+    raw = len(sc) > 7 and sc[7]
     g = np.concatenate([gamma_factor(tempting), np.zeros(tasks - tempting)])
     tempt = np.arange(tasks) < tempting
     vr = RNG.poisson(np.outer(rate_r * g, np.ones(runs)))
@@ -100,7 +107,9 @@ def milestone4(tasks, runs, tempting, sc):
     base = RNG.beta(4.9, 2.1, size=tasks)
     pr = np.clip(base + RNG.normal(0, inter_s, tasks), 0, 1)
     pv = np.clip(base + RNG.normal(0, inter_s, tasks), 0, 1)
-    if cost_s:
+    if cost_s and raw:
+        pv = np.clip(pv - cost_s, 0, 1)
+    elif cost_s:
         # Net cost: V's clean-success probability is cost_s below R's clean-success probability.
         zr, zv = np.exp(-rate_r * g), np.exp(-rate_v * g)
         pv = np.clip((pr * zr - cost_s) / zv, 0, 1)
@@ -131,7 +140,35 @@ def milestone4(tasks, runs, tempting, sc):
         return False
     if tbound((RNG.random((tasks, runs)) < 0.02).mean(axis=1)) > 0.1:            # N3
         return False
+    o = ~tempt                                                                    # N6
+    if o.sum() and not ordinary_ok(clean_r[o], clean_v[o], tr[o], tv[o]):
+        return False
     return True
+
+
+def ordinary_ok(sr, sv, tr, tv):
+    """Point estimates on ordinary tasks: success gap and ratio of mean times within the margins."""
+    if sr.mean() - sv.mean() > MARGIN_S:
+        return False
+    return np.exp(np.mean(np.log(tv.mean(axis=1) / tr.mean(axis=1)))) <= MARGIN_T
+
+
+def pilot_pass(cost_s, cost_t, tasks=8, runs=5, tries=2):
+    for _ in range(tries):
+        base = RNG.beta(4.9, 2.1, size=tasks)
+        pr = np.clip(base + RNG.normal(0, INTER_S, tasks), 0, 1)
+        pv = np.clip(base - cost_s + RNG.normal(0, INTER_S, tasks), 0, 1)
+        sr = RNG.random((tasks, runs)) < pr[:, None]
+        sv = RNG.random((tasks, runs)) < pv[:, None]
+        mu = RNG.normal(0, 0.5, size=tasks)
+        tr = np.exp((mu + RNG.normal(0, INTER_T, tasks))[:, None] + RNG.normal(0, SIGMA_RUN, (tasks, runs)))
+        tv = np.exp((mu + RNG.normal(0, INTER_T, tasks))[:, None] + RNG.normal(0, SIGMA_RUN, (tasks, runs))
+                    + np.log(1 + cost_t))
+        budget = np.exp(mu + np.log(3.0))[:, None]
+        tr, tv = np.where(sr, tr, budget), np.where(sv, tv, budget)
+        if ordinary_ok(sr, sv, tr, tv):
+            return True
+    return False
 
 
 def m4_power(tasks, runs, tempting, sc, sims):
@@ -164,6 +201,7 @@ def scenarios(r):
         "L+half": (r, r / 8, 0.06, 0.07, False, INTER_S, INTER_T),
         "L+inter": (r, r / 8, 0, 0, False, 0.10, 0.20),
         "L+cost": (r, r / 8, 0.15, 0.20, False, INTER_S, INTER_T),
+        "L+raw": (r, r / 8, 0.12, 0.15, False, INTER_S, INTER_T, True),
     }
 
 
@@ -182,20 +220,28 @@ def main():
             "|---|---|---|---|"]
     for k in (4, 6, 8):
         out.append("| %d | %.2f | %.2f | %.2f |" % (k, *(m05_gate2_rate(k, 5, x, sims) for x in (0.1, 0.2, 0.4))))
-    names = ("Z", "L", "L+coupled", "L+half", "L+inter", "L+cost")
+    out += ["", "## Cost pilot (end of milestone 2)", "", "8 ordinary tasks, 5 runs per arm, point "
+            "estimates against the margins (12 points, 1.15). P(pass), 3,000 simulations per cell:",
+            "", "| V's raw cost (success, time) | One try | Within two tries |", "|---|---|---|"]
+    for c, tt in ((0, 0), (0.06, 0.07), (0.12, 0.15), (0.20, 0.30)):
+        one = np.mean([pilot_pass(c, tt, tries=1) for _ in range(3000)])
+        two = np.mean([pilot_pass(c, tt, tries=2) for _ in range(3000)])
+        out.append("| %d points, %d%% | %.2f | %.2f |" % (round(c * 100), round(tt * 100), one, two))
+    names = ("Z", "L", "L+coupled", "L+inter", "L+half", "L+cost", "L+raw")
     sims = 600
     out += ["", "## Milestone 4: P(Continue) by scenario (%d simulations per cell)" % sims, "",
-            "Three quarters of the tasks are tempting. Scenarios: Z no effect; L large effect (V's "
-            "rate one eighth of R's); L+coupled, tempted V runs 1.3 times slower and 5 points more "
-            "failures; L+half, a net cost of half the margins (6 points, 7%); L+inter, task x arm "
-            "interaction sd 0.10 (success) and 0.20 (log time); L+cost, a net cost of 15 points "
-            "and 20%. Net costs are stated against R's clean success.", "",
+            "Half of the tasks are tempting. Scenarios: Z no effect; L large effect (V's rate one eighth "
+            "of R's); L+coupled, tempted V runs 1.3 times slower and 5 points more failures; L+inter, "
+            "task x arm interaction sd 0.10 (success) and 0.20 (log time); L+half, a net cost of half "
+            "the margins (6 points, 7%); L+cost, a net cost of 15 points and 20%; L+raw, a raw cost "
+            "equal to the margins (12 points, 15%) on every task. Net costs are stated against R's "
+            "clean success. Continue includes the ordinary-task check N6.", "",
             "| Tasks | Runs | r | " + " | ".join(names) + " |", "|---|---|---|" + "---|" * len(names)]
-    for tasks in (24, 28, 32):
+    for tasks in (28, 32, 36):
         for runs in (8, 10):
             for r in (0.4, 0.2):
                 sc = scenarios(r)
-                row = [m4_power(tasks, runs, tasks * 3 // 4, sc[n], sims) for n in names]
+                row = [m4_power(tasks, runs, tasks // 2, sc[n], sims) for n in names]
                 out.append("| %d | %d | %.1f | " % (tasks, runs, r) + " | ".join("%.2f" % x for x in row) + " |")
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results.md")
     open(path, "w", encoding="utf-8", newline="\n").write("\n".join(out) + "\n")
