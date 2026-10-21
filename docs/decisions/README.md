@@ -16,4 +16,4 @@ code.
 | 3 | [Contract failure](0003-contract-failure.md): what a panic does to external effects | Accepted |
 | 4 | [Compiler structure](0004-compiler-structure.md): staged compiler or incremental query engine | Accepted |
 | 5 | [Names and reproducibility](0005-names-and-reproducibility.md): extension, command, module path, Go version, platforms | Accepted |
-| 6 | [Evidence protocol](0006-evidence-protocol.md): tasks, measurements, and thresholds for milestone 4 | Accepted; amended by audits 3 to 9 |
+| 6 | [Evidence protocol](0006-evidence-protocol.md): tasks, measurements, and thresholds for milestone 4 | Accepted; amended by audits 3 to 10 |

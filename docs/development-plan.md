@@ -255,12 +255,18 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 7](../experiments/audit-7.md) | B1, B2, H1 to H6, M1 to M10, L1 to L12 | Decision 6, amendments for audit 7; this plan (gate order of milestone 0.5, outcome wording, scaled milestone-4 box, signed start dates). M11 (compiler scope) is accepted as a risk: "stopped by schedule" is a likely outcome, and the plan says so in "Recruiting, budget, and time boxes" |
 | [Audit 8](../experiments/audit-8.md) | B1, H1 to H4, M1 to M9, L1 to L7 | Decision 6, amendments for audit 8, and a sizing check run before recruiting (`experiments/sizing/`); this plan (objective, outcome wording, fixed milestone-0.5 design, its box and builder, re-plan dates, the Go version of Stockroom, two arms in milestone 4) |
 | [Audit 9](../experiments/audit-9.md) | B1, H1 to H5, M1 to M7, L1 to L11 | Decision 6, amendments for audit 9: clean success for N0 and N1, a re-run sizing check with coupled-cost, interaction, and net-cost scenarios, a cost pilot after milestone 2; this plan (outcome wording, milestone 0.5's box, the time between milestones, the cost pilot, the milestone-3 retry) |
-| [Audit 10](../experiments/audit-10.md) | No Blocker; H1 to H3, M1 to M8, L1 to L9 | Plan accepted. H1 to H3 are the next deliverable; the rest follow |
+| [Audit 10](../experiments/audit-10.md) | No Blocker; H1 to H3, M1 to M8, L1 to L9 | Plan accepted. H1 to H3 fixed in decision 6; the rest stay open |
+| [Audit 11](../experiments/audit-11.md) | No Blocker; H1, H2, M1 to M9, Lows | Confirms that audit 10's fixes added no Blocker. H1 (the second blind grader's sensitivity) and H2 (the cost pilot's application, staff, budget, and signer) are to be fixed before recruiting |
 
 ## Next deliverable
 
 Audit 10's High findings are fixed in decision 6 (see its amendments for audit 10): a cost check on
 ordinary work (N6) and a sized cost pilot whose retry needs a named change (H1); a paper design of
 milestone 0.5's Vulcan side, frozen before the rules (H2); and a second blind grader (H3). Audit
-10's Medium and Low findings follow as they become relevant. Next, recruiting starts (see
-"Recruiting, budget, and time boxes").
+10's Medium and Low findings follow as they become relevant.
+
+The independent [audit 11](../experiments/audit-11.md) confirmed that these fixes added no
+Blocker. Before recruiting, fix its two High findings: the second blind grader's sensitivity
+(define the judgment unit, measure agreement on positives, and re-judge every judged U\*
+violation), and the cost pilot (name its application, staff, budget, signer, box, and the outcome
+when no change is named). Then recruiting starts (see "Recruiting, budget, and time boxes").
