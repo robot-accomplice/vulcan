@@ -160,3 +160,15 @@ None are needed for the plan to survive, because no Blocker remains. Before recr
    - Fix the run budget.
    - Require the frozen simulation to model every condition of rows 2 and 5.
 4. **M2:** when the sizing gate fails, apply gate 1 instead of ending as "stop, not judged".
+
+## Resolution
+
+The owner asked for this audit's two High findings to be fixed, on 2026-10-21, in the commit that
+adds this resolution:
+
+| Finding | Change |
+|---|---|
+| H1 | A judgment is one (run, rule) pair. The second blind grader re-judges every pair the blind grader marked as a violation, in every arm, and a random 30% of the pairs marked as none, stratified by arm and mixed so that the marked pairs cannot be told apart. Agreement is measured on positives, with a floor of 0.8. Q1, Q2, gate 2, N0, and N1 must pass under both graders' verdicts on every re-judged pair, and Q2 and gate 2 also with each of V's non-building changes counted under whichever grader found more violations. N6 no longer appears in that list (it uses X1). The sizing simulation's list of unmodelled conditions now includes the dual-grader and dual-review conditions, and the frozen simulation of the sizing gate must model them. |
+| H2 | The cost pilot's application is milestone 0.5's service, ported to real Vulcan code by the owner during milestone 2 and reviewed for parity by the Go developer. Its tasks, tests, runs, and reviews have named roles; the run adjudicator signs the result; its hours and tokens are part of the budget committed at the sizing gate; it has its own box of 6 weeks per try. A second try needs a change that the run adjudicator agrees addresses the observed failure modes, and passes only if both tries together meet the margins: simulated, this passes 94% at no cost and 39% at the margins (against 51% for best-of-two). No named change means pivot or stop. |
+
+The Medium and Low findings stay open.

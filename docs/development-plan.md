@@ -97,6 +97,7 @@ outcome, and an honest one.
 | 0.5 Rules without a compiler | 24 weeks, from the day the roles are filled, with the Go developer at least 2.5 days a week |
 | 1 Vertical slice | 6 weeks |
 | 2 Guarantees | 10 weeks |
+| Cost pilot | 6 weeks per try, from the day milestone 2's gate is signed |
 | 3 Application | 8 weeks |
 | 4 Evaluation | 8 weeks at 640 runs, scaled by decision 6's sizing gate |
 
@@ -186,8 +187,12 @@ Exit gate: every case of `docs/release-1/conformance.md` passes, or is marked as
 its K0009 or "Unchecked paths" entry. A script lists both. At most 5% of the cases may be holes;
 each hole in a construct that release 1 supports needs the run adjudicator's signature, and every
 hole is listed in the milestone-4 report. The Go developer checks the list against spec §5.4d and
-§7 and signs it. Then the **cost pilot** of decision 6, section 13 runs: 8 ordinary tasks, Vulcan
-against the analyzers. If the agents' cost in Vulcan exceeds the margins twice, the project pivots
+§7 and signs it. During milestone 2, the owner also ports milestone 0.5's paper design to real
+Vulcan code, for the cost pilot.
+
+Then the **cost pilot** of decision 6, section 13 runs, in its own box: 8 ordinary tasks on
+milestone 0.5's service, Vulcan against the analyzers. If the agents' cost in Vulcan exceeds the
+margins, and a named change does not bring the two tries together within them, the project pivots
 or stops there, before the application is built.
 
 ## Milestone 3: build and operate a substantive application
@@ -256,7 +261,7 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 8](../experiments/audit-8.md) | B1, H1 to H4, M1 to M9, L1 to L7 | Decision 6, amendments for audit 8, and a sizing check run before recruiting (`experiments/sizing/`); this plan (objective, outcome wording, fixed milestone-0.5 design, its box and builder, re-plan dates, the Go version of Stockroom, two arms in milestone 4) |
 | [Audit 9](../experiments/audit-9.md) | B1, H1 to H5, M1 to M7, L1 to L11 | Decision 6, amendments for audit 9: clean success for N0 and N1, a re-run sizing check with coupled-cost, interaction, and net-cost scenarios, a cost pilot after milestone 2; this plan (outcome wording, milestone 0.5's box, the time between milestones, the cost pilot, the milestone-3 retry) |
 | [Audit 10](../experiments/audit-10.md) | No Blocker; H1 to H3, M1 to M8, L1 to L9 | Plan accepted. H1 to H3 fixed in decision 6; the rest stay open |
-| [Audit 11](../experiments/audit-11.md) | No Blocker; H1, H2, M1 to M9, Lows | Confirms that audit 10's fixes added no Blocker. H1 (the second blind grader's sensitivity) and H2 (the cost pilot's application, staff, budget, and signer) are to be fixed before recruiting |
+| [Audit 11](../experiments/audit-11.md) | No Blocker; H1, H2, M1 to M9, Lows | Confirms that audit 10's fixes added no Blocker. H1 and H2 fixed in decision 6 (amendments for audit 11); the rest stay open |
 
 ## Next deliverable
 
@@ -266,7 +271,7 @@ milestone 0.5's Vulcan side, frozen before the rules (H2); and a second blind gr
 10's Medium and Low findings follow as they become relevant.
 
 The independent [audit 11](../experiments/audit-11.md) confirmed that these fixes added no
-Blocker. Before recruiting, fix its two High findings: the second blind grader's sensitivity
-(define the judgment unit, measure agreement on positives, and re-judge every judged U\*
-violation), and the cost pilot (name its application, staff, budget, signer, box, and the outcome
-when no change is named). Then recruiting starts (see "Recruiting, budget, and time boxes").
+Blocker. Its two High findings are fixed in decision 6 (see its amendments for audit 11): the
+second blind grader now re-judges every judged violation, with agreement measured on positives
+(H1), and the cost pilot has an application, staff, a budget, a signer, its own box, and a pooled
+second try (H2). Next, recruiting starts (see "Recruiting, budget, and time boxes").

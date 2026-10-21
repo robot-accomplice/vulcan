@@ -26,15 +26,19 @@ Model:
   slower on every task, before R's rule-breaking runs are counted.
 - Ordinary-task check (N6): on the untargeted tasks alone, the point estimates of V's success gap
   and of the ratio of mean working times are within the margins.
-- Cost pilot: 8 ordinary tasks, 5 runs per arm, the same point estimates, one retry after a change.
+- Cost pilot: 8 ordinary tasks, 5 runs per arm, the same point estimates. After a failed first
+  try and a named change, a second try runs on 8 new tasks, and passes only if the point estimates
+  over both tries together (16 tasks) meet the margins. The simulation assumes that the change has
+  no effect, which is the case the rule must not reward.
 - Escaped defects: Poisson(0.1) holdout failures per accepted change, in every arm; N2 compares
   per-task means over tasks where both arms have an accepted change.
 - False positives: 2% of V's runs.
 - Tests: exact sign-flip over informative tasks (all 2^n patterns up to n = 16, else 20,000
   random patterns), alpha 0.05, the half-rate condition, at least 5 informative tasks and 10
   events. N0 to N3 use one-sided 95% t-bounds over tasks, as decision 6, section 8 defines them.
-- Not modelled (each would lower P(Continue) somewhat): reviewer disagreement and the dual-review
-  conditions of N0, N1, and N3; N4 and N5 (assumed to pass); the four-rule minimum (assumed met).
+- Not modelled (each would lower P(Continue) somewhat): reviewer and blind-grader disagreement and
+  the dual-review and dual-grader conditions of Q2, N0, N1, and N3; N1 without the reviewer's
+  minutes; N4 and N5 (assumed to pass); the four-rule minimum (assumed met).
 
 Usage: python -I -B sizing.py   (writes results.md next to this file)
 """
@@ -153,22 +157,28 @@ def ordinary_ok(sr, sv, tr, tv):
     return np.exp(np.mean(np.log(tv.mean(axis=1) / tr.mean(axis=1)))) <= MARGIN_T
 
 
+def pilot_try(cost_s, cost_t, tasks, runs):
+    base = RNG.beta(4.9, 2.1, size=tasks)
+    pr = np.clip(base + RNG.normal(0, INTER_S, tasks), 0, 1)
+    pv = np.clip(base - cost_s + RNG.normal(0, INTER_S, tasks), 0, 1)
+    sr = RNG.random((tasks, runs)) < pr[:, None]
+    sv = RNG.random((tasks, runs)) < pv[:, None]
+    mu = RNG.normal(0, 0.5, size=tasks)
+    tr = np.exp((mu + RNG.normal(0, INTER_T, tasks))[:, None] + RNG.normal(0, SIGMA_RUN, (tasks, runs)))
+    tv = np.exp((mu + RNG.normal(0, INTER_T, tasks))[:, None] + RNG.normal(0, SIGMA_RUN, (tasks, runs))
+                + np.log(1 + cost_t))
+    budget = np.exp(mu + np.log(3.0))[:, None]
+    return sr, sv, np.where(sr, tr, budget), np.where(sv, tv, budget)
+
+
 def pilot_pass(cost_s, cost_t, tasks=8, runs=5, tries=2):
-    for _ in range(tries):
-        base = RNG.beta(4.9, 2.1, size=tasks)
-        pr = np.clip(base + RNG.normal(0, INTER_S, tasks), 0, 1)
-        pv = np.clip(base - cost_s + RNG.normal(0, INTER_S, tasks), 0, 1)
-        sr = RNG.random((tasks, runs)) < pr[:, None]
-        sv = RNG.random((tasks, runs)) < pv[:, None]
-        mu = RNG.normal(0, 0.5, size=tasks)
-        tr = np.exp((mu + RNG.normal(0, INTER_T, tasks))[:, None] + RNG.normal(0, SIGMA_RUN, (tasks, runs)))
-        tv = np.exp((mu + RNG.normal(0, INTER_T, tasks))[:, None] + RNG.normal(0, SIGMA_RUN, (tasks, runs))
-                    + np.log(1 + cost_t))
-        budget = np.exp(mu + np.log(3.0))[:, None]
-        tr, tv = np.where(sr, tr, budget), np.where(sv, tv, budget)
-        if ordinary_ok(sr, sv, tr, tv):
-            return True
-    return False
+    """One try, or a failed first try followed by a second try judged on both tries pooled."""
+    first = pilot_try(cost_s, cost_t, tasks, runs)
+    if ordinary_ok(*first) or tries == 1:
+        return ordinary_ok(*first)
+    second = pilot_try(cost_s, cost_t, tasks, runs)
+    pooled = [np.concatenate((a, b)) for a, b in zip(first, second)]
+    return ordinary_ok(*pooled)
 
 
 def m4_power(tasks, runs, tempting, sc, sims):
@@ -221,8 +231,9 @@ def main():
     for k in (4, 6, 8):
         out.append("| %d | %.2f | %.2f | %.2f |" % (k, *(m05_gate2_rate(k, 5, x, sims) for x in (0.1, 0.2, 0.4))))
     out += ["", "## Cost pilot (end of milestone 2)", "", "8 ordinary tasks, 5 runs per arm, point "
-            "estimates against the margins (12 points, 1.15). P(pass), 3,000 simulations per cell:",
-            "", "| V's raw cost (success, time) | One try | Within two tries |", "|---|---|---|"]
+            "estimates against the margins (12 points, 1.15); a second try is judged on both tries pooled. "
+            "P(pass), 3,000 simulations per cell:",
+            "", "| V's raw cost (success, time) | One try | With the pooled second try |", "|---|---|---|"]
     for c, tt in ((0, 0), (0.06, 0.07), (0.12, 0.15), (0.20, 0.30)):
         one = np.mean([pilot_pass(c, tt, tries=1) for _ in range(3000)])
         two = np.mean([pilot_pass(c, tt, tries=2) for _ in range(3000)])

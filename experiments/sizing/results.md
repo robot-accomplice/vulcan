@@ -22,14 +22,14 @@ Gate 2's rate test, P(estimate of R's U* rate >= 0.2), at 5 runs (1000 simulatio
 
 ## Cost pilot (end of milestone 2)
 
-8 ordinary tasks, 5 runs per arm, point estimates against the margins (12 points, 1.15). P(pass), 3,000 simulations per cell:
+8 ordinary tasks, 5 runs per arm, point estimates against the margins (12 points, 1.15); a second try is judged on both tries pooled. P(pass), 3,000 simulations per cell:
 
-| V's raw cost (success, time) | One try | Within two tries |
+| V's raw cost (success, time) | One try | With the pooled second try |
 |---|---|---|
-| 0 points, 0% | 0.81 | 0.96 |
-| 6 points, 7% | 0.54 | 0.81 |
-| 12 points, 15% | 0.30 | 0.51 |
-| 20 points, 30% | 0.07 | 0.14 |
+| 0 points, 0% | 0.81 | 0.94 |
+| 6 points, 7% | 0.54 | 0.73 |
+| 12 points, 15% | 0.30 | 0.39 |
+| 20 points, 30% | 0.07 | 0.08 |
 
 ## Milestone 4: P(Continue) by scenario (600 simulations per cell)
 
