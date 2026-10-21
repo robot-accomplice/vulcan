@@ -2,8 +2,8 @@
 
 Status: proposed, 2026-10-21. The owner accepts it only if it survives an antagonistic audit.
 [Audit 3](../experiments/audit-3.md) (not independent) and [audit 4](../experiments/audit-4.md)
-(independent) both found blockers. This version applies their amendments and waits for the next
-independent audit.
+(independent) both found blockers, and so did [audit 5](../experiments/audit-5.md) (independent).
+This version applies their amendments and waits for the next independent audit.
 
 ## Objective
 
@@ -22,13 +22,14 @@ experiments get their own directories.
 
 ## Possible outcomes
 
-The plan ends in one of six ways. The first four come from the fixed decision rule of
+The plan ends in one of six ways. The first five come from the fixed decision rule of
 [decision 6](decisions/0006-evidence-protocol.md), section 10:
 
-- **Continue the language:** Vulcan enforces rules that Go cannot express, that changes outcomes,
-  and it is no worse than Go with its rules on everything else.
-- **Narrow:** the rules that only Vulcan can enforce help, but some cost fails. Keep the language
-  features behind those rules, and drop or redesign the rest.
+- **Continue the language:** Vulcan enforces rules that Go's static analyzers cannot check, that
+  changes outcomes, and it costs no more than 10% in task success or working time.
+- **Narrow:** as above, but a secondary bound fails, or contract rules carried the result (a Go
+  code generator might deliver those). Keep the language features behind the rules that helped,
+  and drop or redesign the rest.
 - **Pivot to the rules:** the rules help, and Go analyzers deliver them. Continue as a Go tool, not
   as a language.
 - **Stop:** enforcing the rules does not change outcomes, or nothing above applies.
@@ -55,14 +56,19 @@ not validate their design; it isolates the first implementation experiment.
 
 ## Time boxes
 
-Each milestone from 0.5 to 4 has a time box in weeks of the owner's work. When a milestone runs
-over its box by more than half, work stops for a re-plan: a written note in `docs/status.md` that
-says why, and what changes. A second overrun of the same milestone is a reason to stop the
-project.
+Each milestone from 0.5 to 4 has a time box in calendar weeks, counted from its start date in
+`docs/status.md`. When a milestone runs over its box by more than half, work stops for a re-plan:
+a written note in `docs/status.md` that says why, what changes, and one new box. If the milestone
+then overruns the new box, the project ends as **stopped by schedule**. The run adjudicator of
+decision 6 signs each overrun.
+
+Recruiting the roles of decision 6, section 3 comes before milestone 0.5 and has its own deadline:
+**8 weeks** from the plan's acceptance. If the roles are not filled by then, the project ends as
+"stop, not judged". Milestone 0.5's box starts when the roles are filled.
 
 | Milestone | Box |
 |---|---|
-| 0.5 Rules without a compiler | 4 weeks |
+| 0.5 Rules without a compiler | 6 weeks |
 | 1 Vertical slice | 6 weeks |
 | 2 Guarantees | 10 weeks |
 | 3 Application | 8 weeks |
@@ -90,19 +96,19 @@ example. No decision silently weakens a promise while keeping its stronger descr
 H-A and H-B (spec §1.1) are claims about rules, not about syntax. So test the rules first, in the
 cheapest form, and find out whether a language is needed at all:
 
-- **Recruit first.** Fill the roles of decision 6, section 3. If they are not filled within
-  **8 weeks** of the plan's acceptance, the project ends as "stop, not judged".
-- Write every rule of Vulcan that Go can express as Go analyzers, a configuration file, and
-  checked comments (arm R of decision 6). The Go developer signs that the coverage is complete.
+- Start only when the roles of decision 6, section 3 are filled (see "Time boxes").
+- Write arm R of decision 6: static analyzers and one configuration file, nothing else, within the
+  Go developer's 15-day cap. The Go developer signs that the coverage is complete.
 - Build a small order service in Go (the test 3 shop, rebuilt with a database is enough).
 - Run the reduced protocol of decision 6, section 12: arm R against arm P, eight tasks, six of
-  them tempting.
+  them tempting, with hidden rules from the same rule-writer process as milestone 4.
 
-Exit gate, in two parts (decision 6, section 12):
+Exit gate, in two parts (decision 6, section 12), signed by the run adjudicator:
 
 1. If the rules do not help (T1 fails), **stop**.
-2. If fewer than 4 rules need a language, or their violations number fewer than 5, **pivot to the
-   rules** without building a compiler.
+2. If fewer than 4 hidden rules need a language, or their violations number fewer than 5,
+   **pivot to the rules** without building a compiler (or stop, if arm R costs too much against
+   arm P).
 
 Otherwise continue to milestone 1. The analyzers become arm R of milestone 4.
 
@@ -135,34 +141,41 @@ and contracts needed for a local change; query must return actual compiler symbo
 Make the conformance suite of release 1 pass, and grow it with each bug. Use differential tests
 against Go for supported ordinary Go bodies. Add parser fuzzing and malformed-input tests. Run
 race detection in CI on a host that has it. Measure check and build latency against the targets
-of decision 6, section 8. A miss starts the incremental work of decision 4, rule 4.
+of decision 6, section 9, on a synthetic application of fixed size. A miss starts the incremental
+work of decision 4, rule 4. Decide `pure` (release 1) from the written design of the milestone-3
+application, which exists by the end of milestone 1.
 
-Exit gate: the supported subset has executable conformance tests, and known holes are either
-rejected or accurately exposed. No missing compiler feature is replaced with manual checking.
+Exit gate: every case of `docs/release-1/conformance.md` passes, or is marked as a known hole with
+its K0009 or "Unchecked paths" entry. A script lists both. Someone other than the owner (the Go
+developer of decision 6) checks the list against §5.4d and signs it.
 
 ## Milestone 3: build and operate a substantive application
 
 Build Stockroom, the order and inventory service of
 [release-1/acceptance.md](release-1/acceptance.md), in Vulcan with the compiler, and in Go for the
 two Go arms of decision 6. The Go developer of decision 6 builds the Go version, or reviews it and
-signs that it is a fair baseline.
+writes a list of changes that are applied before sealing. The Go developer also reviews the Vulcan
+version for parity (decision 6, section 2).
 
 Exit gate: the Vulcan version passes all 32 acceptance criteria, and the Go version passes the 28
 that apply to it (V1 to V4 are for Vulcan only). Then a **fresh agent session**, with
-only the repository and its README and no contact with the owner, builds, runs, diagnoses one
-injected fault, and makes one small change in each version, from the documented instructions. The
-transcript is kept in `experiments/m3/`.
+only the repository and its README and no contact with the owner, builds and runs each version,
+finds the cause of one fault that the grader of decision 6 injects (named in a sealed file), and
+makes one small change that the grader specifies, from the documented instructions. The run
+adjudicator compares the result with the sealed file and signs the gate. The transcript is kept
+in `experiments/m3/`.
 
 ## Milestone 4: evaluate development and maintenance
 
-Run [decision 6](decisions/0006-evidence-protocol.md): three arms (Vulcan, Go with every rule
-that Go can express, Go without the rules), fourteen tasks of which eight are tempting, hidden
-rules from a person who has not read the spec, labelled for each arm, a frozen toolchain, mandatory
-independent roles, exact permutation tests on paired per-task differences, and sealed files kept
-outside the agents' reach with an outside timestamp.
+Run [decision 6](decisions/0006-evidence-protocol.md): three arms (Vulcan; Go with the rules as
+static analyzers; Go with the rules written down but not enforced), at least fourteen tasks sized by
+simulation, written by a non-owner from sealed hidden rules, rules labelled for each arm by seeded
+cases, a toolchain frozen before the rules exist, mandatory independent roles, exact permutation
+tests on paired per-task differences, a committed budget, and sealed files kept from the owner and
+the agents, with an outside timestamp.
 
-Exit gate: apply the decision rule of decision 6, section 10. Inconclusive counts as fail. The
-result is one of the outcomes above.
+Exit gate: the run adjudicator applies the decision rule of decision 6, section 10. Inconclusive
+counts as fail. The result is one of the outcomes above.
 
 ## Milestone 5: consider distributed features separately
 
@@ -209,7 +222,8 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | Audit 3 | L1 | Decision 1 and spec §7.3 state the limit; conformance case D12 |
 | [Audit 4](../experiments/audit-4.md) | B1 to B4, H1, H2, H4, H6 | Decision 6, amended; milestone 0.5 |
 | Audit 4 | M3, M4, L1 | This plan; conformance S08, S10, D12; decision 1; notes in decisions 1 to 4 |
-| Audit 4 | H3, H5, H7, M1, M2, M5 to M10, L2 to L6 | Open: before milestone 4 is sealed, or as noted in audit 4's resolution |
+| Audit 4 | H3, H5, H7, M1, M2, M5 to M10, L2 to L6 | Mostly answered by the audit-5 changes; see audit 5's resolution |
+| [Audit 5](../experiments/audit-5.md) | B1, B2, H1 to H4, M1 to M6, Lows | Decision 6, amended; this plan; see audit 5's resolution |
 
 ## Next deliverable
 

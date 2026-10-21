@@ -106,8 +106,9 @@ run per package, in parallel. Stages 5 and 6 run once per build.
    cache.
 3. **No separate IR in the first release.** Stage 6 rewrites the typed Go syntax tree. An IR is
    added when a second backend is a real requirement, with that backend as its first test.
-4. **An incremental engine only when measured.** Milestone 2 measures, on the milestone-3
-   application: the time of `keel check` after a one-line edit in one leaf, and of a full check.
+4. **An incremental engine only when measured.** Milestone 2 measures, on a synthetic application
+   of fixed size (decision 6, section 9), and milestone 3 again on the application: the time of
+   `keel check` after a one-line edit in one leaf, and of a full check.
    If the 95th percentile of a one-edit check exceeds the target that decision 6 sets, the project
    adds incremental computation to the slowest stage, and records that in a new decision.
 5. **Self-hosting is not planned.** It stays a possibility after the language earns continued

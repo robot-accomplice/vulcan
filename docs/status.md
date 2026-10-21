@@ -75,8 +75,8 @@ open.
 
 The [development plan](development-plan.md) is **proposed**. The owner accepts it only if it
 survives an antagonistic audit. [Audit 3](../experiments/audit-3.md) (not independent) and
-[audit 4](../experiments/audit-4.md) (independent) found blockers. This version applies their
-amendments and waits for the next independent audit. The plan answers item 1 below: milestone 0.5
+[audit 4](../experiments/audit-4.md) and [audit 5](../experiments/audit-5.md) (both independent)
+found blockers. This version applies their amendments and waits for the next independent audit. The plan answers item 1 below: milestone 0.5
 tests the rules without a compiler, and decision 6 decides by a fixed rule. **Next:** the
 independent audit; then milestone 0.5, starting with the roles of decision 6, section 3.
 

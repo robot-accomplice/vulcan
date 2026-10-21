@@ -54,7 +54,7 @@ The **Milestone** column says when a construct starts to work. Until then, K0009
 | `err`, `result`, `result.N`, `old(x)`, `=>` in contracts | 2 | |
 | `invariant` on a struct | 2 | |
 | Tier-1 contract expressions | 2 | Comparisons, arithmetic with exact integers, `&&`, `\|\|`, `!`, `=>`, field access, `len`. |
-| `pure` functions, and calls to them in contracts (tier 2) | Deferred | K0009. Added in milestone 2 only if the milestone-3 application needs them. |
+| `pure` functions, and calls to them in contracts (tier 2) | Deferred | K0009. Added in milestone 2 only if the written design of the milestone-3 application, finished in milestone 1, needs them. |
 | `vulcan.All`, `vulcan.Any` | Deferred | K0009, with `pure`. |
 | `limit` on a field | Deferred | K0009. Only message types use it. |
 | `handle`, `idempotent` | Deferred | K0009. |

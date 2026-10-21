@@ -11,8 +11,9 @@ An operator manages stock and reads the audit trail. An internal ledger records 
 refund. It does not process real payments.
 
 It is built twice, with the same HTTP API and the same tests: once in Vulcan (strict mode), and
-once in Go. The Go version serves both Go arms of decision 6: with Vulcan's rules as analyzers
-(Go-rules), and with only a dependency linter (Go-plain). Every criterion below applies to both
+once in Go. The Go version serves both Go arms of decision 6: with Vulcan's rules as static
+analyzers (Go-rules), and with the rules written down but enforced only by `go vet`, `staticcheck`,
+and a dependency linter (Go-plain). Every criterion below applies to both
 versions, unless it says "Vulcan arm". "Both arms" below means both versions.
 
 ### Shape
@@ -99,12 +100,11 @@ finding of [audit 2](../../experiments/audit-2.md) or a decision.
 
 ## Exit gate of milestone 3
 
-The application passes every criterion in both versions, from a clean checkout, with documented
-commands. Then a fresh agent session, with only the repository and its README, builds, runs,
-diagnoses one injected fault, and makes one small change in each version, with no contact with the
-owner (development plan, milestone 3). The Go developer of decision 6 builds or signs off the Go
-version. Each criterion that a person checks (none today) is checked by someone other than the
-author.
+The Vulcan version passes all 32 criteria, and the Go version the 28 that apply to it, from a
+clean checkout, with documented commands. Then a fresh agent session checks each version as the
+development plan, milestone 3 describes. Three criteria need a person: D5 (each guard cannot
+overflow), V1 (the reasons for exemptions), and V2 (each K0525 warning reviewed). The Go developer
+of decision 6 checks them, not the author.
 
 ## Out of scope
 

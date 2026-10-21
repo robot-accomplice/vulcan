@@ -37,8 +37,8 @@ Below, **Accept** means the project builds with no diagnostic except the listed 
 | S06 | A body with a Go type error, inside a file with contracts above it | K0008 at the true `.vulcan` position. |
 | S07 | A panic in a body at a known line | The stack trace names the `.vulcan` file and line (`//line`). |
 | S08 | Each deferred source construct of syntax.md, one case each (topic, remote port, `via`, `limit`, `handle`, `pure`, a second container) | K0009 at the construct, naming it. |
+| S09 | A Go feature newer than Go 1.22 in a body, for example a range-over-func iterator (Go 1.23) | Accept, and the same output as the same body in Go. |
 | S10 | Each deferred command of syntax.md (`vulcan fmt`, `explain`, `doc`, `diagram`, `archdiff`, `fake`, `trace`) | The command prints that it is not in release 1, and exits 2. |
-| S09 | A Go 1.26 feature in a body, for example a range-over-func iterator | Accept, and the same output as the same body in Go. |
 
 ## Architecture and wiring (milestone 1)
 
