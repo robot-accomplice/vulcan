@@ -212,7 +212,8 @@ The findings below come from an external audit of the project; its report is not
 ## Immediate next deliverable
 
 The milestone-0 decision packet is complete: [decisions 1 to 6](decisions/README.md), accepted
-on 2026-10-20 and 2026-10-21, with the guarantee matrix in spec §5.4d. Still to produce before
-milestone 1: the supported syntax of the first release, the first conformance cases, and the
-application acceptance criteria. Estimate the implementation after this scope is concrete. Do not
-attach a full-language delivery date to the current specification.
+on 2026-10-20 and 2026-10-21, with the guarantee matrix in spec §5.4d. The milestone-1 scope is
+accepted in `docs/release-1/`: the [supported syntax](release-1/syntax.md), the
+[first conformance cases](release-1/conformance.md), and the
+[application acceptance criteria](release-1/acceptance.md). Estimate the implementation from this
+scope. Do not attach a full-language delivery date to the current specification.

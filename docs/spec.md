@@ -2194,6 +2194,7 @@ the long form.
 | K0005 | E | A declared name starts with `vulcan_` or `Vulcan_` | App. B |
 | K0006 | E | Unknown key in `config { }` | App. B |
 | K0007 | E | A `transport` name is not lower case | App. B |
+| K0009 | E | A construct that this release does not support; the message names the construct, the release, and the spec section | [release 1](release-1/syntax.md) |
 | **K01** | | **Architecture** | |
 | K0101 | E | A leaf refers to another leaf other than through a port, a topic, or a library | §5.4 r1 |
 | K0102 | E | A method port wired across containers is not `remote`, or a `remote` port is wired inside one container | §5.4 r3 |
