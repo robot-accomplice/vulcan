@@ -5,9 +5,9 @@ Amended by [audit 3](../../experiments/audit-3.md), then by the independent audi
 [4](../../experiments/audit-4.md), [5](../../experiments/audit-5.md),
 [6](../../experiments/audit-6.md), [7](../../experiments/audit-7.md),
 [8](../../experiments/audit-8.md), and [9](../../experiments/audit-9.md), and after the plan's
-acceptance by the High findings of [audit 10](../../experiments/audit-10.md) and
-[audit 11](../../experiments/audit-11.md). See "Amendments" at
-the end. Milestone 0, item 6 of the [development plan](../development-plan.md).
+acceptance by the High findings of [audit 10](../../experiments/audit-10.md),
+[audit 11](../../experiments/audit-11.md), and [audit 12](../../experiments/audit-12.md). See "Amendments"
+at the end. Milestone 0, item 6 of the [development plan](../development-plan.md).
 
 ## Question
 
@@ -113,7 +113,7 @@ transcripts until the runs end. These roles are mandatory, filled by people othe
 | Task writer | Writes all task briefs and the FAQ from the sealed rules; tags targets; keeps the private store | 3 days per milestone |
 | Grader | Writes seeded cases, hidden and holdout tests, grading scripts, and a reference solution that keeps every rule, for each task and arm; labels rules; checks acceptance criterion D5 on the Go version | 15 days per milestone |
 | Blind grader | Judges, from the diff and the rule list, the rules that no hidden test can observe and every final change that does not build (section 7). Sees the diff, so the language is visible, but not run logs, other judgments, or which Go arm a diff comes from. Not the grader, the Go developer, or the run adjudicator. | About 2 days per milestone |
-| Second blind grader | Re-judges, without seeing the first judgments and without knowing which pairs were marked, every (run, rule) pair that the blind grader marked as a violation and a random 30% of the pairs it marked as none, mixed together; reports agreement. Same view as the blind grader. Not the blind grader, the grader, the Go developer, or the run adjudicator. | About 3 days per milestone |
+| Second blind grader | Re-judges, without seeing the first judgments, every **decisive** pair (section 5) in every arm, and a random 30% of the other judged pairs; reports agreement. Same view as the blind grader. Not the blind grader, the grader, the Go developer, or the run adjudicator. | About 4 days per milestone |
 | Analyst | Writes the analysis script and the frozen sizing simulation, before the freeze. Not the grader. | 5 days |
 | Run adjudicator | Exclusions, toolchain bugs, gap calls, coverage-map review, the equivalence of seeded cases across arms, arm C's contract check, replacements, milestone start dates, exit-gate and overrun signatures | 4 days per milestone |
 | Operator | Runs the harness during runs, under the operator's own model account, and stores the logs in the private store; answers agents only from the sealed FAQ, which may point a Vulcan agent to a section of the primer | Present during runs: about 2 weeks in milestone 0.5, 4 weeks in milestone 4 |
@@ -181,20 +181,22 @@ role.
 - **Grading:** a violation is found by the grader's hidden tests, which may run the application,
   and by the blind grader for rules that no test can observe. The method of each rule is sealed
   with it.
-- **Second judgment.** A **judgment** is one (run, rule) pair that the blind grader decides. The
-  second blind grader re-judges every pair that the blind grader marked as a violation, in every
-  arm, and a random 30% of the pairs it marked as none, stratified by arm, all mixed together so
-  that the second grader cannot tell which were marked. Then:
-  - **Agreement on positives:** of the re-judged pairs that either grader marks as a violation,
-    the share that both mark. If it is below 0.8, every test and bound that uses judged
-    violations is inconclusive.
-  - **Both verdicts:** every test and bound that uses judged violations (Q1, Q2, gate 2, N0, N1)
-    is computed with the blind grader's verdicts, and again with the second blind grader's verdict
-    on every re-judged pair. It passes only if both pass.
-  - **Worst case for V's non-building changes:** Q2 and gate 2 also pass only if they pass with
-    each of V's final changes that does not build counted under whichever grader found more
-    violations in it.
-  - The report gives the share of U\* violations that a judgment, not a test, decided.
+- **Second judgment.** A **judgment** is one (run, rule) pair that the blind grader decides. A
+  judgment is **decisive** when its rule is a targeted rule of its task, because only those pairs
+  enter the tests that decide the outcome: Q1, Q2, and gate 2 through X2, and N0 and N1 through
+  X1c. The second blind grader re-judges **every decisive pair, in every arm**, whatever the blind
+  grader marked, and a random 30% of the other judged pairs. Then:
+  - **Both verdicts:** every test and bound that uses judged violations (Q1, Q2, gate 2, N0, N1) is
+    computed with the blind grader's verdicts, and again with the second blind grader's verdicts on
+    all decisive pairs. It passes only if both pass. Because every decisive pair has two verdicts,
+    a grader who over-counts or under-counts in either arm cannot move the result alone.
+  - **Worst case for V's non-building changes:** Q2 also passes only if it passes with each of V's
+    final changes that does not build counted under whichever grader found more violations in it.
+  - **Agreement:** the report gives Cohen's kappa of the two graders on the decisive pairs, by arm,
+    and the share of U\* violations that a judgment, not a test, decided. There is no fixed
+    agreement floor: with honest graders and a few independent false positives, a floor of 0.8
+    on positive agreement would trip almost always (`experiments/sizing/results.md`), and the
+    both-verdicts rule already corrects a biased grader.
 - **Integrity check:** immediately before and after the runs, the operator re-runs every seeded
   case on the frozen toolchain. Each must give the same result as at labelling.
 - **Too few rules:** in milestone 4, if U\* holds fewer than 4 rules after labelling, no rule needs
@@ -319,13 +321,21 @@ U\* rate on targeted tasks in milestone 0.5. Results before recruiting:
 - **Milestone 0.5:** 16 tasks, 12 tempting, 5 runs per task and arm: P(Q1 passes \| L) about 0.93.
   Gate 2's rate test with 8 tasks targeting U\*: a true rate of 0.4 passes 91% of the time, a true
   rate of 0.1 passes 9%.
-- **Milestone 4:** with half of the tasks tempting, 32 tasks × 10 runs gives P(Continue) of about
-  0.85 to 0.90 under L, 0.84 to 0.88 under L+coupled, 0.81 to 0.86 under L+inter, about 0.2 under
-  L+half, 0.05 to 0.12 under L+raw, and about 0 under Z and L+cost, for r of 0.4 and 0.2. With
-  three quarters tempting, N6 could not reach 0.8 under L+inter, so the share was lowered.
+- **Milestone 4:** with half of the tasks tempting, 36 tasks × 10 runs gives P(Continue) of about
+  0.89 to 0.91 under L, 0.90 to 0.91 under L+coupled, 0.82 to 0.86 under L+inter, 0.26 to 0.30
+  under L+half, 0.06 to 0.11 under L+raw, and about 0 under Z and L+cost, for r of 0.4 and 0.2.
+  32 tasks × 10 runs passes every criterion at r = 0.4, and sits within simulation error of 0.8
+  under L+inter at r = 0.2 (0.79 to 0.81 across runs of the check). The budget is planned for
+  36 × 10; the sizing gate chooses the smallest design that passes. With three quarters of the
+  tasks tempting, N6 could not reach 0.8 under L+inter, so the share was lowered.
 - **Cost pilot:** 8 ordinary tasks × 5 runs, with a second try judged on both tries pooled,
   passes 94% of the time at no cost, 73% at half the margins, 39% at the margins, and 8% at 20
   points and 30% (assuming the named change has no effect).
+- **Gate 2's rate test** at its threshold: a true rate of 0.2 passes about half the time (0.51).
+- **End to end,** for a language with a large effect and no cost: gate 2 (at a true rate of 0.4),
+  the pilot, and milestone 4 together continue about 0.75 of the time; at a true rate of 0.2,
+  about 0.41. These figures leave out schedule stops and the conditions that the check does not
+  model.
 
 **Accepted limit:** a language with a real net cost of half the margins continues only about one
 time in five. The margins are the costs the owner accepts, and a bound must exclude them; a smaller
@@ -350,7 +360,7 @@ including the dual-review and dual-grader conditions (with disagreement rates me
 chosen design, for milestone 4 and for the cost pilot. The sizing gate passes only when each role
 holder commits in writing to the sized load, and the budget is committed. Milestone 4's time box is
 8 weeks times the ratio of the sized number of runs to 640 (32 tasks × 10 runs × 2 arms), rounded up
-to whole weeks, and never less than 8 weeks.
+to whole weeks, and never less than 8 weeks. Loads and budgets are planned for 36 × 10 (720 runs).
 
 **Model change.** Milestone 4 uses the model version of milestone 0.5 if it is still available. If
 not, arm P runs in milestone 4 as well, Q1 is tested again there, and row 4 uses that result.
@@ -448,19 +458,30 @@ cheaply, on ordinary work only:
   acceptance tests and reference solutions, sealed apart from milestone 4's material. There are no
   hidden rules, so success is X1. The operator runs 5 runs per task in arms V and R; the reviewer
   and the second reviewer review as in section 3. The run adjudicator signs the result.
+- **Run rules:** section 6 applies to each try: unanswered questions, rejected changes,
+  exclusions, and toolchain bugs. A try in which more than 10% of V's runs end because a toolchain
+  bug blocked them is **void**: it does not count and is not pooled, the bug is fixed under section
+  6's procedure, and the try runs again on 8 new tasks in the same box. A try can be void once; a
+  second void try ends the project as **stop, not judged**.
 - **Budget and box:** the pilot's hours and tokens are part of the budget committed at the sizing
-  gate. It has its own box of 6 weeks, from the day milestone 2's gate is signed, outside
-  milestone 2's box.
+  gate. Its first try has its own box of 6 weeks, from the day milestone 2's gate is signed,
+  outside milestone 2's box. The pilot's signed result is the gate that starts milestone 3.
 - **Pass:** V's success is at most 12 points below R's, and the geometric mean over the tasks of
-  the ratio of V's mean working time to R's is at most 1.15, as point estimates.
+  the ratio of V's mean working time to R's is at most 1.15, as point estimates. Both are computed
+  with the reviewer's verdicts, and again with each verdict that the second reviewer disputed
+  replaced by the second reviewer's (as for N0); the try passes only if both pass. If the two
+  reviewers disagree on more than 20% of the sampled verdicts, the try is inconclusive.
 - **After a failure:** the owner names a change to the compiler, its diagnostics, the primer, or
   the tools that addresses the failure modes in the pilot's report; the run adjudicator agrees in
   writing that it does, and it is frozen before new tasks are written. Then a second try runs on
-  8 new tasks, within a second box of 6 weeks, and passes only if the point estimates over **both
-  tries together** (16 tasks) meet the margins. So a change that does not work does not pass by a
-  second chance alone (section 9 publishes the rates).
-- **If no change is named,** or the second try fails, the project ends by row 4 of section 10 if
-  its conditions hold, and otherwise as **stop: the language costs too much**.
+  8 new tasks, within a second box of 6 weeks that starts on the day the change is frozen, at most
+  4 weeks after the first try is signed. It passes only if the point estimates over **both tries
+  together** (16 tasks) meet the margins. A change that does not work therefore passes less often
+  than it would with a free second try (section 9 publishes the rates).
+- **Outcomes:** if no change is named, or the second try fails, the project ends by row 4 of
+  section 10 if its conditions hold, and otherwise as **stop: the language costs too much**. A try
+  that does not finish (a role falls vacant, the box runs out, or it is inconclusive) ends the
+  project as **stop, not judged**.
 
 ### 14. Records
 
@@ -489,6 +510,8 @@ every number.
 | Audit 8, H2 | Non-building final changes are judged by a blind grader for X2, fail every holdout test for X6, and are counted per arm. |
 | Audit 8, H3 | The second reviewer samples accepted and rejected changes and X8 calls; N0, N1, and N3 must hold under both reviewers' judgments and without reviewer minutes; reversal defined. |
 | Audit 8, H4 | The owner builds milestone 0.5's service; the Go developer commits at least 2.5 days a week; the plan's box follows. |
+| Audit 12, H1 | The cost pilot follows section 6's run rules; a try with more than 10% bug-blocked Vulcan runs is void and rerun, not pooled; the pass rule holds under both reviewers' verdicts, with N0's 20% limit; an unfinished or inconclusive try is "stop, not judged"; the pilot's result is the gate that starts milestone 3, and the second try's box starts when the change is frozen. |
+| Audit 12, H2 | The fixed agreement floor is dropped: the sizing check showed that it trips almost always with honest graders. Instead the second blind grader re-judges every decisive pair (targeted rules) in every arm, so the both-verdicts rule corrects a biased grader in either direction; kappa is reported; the worst-case rule applies to Q2 only. Section 9 also publishes gate 2's rate at its threshold and the end-to-end chance of continuing. |
 | Audit 11, H1 | A judgment is one (run, rule) pair; the second blind grader re-judges every pair the first marked as a violation and 30% of the rest, mixed; agreement is measured on positives with a floor of 0.8; tests must pass under both verdicts, and Q2 and gate 2 also with V's non-building changes counted under the stricter grader; the sizing gate's simulation must model these conditions. |
 | Audit 11, H2 | The cost pilot's application (milestone 0.5's service, ported by the owner and reviewed for parity), staff, budget, signer, and own box; a second try needs a named change that the run adjudicator agrees addresses the failure, and is judged on both tries pooled; no change means pivot or stop. |
 | Audit 10, H1 | N6, a cost check on the ordinary tasks of milestone 4; half of the tasks tempting; the sizing check re-run with a raw-cost scenario and the cost pilot, which fixed milestone 4 at 32 tasks × 10 runs before recruiting; the pilot's retry needs a named change. |

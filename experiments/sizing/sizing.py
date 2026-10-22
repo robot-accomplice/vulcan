@@ -36,6 +36,10 @@ Model:
 - Tests: exact sign-flip over informative tasks (all 2^n patterns up to n = 16, else 20,000
   random patterns), alpha 0.05, the half-rate condition, at least 5 informative tasks and 10
   events. N0 to N3 use one-sided 95% t-bounds over tasks, as decision 6, section 8 defines them.
+- Agreement floor of the blind graders (a rule considered and dropped): each grader marks a true violation with probability q and
+  a non-violation with probability 0.005; the second grader re-judges every pair the first marked
+  and 30% of the rest; agreement = both / (both + first only + second only / 0.3), checked only
+  when the estimated number of marked pairs is at least 20. The table gives P(agreement < 0.8).
 - Not modelled (each would lower P(Continue) somewhat): reviewer and blind-grader disagreement and
   the dual-review and dual-grader conditions of Q2, N0, N1, and N3; N1 without the reviewer's
   minutes; N4 and N5 (assumed to pass); the four-rule minimum (assumed met).
@@ -202,6 +206,25 @@ def m05_gate2_rate(targeted, runs, true_rate, sims):
     return hits / sims
 
 
+def agreement_trip(true_pos, negatives, q, sims, fp=0.005, share=0.3):
+    trips = 0
+    for _ in range(sims):
+        f_pos = RNG.random(true_pos) < q
+        s_pos = RNG.random(true_pos) < q
+        f_neg = RNG.random(negatives) < fp
+        s_neg = RNG.random(negatives) < fp
+        # Re-judged: every pair the first marked, and a 30% sample of the pairs it did not mark.
+        sampled_pos = ~f_pos & (RNG.random(true_pos) < share)
+        sampled_neg = ~f_neg & (RNG.random(negatives) < share)
+        both = (f_pos & s_pos).sum() + (f_neg & s_neg).sum()
+        first_only = (f_pos & ~s_pos).sum() + (f_neg & ~s_neg).sum()
+        second_only = (sampled_pos & s_pos).sum() + (sampled_neg & s_neg).sum()
+        marked = both + first_only + second_only / share
+        if marked >= 20 and both / marked < 0.8:
+            trips += 1
+    return trips / sims
+
+
 def scenarios(r):
     # (rate_R, rate_V, cost_success, cost_time, coupled, interaction_s, interaction_t)
     return {
@@ -238,6 +261,14 @@ def main():
         one = np.mean([pilot_pass(c, tt, tries=1) for _ in range(3000)])
         two = np.mean([pilot_pass(c, tt, tries=2) for _ in range(3000)])
         out.append("| %d points, %d%% | %.2f | %.2f |" % (round(c * 100), round(tt * 100), one, two))
+    out += ["", "## Agreement floor of the blind graders (considered and dropped)", "",
+            "P(weighted positive agreement < 0.8) for two honest graders, with 60 true judged "
+            "violations among 2,000 judged pairs and a false-positive rate of 0.005 (2,000 "
+            "simulations per cell). A fixed floor trips almost always, so decision 6 re-judges "
+            "every decisive pair instead:", "",
+            "| Each grader's detection rate q | P(floor trips) |", "|---|---|"]
+    for q in (0.95, 0.90, 0.85, 0.80, 0.70):
+        out.append("| %.2f | %.2f |" % (q, agreement_trip(60, 2000, q, 2000)))
     names = ("Z", "L", "L+coupled", "L+inter", "L+half", "L+cost", "L+raw")
     sims = 600
     out += ["", "## Milestone 4: P(Continue) by scenario (%d simulations per cell)" % sims, "",

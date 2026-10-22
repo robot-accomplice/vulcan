@@ -4,9 +4,9 @@ Status: **accepted**, 2026-10-21. The owner's condition was that the plan surviv
 audit. [Audit 3](../experiments/audit-3.md) (not independent) and the independent audits
 [4](../experiments/audit-4.md) to [9](../experiments/audit-9.md) found blockers, which this version
 answers. The independent [audit 10](../experiments/audit-10.md) found none. Its High findings were
-fixed, and two further independent audits, [11](../experiments/audit-11.md) and
+fixed, and further independent audits, [11](../experiments/audit-11.md) and
 [12](../experiments/audit-12.md), each confirmed that the fixes so far added no Blocker. Audit 12's
-two High findings are open.
+two High findings were then fixed as the last round, and a final independent audit checks them.
 
 ## Objective
 
@@ -99,7 +99,7 @@ outcome, and an honest one.
 | 0.5 Rules without a compiler | 24 weeks, from the day the roles are filled, with the Go developer at least 2.5 days a week |
 | 1 Vertical slice | 6 weeks |
 | 2 Guarantees | 10 weeks |
-| Cost pilot | 6 weeks per try, from the day milestone 2's gate is signed |
+| Cost pilot | 6 weeks per try; the first from the day milestone 2's gate is signed, the second from the day the named change is frozen. Its signed result starts milestone 3 |
 | 3 Application | 8 weeks |
 | 4 Evaluation | 8 weeks at 640 runs, scaled by decision 6's sizing gate |
 
@@ -264,7 +264,7 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 9](../experiments/audit-9.md) | B1, H1 to H5, M1 to M7, L1 to L11 | Decision 6, amendments for audit 9: clean success for N0 and N1, a re-run sizing check with coupled-cost, interaction, and net-cost scenarios, a cost pilot after milestone 2; this plan (outcome wording, milestone 0.5's box, the time between milestones, the cost pilot, the milestone-3 retry) |
 | [Audit 10](../experiments/audit-10.md) | No Blocker; H1 to H3, M1 to M8, L1 to L9 | Plan accepted. H1 to H3 fixed in decision 6; the rest stay open |
 | [Audit 11](../experiments/audit-11.md) | No Blocker; H1, H2, M1 to M9, Lows | Confirms that audit 10's fixes added no Blocker. H1 and H2 fixed in decision 6 (amendments for audit 11); the rest stay open |
-| [Audit 12](../experiments/audit-12.md) | No Blocker; H1, H2, M1 to M7, Lows | Confirms that audit 11's fixes added no Blocker. H1 (the cost pilot's run rules) and H2 (the agreement floor's bias and sizing) are open |
+| [Audit 12](../experiments/audit-12.md) | No Blocker; H1, H2, M1 to M7, Lows | Confirms that audit 11's fixes added no Blocker. H1 and H2 fixed in decision 6 (amendments for audit 12), with M1 and M3; the rest stay open |
 
 ## Next deliverable
 
@@ -277,8 +277,11 @@ The independent [audit 11](../experiments/audit-11.md) confirmed that these fixe
 Blocker. Its two High findings are fixed in decision 6 (see its amendments for audit 11): the
 second blind grader now re-judges every judged violation, with agreement measured on positives
 (H1), and the cost pilot has an application, staff, a budget, a signer, its own box, and a pooled
-second try (H2). The independent [audit 12](../experiments/audit-12.md) confirmed that these fixes
-added no Blocker, and found two High findings, which are open: the cost pilot has no run rules
-(toolchain bugs, the second reviewer's role, an unfinished try), and the blind graders' agreement
-floor overstates agreement and is not sized for milestone 0.5. Next: fix them, or accept them, and
-start recruiting (see "Recruiting, budget, and time boxes").
+second try (H2). The independent [audit 12](../experiments/audit-12.md) confirmed that these fixes added no
+Blocker. Its two High findings are fixed in decision 6 (see its amendments for audit 12): the cost
+pilot follows section 6's run rules, treats a bug-blocked try as void, holds under both reviewers,
+and maps an unfinished try to "stop, not judged" (H1); and the fixed agreement floor is replaced by
+re-judging every decisive pair, after the sizing check showed that a floor would trip almost
+always with honest graders (H2). This was the owner's last round of fixes. Next, recruiting starts
+(see "Recruiting, budget, and time boxes"); the open Medium and Low findings follow as they become
+relevant.

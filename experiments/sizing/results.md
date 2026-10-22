@@ -31,21 +31,33 @@ Gate 2's rate test, P(estimate of R's U* rate >= 0.2), at 5 runs (1000 simulatio
 | 12 points, 15% | 0.30 | 0.39 |
 | 20 points, 30% | 0.07 | 0.08 |
 
+## Agreement floor of the blind graders (considered and dropped)
+
+P(weighted positive agreement < 0.8) for two honest graders, with 60 true judged violations among 2,000 judged pairs and a false-positive rate of 0.005 (2,000 simulations per cell). A fixed floor trips almost always, so decision 6 re-judges every decisive pair instead:
+
+| Each grader's detection rate q | P(floor trips) |
+|---|---|
+| 0.95 | 0.95 |
+| 0.90 | 0.99 |
+| 0.85 | 1.00 |
+| 0.80 | 1.00 |
+| 0.70 | 1.00 |
+
 ## Milestone 4: P(Continue) by scenario (600 simulations per cell)
 
 Half of the tasks are tempting. Scenarios: Z no effect; L large effect (V's rate one eighth of R's); L+coupled, tempted V runs 1.3 times slower and 5 points more failures; L+inter, task x arm interaction sd 0.10 (success) and 0.20 (log time); L+half, a net cost of half the margins (6 points, 7%); L+cost, a net cost of 15 points and 20%; L+raw, a raw cost equal to the margins (12 points, 15%) on every task. Net costs are stated against R's clean success. Continue includes the ordinary-task check N6.
 
 | Tasks | Runs | r | Z | L | L+coupled | L+inter | L+half | L+cost | L+raw |
 |---|---|---|---|---|---|---|---|---|---|
-| 28 | 8 | 0.4 | 0.00 | 0.75 | 0.76 | 0.69 | 0.16 | 0.00 | 0.07 |
-| 28 | 8 | 0.2 | 0.01 | 0.68 | 0.62 | 0.60 | 0.14 | 0.00 | 0.04 |
-| 28 | 10 | 0.4 | 0.00 | 0.86 | 0.83 | 0.78 | 0.23 | 0.00 | 0.09 |
-| 28 | 10 | 0.2 | 0.01 | 0.81 | 0.81 | 0.70 | 0.21 | 0.00 | 0.05 |
-| 32 | 8 | 0.4 | 0.00 | 0.82 | 0.81 | 0.78 | 0.17 | 0.00 | 0.09 |
-| 32 | 8 | 0.2 | 0.01 | 0.77 | 0.80 | 0.70 | 0.17 | 0.00 | 0.05 |
-| 32 | 10 | 0.4 | 0.00 | 0.90 | 0.88 | 0.86 | 0.22 | 0.00 | 0.12 |
-| 32 | 10 | 0.2 | 0.01 | 0.85 | 0.84 | 0.81 | 0.23 | 0.00 | 0.05 |
-| 36 | 8 | 0.4 | 0.00 | 0.85 | 0.85 | 0.83 | 0.22 | 0.00 | 0.10 |
-| 36 | 8 | 0.2 | 0.01 | 0.84 | 0.80 | 0.77 | 0.20 | 0.00 | 0.05 |
-| 36 | 10 | 0.4 | 0.00 | 0.92 | 0.91 | 0.88 | 0.27 | 0.00 | 0.12 |
-| 36 | 10 | 0.2 | 0.01 | 0.91 | 0.90 | 0.86 | 0.25 | 0.00 | 0.05 |
+| 28 | 8 | 0.4 | 0.00 | 0.74 | 0.75 | 0.67 | 0.16 | 0.00 | 0.09 |
+| 28 | 8 | 0.2 | 0.00 | 0.64 | 0.65 | 0.61 | 0.13 | 0.00 | 0.04 |
+| 28 | 10 | 0.4 | 0.00 | 0.81 | 0.81 | 0.80 | 0.20 | 0.00 | 0.10 |
+| 28 | 10 | 0.2 | 0.01 | 0.82 | 0.81 | 0.71 | 0.18 | 0.00 | 0.05 |
+| 32 | 8 | 0.4 | 0.00 | 0.81 | 0.79 | 0.74 | 0.17 | 0.00 | 0.08 |
+| 32 | 8 | 0.2 | 0.01 | 0.74 | 0.78 | 0.69 | 0.15 | 0.00 | 0.04 |
+| 32 | 10 | 0.4 | 0.00 | 0.87 | 0.87 | 0.86 | 0.29 | 0.00 | 0.10 |
+| 32 | 10 | 0.2 | 0.00 | 0.87 | 0.87 | 0.79 | 0.21 | 0.00 | 0.04 |
+| 36 | 8 | 0.4 | 0.00 | 0.84 | 0.85 | 0.80 | 0.23 | 0.00 | 0.10 |
+| 36 | 8 | 0.2 | 0.00 | 0.84 | 0.78 | 0.75 | 0.20 | 0.00 | 0.07 |
+| 36 | 10 | 0.4 | 0.00 | 0.91 | 0.91 | 0.86 | 0.30 | 0.00 | 0.11 |
+| 36 | 10 | 0.2 | 0.01 | 0.89 | 0.90 | 0.82 | 0.26 | 0.00 | 0.06 |

@@ -80,9 +80,8 @@ milestone 0.5 tests the rules without a compiler, and decision 6 decides by a fi
 Audit 10's three High findings are fixed in decision 6, and the independent
 [audit 11](../experiments/audit-11.md) found that the fixes added no Blocker. Its two High findings are
 fixed too, and the independent [audit 12](../experiments/audit-12.md) found no Blocker in those
-fixes. **Next:** decide on audit 12's two High findings (the cost pilot's run rules and the
-agreement floor), then recruit the roles of decision 6, section 3 (at least eight people besides
-the owner), and start milestone 0.5.
+fixes. Its two High findings are fixed as the last round. **Next:** recruit the roles of decision 6,
+section 3 (at least eight people besides the owner), and start milestone 0.5.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

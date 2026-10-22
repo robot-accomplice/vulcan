@@ -104,3 +104,17 @@ None are required for the plan to survive, because no Blocker remains. Before re
 1. **H1:** apply section 6 to each pilot try. Exclude a try halted by toolchain bugs from the pool, and rerun it. Compute the pilot pass rule under both reviewers' verdicts, with N0's 20% limit. Map an unfinished try to "stop, not judged".
 2. **H2:** weight sampled negatives in the agreement statistic, or use kappa. Set a minimum positive count and a rule for zero positives. Include the floor in milestone 0.5's sizing, or report its trip rate. Fix the worst-case rule's reference to gate 2. Have the second grader judge every pair of V's non-building changes.
 3. **M1 to M3:** publish gate 2's 0.51 at a rate of 0.2 and the chained P(Continue | L). Add milestone 4's reaching-test rule. Make the pilot's signed result the gate that starts milestone 3, and fix when the second box starts.
+
+## Resolution
+
+The owner asked for this audit's two High findings to be fixed as the last round, on 2026-10-22, in
+the commit that adds this resolution:
+
+| Finding | Change |
+|---|---|
+| H1 | The cost pilot follows section 6's run rules (unanswered questions, rejected changes, exclusions, toolchain bugs). A try in which more than 10% of Vulcan's runs end on a toolchain bug is void: it is not pooled, the bug is fixed under section 6, and the try reruns on new tasks; a second void try is "stop, not judged". The pass rule holds under both reviewers' verdicts, with N0's 20% disagreement limit. An unfinished or inconclusive try is "stop, not judged". The pilot's signed result is the gate that starts milestone 3, and the second try's box starts on the day the named change is frozen, at most 4 weeks after the first try. The claim about the second try now says it passes "less often than it would with a free second try". |
+| H2 | The sizing check simulated the agreement floor: with two honest graders and a false-positive rate of 0.005, a floor of 0.8 on weighted positive agreement trips 95% of the time or more. So the floor is dropped. Instead, a judgment is **decisive** when its rule is a targeted rule of its task, and the second blind grader re-judges every decisive pair in every arm, so the both-verdicts rule corrects a grader who over-counts or under-counts in either arm. Kappa on the decisive pairs is reported. The worst-case rule for non-building changes now applies to Q2 only. |
+| M1 | Section 9 publishes gate 2's rate at its threshold (0.51) and the end-to-end chance that a language with a large effect continues: about 0.75 at a true rate of 0.4, and 0.41 at 0.2. It also notes that 32 × 10 sits within simulation error of 0.8 under L+inter at r = 0.2, and plans budgets for 36 × 10. |
+| M3 | The pilot's boxes and its place before milestone 3 are defined (see H1). |
+
+The other Medium and Low findings stay open.
