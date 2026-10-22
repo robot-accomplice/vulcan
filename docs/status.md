@@ -81,9 +81,19 @@ Audit 10's three High findings are fixed in decision 6, and the independent
 [audit 11](../experiments/audit-11.md) found that the fixes added no Blocker. Its two High findings are
 fixed too, and the independent [audit 12](../experiments/audit-12.md) found no Blocker in those
 fixes. Its two High findings are fixed as the last round, and the final independent
-[audit 13](../experiments/audit-13.md) found no Blocker. **Next:** fix audit 13's H1 (count only
-targeted rules in Q1, Q2, and gate 2), recruit the roles of decision 6, section 3 (at least eight
-people besides the owner), and start milestone 0.5.
+[audit 13](../experiments/audit-13.md) found no Blocker. No people are recruited
+(owner, 2026-10-22): the roles of decision 6 are AI agent sessions.
+
+**Owner's roadmap (2026-10-22):**
+
+1. **Colleague review.** Share the internally vetted spec with colleagues and collect their
+   feedback.
+2. **Prototype and evaluation.** Build a prototype and evaluate it.
+3. **MVP.** If the prototype passes muster, build an MVP.
+
+The development plan's milestones and decision 6 were written for a different sequence (a
+compiler-free test in milestone 0.5 before any compiler work, then a release-1 compiler, an
+application, and a formal evaluation). How they map onto this roadmap is still to be decided.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

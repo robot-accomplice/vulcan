@@ -46,7 +46,7 @@ milestone 0.5):
   should remove, so enforcing the rules does not change outcomes enough to matter; or the rules
   help but cost too much (in milestone 0.5, the analyzers against plain Go; in milestone 2's cost
   pilot or milestone 4, the language against the analyzers).
-- **Stop, not judged:** the independent roles were not filled in time, the budget would be
+- **Stop, not judged:** the budget would be
   exceeded, the evaluation cannot reach a useful power, the integrity check of the seeded cases
   failed, or the evaluation could not finish or gave no clear answer. Any result that matches no
   row above ends here too.
@@ -73,14 +73,12 @@ integrations are deferred. Release 1 rejects each deferred source construct with
 deferred command with exit code 2 ([release-1/syntax.md](release-1/syntax.md)). Their deferral does
 not validate their design; it isolates the first implementation experiment.
 
-## Recruiting, budget, and time boxes
+## Budget and time boxes
 
-**Recruiting comes first.** Fill the roles of decision 6, section 3, and get each person's
-commitment to the estimated load listed there. The deadline is **8 weeks** from the plan's
-acceptance. If the roles are not filled by then, the project ends as "stop, not judged". The
-budget of milestone 0.5 (volunteer hours and tokens, for its fixed design of 16 tasks, 5 runs, and
-2 arms) is committed at the same time. The budget of milestone 4 comes from decision 6's sizing
-gate. The design sizes were checked before recruiting by simulation
+No people are recruited: the roles of decision 6, section 3 are AI agent sessions. The budget of
+milestone 0.5 (agent effort and tokens, for its fixed design of 16 tasks, 5 runs, and 2 arms) is
+committed before it starts. The budget of milestone 4 comes from decision 6's sizing
+gate. The design sizes were checked before milestone 0.5 by simulation
 ([experiments/sizing/results.md](../experiments/sizing/results.md)).
 
 **Time boxes** are in calendar weeks, counted from each milestone's start date in `docs/status.md`,
@@ -98,7 +96,7 @@ outcome, and an honest one.
 
 | Milestone | Box |
 |---|---|
-| 0.5 Rules without a compiler | 24 weeks, from the day the roles are filled, with the Go developer at least 2.5 days a week |
+| 0.5 Rules without a compiler | 24 weeks |
 | 1 Vertical slice | 6 weeks |
 | 2 Guarantees | 10 weeks |
 | Cost pilot | 6 weeks per try; the first from the day milestone 2's gate is signed, the second from the day the named change is frozen. Its signed result starts milestone 3 |
@@ -118,7 +116,7 @@ spec and the primer.
 4. Compiler structure: six cached stages that reuse `go/parser` and `go/types` (spec §11.1).
 5. Names and reproducibility (spec §6, §11, Q1 closed).
 6. Evidence protocol: two run arms in each milestone, a generator check, independent roles, fixed
-   thresholds, designs sized before recruiting, a sizing gate, and a fixed decision rule.
+   thresholds, designs sized before milestone 0.5, a sizing gate, and a fixed decision rule.
 
 Exit gate (met): every implemented guarantee has a precise rule and an acceptance or rejection
 example. No decision silently weakens a promise while keeping its stronger description.
@@ -133,7 +131,7 @@ protocol:
   enough), and the Go developer reviews it. The Go developer writes the coverage map, and builds
   arm R (static analyzers and one configuration file) and arm C's contract generator, each within
   its 15-day cap.
-- A rule writer who has not read the spec writes the hidden rules. The grader labels them, using
+- A rule-writer agent session that gets no Vulcan material writes the hidden rules. The grader labels them, using
   the release-1 diagnostics and contracts that Vulcan would apply.
 - Run arm R against arm P: 16 tasks, 12 of them tempting (8 of those also targeting the rules
   that need more than Go tools), 5 runs each (decision 6, section 9).
@@ -147,7 +145,7 @@ Exit gate, in this order, signed by the run adjudicator (decision 6, section 13)
    compiler (or **stop**, if arm R costs too much against arm P). If a bound shows that the
    analyzers keep more than half of the violations, **stop**. Otherwise, **stop, not judged**.
 3. **Can milestone 4 give an answer?** The sizing gate of decision 6, section 9, including each
-   role holder's commitment to the sized load. If no design reaches the required power within the
+   committed budget. If no design reaches the required power within the
    caps, **stop, not judged**.
 
 Otherwise continue to milestone 1. For milestone 4, the Go developer revises arms R and C for
@@ -220,7 +218,7 @@ not the Go developer, checks acceptance criterion D5 on the Go version. The tran
 
 Run [decision 6](decisions/0006-evidence-protocol.md) at the size that its sizing gate fixed: arms V
 and R, with arm C's labels (arm P ran in milestone 0.5, whose result row 4 uses); hidden rules from
-a second rule writer; tasks written by a non-owner task writer from those sealed rules; rules
+a second rule writer; tasks written by a task-writer session from those sealed rules; rules
 labelled for each arm by seeded cases; a toolchain, harness, and analysis frozen before the rules
 exist; mandatory independent roles; exact permutation tests on paired per-task differences; the
 committed budget; and sealed material kept from the owner and the agents, with an outside timestamp.
@@ -289,8 +287,8 @@ re-judging every decisive pair, after the sizing check showed that a floor would
 always with honest graders (H2). This was the owner's last round of fixes.
 
 The final independent [audit 13](../experiments/audit-13.md) found no Blocker. Its findings are open.
-The first to fix before recruiting is its H1, a regression from audit 12's H2 fix: Q1, Q2, and
+The first to fix before milestone 0.5 is its H1, a regression from audit 12's H2 fix: Q1, Q2, and
 gate 2 count violations of all rules in the tested set, but the second blind grader re-judges only
 the targeted rules. The one-line fix is to count only each task's targeted rules (as the sizing
-check already does), with gate 2 over the tasks that target U\*. Next, recruiting starts (see
-"Recruiting, budget, and time boxes").
+check already does), with gate 2 over the tasks that target U\*. Next, milestone 0.5 can start (see
+"Budget and time boxes").

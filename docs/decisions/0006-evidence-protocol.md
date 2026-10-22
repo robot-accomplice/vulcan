@@ -104,35 +104,33 @@ estimated from the untargeted tasks and reported (section 8), not tested.
 The owner builds the Vulcan application, the compiler, the harness, and milestone 0.5's Go service
 (which the Go developer reviews and signs for parity), and makes no judgment that affects a result.
 The owner does not see task briefs, hidden rules, labels, targets, hidden tests, the FAQ, or run
-transcripts until the runs end. These roles are mandatory, filled by people other than the owner:
+transcripts until the runs end: the sessions that produce hidden material run after the freeze,
+and its hashes are committed with an outside timestamp before the owner can open it. Each role is
+performed by its own AI agent session, with an isolated context that holds only that role's inputs.
+A person may take a role instead, if one is available. The owner performs none of them:
 
-| Role | Duties | Estimated load |
+| Role | Duties | Estimated effort |
 |---|---|---|
-| Go developer | Reviews milestone 0.5's Go service; builds the Go version of Stockroom; writes the coverage map; builds arm R and arm C's generator, and writes arm C's contracts; for milestone 4, revises the coverage map, the configuration file, and arm C's contracts for Stockroom within 10 working days; writes the rule document and the review checklist; parity review; the person-checked acceptance criteria; signs the exit gates of milestones 1 and 2 | Up to 80 working days over the project, at least 2.5 days a week during milestone 0.5 |
-| Rule writer | Has not read the spec. Writes the hidden rules from a functional brief (section 5). A different person for each rule set (milestone 0.5, milestone 4, and a re-run under row 3). Holds no other role. | 1 to 2 days per rule set |
+| Go developer | Reviews milestone 0.5's Go service; builds the Go version of Stockroom; writes the coverage map; builds arm R and arm C's generator, and writes arm C's contracts; for milestone 4, revises the coverage map, the configuration file, and arm C's contracts for Stockroom within 10 working days; writes the rule document and the review checklist; parity review; the person-checked acceptance criteria; signs the exit gates of milestones 1 and 2 | The largest of the roles |
+| Rule writer | Gets no Vulcan material. Writes the hidden rules from a functional brief (section 5). A fresh session for each rule set (milestone 0.5, milestone 4, and a re-run under row 3). Holds no other role. | 1 to 2 days per rule set |
 | Task writer | Writes all task briefs and the FAQ from the sealed rules; tags targets; keeps the private store | 3 days per milestone |
 | Grader | Writes seeded cases, hidden and holdout tests, grading scripts, and a reference solution that keeps every rule, for each task and arm; labels rules; checks acceptance criterion D5 on the Go version | 15 days per milestone |
 | Blind grader | Judges, from the diff and the rule list, the rules that no hidden test can observe and every final change that does not build (section 7). Sees the diff, so the language is visible, but not run logs, other judgments, or which Go arm a diff comes from. Not the grader, the Go developer, or the run adjudicator. | About 2 days per milestone |
 | Second blind grader | Re-judges, without seeing the first judgments, every **decisive** pair (section 5) in every arm, and a random 30% of the other judged pairs; reports agreement. Same view as the blind grader. Not the blind grader, the grader, the Go developer, or the run adjudicator. | About 4 days per milestone |
 | Analyst | Writes the analysis script and the frozen sizing simulation, before the freeze. Not the grader. | 5 days |
-| Run adjudicator | Exclusions, toolchain bugs, gap calls, coverage-map review, the equivalence of seeded cases across arms, arm C's contract check, replacements, milestone start dates, exit-gate and overrun signatures | 4 days per milestone |
+| Run adjudicator | Exclusions, toolchain bugs, gap calls, coverage-map review, the equivalence of seeded cases across arms, arm C's contract check, milestone start dates, exit-gate and overrun signatures | 4 days per milestone |
 | Operator | Runs the harness during runs, under the operator's own model account, and stores the logs in the private store; answers agents only from the sealed FAQ, which may point a Vulcan agent to a section of the primer | Present during runs: about 2 weeks in milestone 0.5, 4 weeks in milestone 4 |
-| Reviewer | Reviews and times each change submitted for review, against the sealed checklist; judges every Vulcan diagnostic in the run logs (X8). Sees the task brief of the change, and nothing else of the hidden material. Blind to which Go arm a change comes from in milestone 0.5. In milestone 4 the role is held by two people, each assigned changes at random within each arm. | About 15 minutes per review: about 230 hours in total at the designs of section 9, with the cost pilot and some resubmissions |
+| Reviewer | Reviews and times each change submitted for review, against the sealed checklist; judges every Vulcan diagnostic in the run logs (X8). Sees the task brief of the change, and nothing else of the hidden material. Blind to which Go arm a change comes from in milestone 0.5. In milestone 4 the role runs in two sessions, each assigned changes at random within each arm. | About 15 minutes per review: about 230 hours in total at the designs of section 9, with the cost pilot and some resubmissions |
 | Second reviewer | Re-reviews a random 30% sample of accepted and of rejected changes from each arm, and re-judges a random 30% sample of X8 calls; reports agreement with the reviewer. Same blinding as the reviewer. | About 70 hours |
 
-Holding several roles: the rule writer, the reviewer, and the second reviewer hold no other role;
-the Go developer is neither the grader, the run adjudicator, nor the blind grader; the grader is
-neither the run adjudicator, the analyst, nor the blind grader; the blind grader is not the run
-adjudicator; the second blind grader is not the blind grader, the grader, the Go developer, or the
-run adjudicator. Thus the evaluation needs **at least eight people besides the owner** (rule
-writer, reviewer, second reviewer, Go developer, grader, run adjudicator, blind grader, second
-blind grader), a second reviewer person in milestone 4, and another rule writer for each later
-rule set. **If a role is empty when
-the files are sealed, the evaluation does not run** (row 1 of section 10). Each person commits to
-their estimated load while recruiting, and again at the sizing gate (section 9). A person who leaves
-is replaced by someone the run adjudicator approves, who has not seen material that the role must
-not see; a rule writer cannot be replaced after the rules exist. The report names the holder of each
-role.
+Separations: each role runs in its own session, and a session holds only one role, except that
+the Go developer may also be the analyst, and the task writer may also be the operator. The rule
+writer, reviewer, and second reviewer sessions never hold another role. The Go developer is never
+the grader, the run adjudicator, or a blind grader; the grader is never the run adjudicator, the
+analyst, or a blind grader. Each later rule set gets a fresh rule-writer session. The model
+version, prompt, and inputs of every session are recorded and published with the report. The
+report says that the roles were performed by AI agent sessions under the owner's control, not by
+independent people.
 
 ### 4. Tasks
 
@@ -220,8 +218,8 @@ role.
   the run's budget.
 - **Toolchain bugs:** a run that a toolchain bug blocks ends as a failure of its arm; the run
   adjudicator decides. If more than 10% of an arm's runs end this way, the evaluation stops; a
-  non-owner gives the person who fixes the bug (section 2) a minimal reproduction with no hidden
-  material; the bug is fixed under a new tag; the run adjudicator reviews the change; and the whole
+  separate agent session gives the one who fixes the bug (section 2) a minimal reproduction with no
+  hidden material; the bug is fixed under a new tag; the run adjudicator reviews the change; and the whole
   schedule runs again for every arm. The first schedule is reported. This can happen once; a
   second time ends the evaluation as inconclusive.
 - **Exclusions:** a run counts unless its infrastructure failed, as the run adjudicator decides.
@@ -294,7 +292,7 @@ The report gives, for each arm, the number of runs whose final change does not b
 
 ### 9. Sizing
 
-**Before recruiting** (done): `experiments/sizing/sizing.py` simulates both milestones with the
+**Before milestone 0.5** (done): `experiments/sizing/sizing.py` simulates both milestones with the
 tests and bounds of section 8, clean success for N0 and N1, escaped defects per accepted change, and
 the parameters listed in its docstring (task heterogeneity CV 1.0, run time spread 0.5, a run
 without a clean success costs three times the median, base success 0.7, a small task × arm
@@ -315,8 +313,8 @@ P(Continue) somewhat; the frozen simulation of the sizing gate must model them (
 | L+raw | r, r/8 | a raw cost equal to the margins (12 points, 15%) on every task, before R's rule-breaking runs are counted |
 
 Net costs are stated against R's clean success, so they are costs in the quantity that N0 and N1
-measure. Here r is 0.4 before recruiting, and at the sizing gate the lower of 0.4 and R's measured
-U\* rate on targeted tasks in milestone 0.5. Results before recruiting:
+measure. Here r is 0.4 before milestone 0.5, and at the sizing gate the lower of 0.4 and R's measured
+U\* rate on targeted tasks in milestone 0.5. Results before milestone 0.5:
 
 - **Milestone 0.5:** 16 tasks, 12 tempting, 5 runs per task and arm: P(Q1 passes \| L) about 0.93.
   Gate 2's rate test with 8 tasks targeting U\*: a true rate of 0.4 passes 91% of the time, a true
@@ -356,9 +354,8 @@ The frozen simulation of the sizing gate models every condition of rows 2 and 5 
 including the dual-review and dual-grader conditions (with disagreement rates measured in milestone
 0.5) and N1 without the reviewer's minutes.
 
-**Re-commitment.** The simulation also gives the volunteer hours of each role and the tokens at the
-chosen design, for milestone 4 and for the cost pilot. The sizing gate passes only when each role
-holder commits in writing to the sized load, and the budget is committed. Milestone 4's time box is
+**Budget.** The simulation also gives the effort of each role and the tokens at the chosen design,
+for milestone 4 and for the cost pilot. The sizing gate passes only when that budget is committed. Milestone 4's time box is
 8 weeks times the ratio of the sized number of runs to 640 (32 tasks × 10 runs × 2 arms), rounded up
 to whole weeks, and never less than 8 weeks. Loads and budgets are planned for 36 × 10 (720 runs).
 
@@ -371,9 +368,9 @@ Apply the rows in order. The first row that matches decides.
 
 | # | Condition | Outcome |
 |---|---|---|
-| 1 | A role is empty, the recruiting deadline passed, the budget would be exceeded, the sizing gate failed, the integrity check failed, or the evaluation ended inconclusive under section 6 | **Stop: not judged.** |
+| 1 | The budget would be exceeded, the sizing gate failed, the integrity check failed, or the evaluation ended inconclusive under section 6 | **Stop: not judged.** |
 | 2 | Q2 passes, and N0 to N6 pass | **Continue the language.** |
-| 3 | Q2 passes, N0, N1, and N6 pass, and a bound of N2 to N5 fails | **Narrow, as a hold.** A new decision changes or drops the feature behind the failing bound. Then milestone 4 runs once more, at the sized design, with a committed budget and a time box equal to milestone 4's, a new rule writer recruited for it, new rules, and new tasks. Its result is decided by rows 1 to 6 again, except that row 3 then counts as row 6. Milestone 5 and new features wait. |
+| 3 | Q2 passes, N0, N1, and N6 pass, and a bound of N2 to N5 fails | **Narrow, as a hold.** A new decision changes or drops the feature behind the failing bound. Then milestone 4 runs once more, at the sized design, with a committed budget and a time box equal to milestone 4's, a fresh rule-writer session, new rules, and new tasks. Its result is decided by rows 1 to 6 again, except that row 3 then counts as row 6. Milestone 5 and new features wait. |
 | 4 | Q1 passed in milestone 0.5, and R's clean success and working time were within the margins of P's there (at most 12 points lower, at most 1.15 times slower), as point estimates | **Pivot to the rules.** Continue as a Go tool: arm R's analyzers, plus arm C's generator when Q2 would pass on U (with UC included). |
 | 5 | Q2 passes, and N0 or N1 fails on its bound (not by being inconclusive), or N6 fails | **Stop: the language costs too much.** |
 | 6 | Any other result | **Stop** when Q2's half-bound shows that V keeps more than half of R's U\* violations; otherwise **stop, not judged**. |
@@ -383,7 +380,7 @@ keeps Go and commits to no new language; rows 2 and 3 commit to a language and n
 
 ### 11. Sealing and isolation
 
-- **Private store:** kept by the task writer, outside this repository and out of the owner's reach.
+- **Private store:** kept by the task writer's session, outside this repository; the owner does not open it.
   It holds the task briefs, rules, labels, seeded cases, hidden and holdout tests, FAQ, seed, and
   grading scripts until milestone 4 ends (milestone 0.5's material too). The repository holds only
   their SHA-256 hashes, and the hashes of the frozen toolchain, applications, harness, analysis
@@ -428,8 +425,8 @@ database), built by the owner and reviewed by the Go developer:
   follow by the same definitions. **Limit:** paper calls
   assume a correct compiler. The report says so.
 - **Rules, tasks, roles, order, sealing:** as in sections 3 to 6 and 11, with its own rule writer,
-  at the size of section 9 (16 tasks, 12 tempting, 5 runs). Its budget is committed while
-  recruiting.
+  at the size of section 9 (16 tasks, 12 tempting, 5 runs). Its budget is committed before it
+  starts.
 
 The gates, in order:
 
@@ -444,7 +441,7 @@ The gates, in order:
   are within the margins of P's as point estimates; if they are not, **stop**. If Q1 fails and its
   half-bound shows that R keeps more than half of P's violations, **stop**: enforcing the rules
   does not change outcomes. If Q1 fails in any other way, or is inconclusive, **stop, not judged**.
-- **Gate 3 (can milestone 4 answer?):** the sizing gate of section 9, with re-commitment.
+- **Gate 3 (can milestone 4 answer?):** the sizing gate of section 9, with its budget.
 - Otherwise continue to milestone 1.
 
 **Cost pilot (after milestone 2).** Before milestone 3, the agents' cost in Vulcan is checked
@@ -480,7 +477,7 @@ cheaply, on ordinary work only:
   than it would with a free second try (section 9 publishes the rates).
 - **Outcomes:** if no change is named, or the second try fails, the project ends by row 4 of
   section 10 if its conditions hold, and otherwise as **stop: the language costs too much**. A try
-  that does not finish (a role falls vacant, the box runs out, or it is inconclusive) ends the
+  that does not finish (the box runs out, or it is inconclusive) ends the
   project as **stop, not judged**.
 
 ### 14. Records
@@ -493,7 +490,7 @@ every number.
 
 ## Open points
 
-- **The thresholds are judgments,** fixed now. Nothing may change them after recruiting starts.
+- **The thresholds are judgments,** fixed now. Nothing may change them after milestone 0.5 starts.
 - **One model.** All results bind to one model version. The report says so.
 
 ## Amendments
@@ -510,6 +507,7 @@ every number.
 | Audit 8, H2 | Non-building final changes are judged by a blind grader for X2, fail every holdout test for X6, and are counted per arm. |
 | Audit 8, H3 | The second reviewer samples accepted and rejected changes and X8 calls; N0, N1, and N3 must hold under both reviewers' judgments and without reviewer minutes; reversal defined. |
 | Audit 8, H4 | The owner builds milestone 0.5's service; the Go developer commits at least 2.5 days a week; the plan's box follows. |
+| Owner, 2026-10-22 | No people are recruited. Each role is an isolated AI agent session; the rules that stopped the project when a role was empty or the recruiting deadline passed are removed; the report states that the roles were agent sessions under the owner's control. |
 | Audit 12, H1 | The cost pilot follows section 6's run rules; a try with more than 10% bug-blocked Vulcan runs is void and rerun, not pooled; the pass rule holds under both reviewers' verdicts, with N0's 20% limit; an unfinished or inconclusive try is "stop, not judged"; the pilot's result is the gate that starts milestone 3, and the second try's box starts when the change is frozen. |
 | Audit 12, H2 | The fixed agreement floor is dropped: the sizing check showed that it trips almost always with honest graders. Instead the second blind grader re-judges every decisive pair (targeted rules) in every arm, so the both-verdicts rule corrects a biased grader in either direction; kappa is reported; the worst-case rule applies to Q2 only. Section 9 also publishes gate 2's rate at its threshold and the end-to-end chance of continuing. |
 | Audit 11, H1 | A judgment is one (run, rule) pair; the second blind grader re-judges every pair the first marked as a violation and 30% of the rest, mixed; agreement is measured on positives with a floor of 0.8; tests must pass under both verdicts, and Q2 and gate 2 also with V's non-building changes counted under the stricter grader; the sizing gate's simulation must model these conditions. |
