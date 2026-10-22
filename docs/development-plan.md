@@ -6,7 +6,9 @@ audit. [Audit 3](../experiments/audit-3.md) (not independent) and the independen
 answers. The independent [audit 10](../experiments/audit-10.md) found none. Its High findings were
 fixed, and further independent audits, [11](../experiments/audit-11.md) and
 [12](../experiments/audit-12.md), each confirmed that the fixes so far added no Blocker. Audit 12's
-two High findings were then fixed as the last round, and a final independent audit checks them.
+two High findings were then fixed as the owner's last round, and the final independent
+[audit 13](../experiments/audit-13.md) found no Blocker. Its findings are recorded as open (see
+"Next deliverable").
 
 ## Objective
 
@@ -265,6 +267,7 @@ compatibility guarantee before those guarantees appear in user-facing documentat
 | [Audit 10](../experiments/audit-10.md) | No Blocker; H1 to H3, M1 to M8, L1 to L9 | Plan accepted. H1 to H3 fixed in decision 6; the rest stay open |
 | [Audit 11](../experiments/audit-11.md) | No Blocker; H1, H2, M1 to M9, Lows | Confirms that audit 10's fixes added no Blocker. H1 and H2 fixed in decision 6 (amendments for audit 11); the rest stay open |
 | [Audit 12](../experiments/audit-12.md) | No Blocker; H1, H2, M1 to M7, Lows | Confirms that audit 11's fixes added no Blocker. H1 and H2 fixed in decision 6 (amendments for audit 12), with M1 and M3; the rest stay open |
+| [Audit 13](../experiments/audit-13.md) | No Blocker; H1, M1 to M7, L1 to L13 | Final check. Open: H1, a regression from audit 12's H2 fix (the violation counts include non-targeted rules, which the second blind grader does not re-judge); M1 (the pilot's 20% rule on a small sample) and the rest |
 
 ## Next deliverable
 
@@ -283,6 +286,11 @@ Blocker. Its two High findings are fixed in decision 6 (see its amendments for a
 pilot follows section 6's run rules, treats a bug-blocked try as void, holds under both reviewers,
 and maps an unfinished try to "stop, not judged" (H1); and the fixed agreement floor is replaced by
 re-judging every decisive pair, after the sizing check showed that a floor would trip almost
-always with honest graders (H2). This was the owner's last round of fixes. Next, recruiting starts
-(see "Recruiting, budget, and time boxes"); the open Medium and Low findings follow as they become
-relevant.
+always with honest graders (H2). This was the owner's last round of fixes.
+
+The final independent [audit 13](../experiments/audit-13.md) found no Blocker. Its findings are open.
+The first to fix before recruiting is its H1, a regression from audit 12's H2 fix: Q1, Q2, and
+gate 2 count violations of all rules in the tested set, but the second blind grader re-judges only
+the targeted rules. The one-line fix is to count only each task's targeted rules (as the sizing
+check already does), with gate 2 over the tasks that target U\*. Next, recruiting starts (see
+"Recruiting, budget, and time boxes").
