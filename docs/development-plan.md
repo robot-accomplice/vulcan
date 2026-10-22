@@ -275,9 +275,10 @@ milestone 0.5's Vulcan side, frozen before the rules (H2); and a second blind gr
 
 The independent [audit 11](../experiments/audit-11.md) confirmed that these fixes added no
 Blocker. Its two High findings are fixed in decision 6 (see its amendments for audit 11): the
-second blind grader now re-judges every judged violation, with agreement measured on positives
-(H1), and the cost pilot has an application, staff, a budget, a signer, its own box, and a pooled
-second try (H2). The independent [audit 12](../experiments/audit-12.md) confirmed that these fixes added no
+second blind grader re-judges every judged violation (H1; revised after audit 12), and the cost
+pilot has an application, staff, a budget, a signer, its own box, and a pooled second try (H2).
+
+The independent [audit 12](../experiments/audit-12.md) confirmed that these fixes added no
 Blocker. Its two High findings are fixed in decision 6 (see its amendments for audit 12): the cost
 pilot follows section 6's run rules, treats a bug-blocked try as void, holds under both reviewers,
 and maps an unfinished try to "stop, not judged" (H1); and the fixed agreement floor is replaced by
