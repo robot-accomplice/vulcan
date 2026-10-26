@@ -1,0 +1,64 @@
+Wires A.P: B.New, B.Q: C.New, C.R: A.New.
+-- want.txt --
+error system.vulcan:5:9 K0111
+-- api/a/a.vulcan --
+package a
+
+// T does the work.
+type T struct{}
+
+// New returns a T.
+func New() *T { return &T{} }
+
+// Do does it.
+func (*T) Do() error { return nil }
+-- api/a/component.vulcan --
+component A {
+    needs port P {
+        func Do() error
+    }
+}
+-- api/b/b.vulcan --
+package b
+
+// T does the work.
+type T struct{}
+
+// New returns a T.
+func New() *T { return &T{} }
+
+// Do does it.
+func (*T) Do() error { return nil }
+-- api/b/component.vulcan --
+component B {
+    needs port Q {
+        func Do() error
+    }
+}
+-- api/c/c.vulcan --
+package c
+
+// T does the work.
+type T struct{}
+
+// New returns a T.
+func New() *T { return &T{} }
+
+// Do does it.
+func (*T) Do() error { return nil }
+-- api/c/component.vulcan --
+component C {
+    needs port R {
+        func Do() error
+    }
+}
+-- system.vulcan --
+system Loop {
+    container Api {
+        A, B, C
+
+        A.P: B.New
+        B.Q: C.New
+        C.R: A.New
+    }
+}

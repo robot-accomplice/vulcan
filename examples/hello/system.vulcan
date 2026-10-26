@@ -1,0 +1,12 @@
+// Hello greets one person and exits.
+system Hello {
+    person Customer "Wants a greeting"
+
+    config { shutdown_timeout: 2 * time.Second }
+
+    container Api {
+        Web{ Who: flag("who", default: "world") }, Greeter
+
+        Web.Greetings: Greeter.NewEnglish{ Punct: "!" }
+    }
+}

@@ -1,0 +1,28 @@
+package greeter
+
+import (
+	"errors"
+
+	"hello/lib/text"
+)
+
+// EnglishSettings configure English.
+type EnglishSettings struct {
+	Punct string
+}
+
+// English greets in English.
+type English struct {
+	punct string
+}
+
+// NewEnglish returns an English greeter.
+func NewEnglish(s EnglishSettings) *English { return &English{punct: s.Punct} }
+
+// Greet greets name.
+func (e *English) Greet(name string) (text.Greeting, error) {
+	if name == "" {
+		return text.Greeting{}, errors.New("no name")
+	}
+	return text.Greeting{To: name, Text: "Hello, " + name + e.punct}, nil
+}

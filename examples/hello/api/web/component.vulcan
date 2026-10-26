@@ -1,0 +1,10 @@
+import "hello/lib/text"
+
+component Web {
+    entry for Customer
+
+    // Greetings makes a greeting for a name.
+    needs port Greetings {
+        func Greet(name string) (text.Greeting, error)
+    }
+}

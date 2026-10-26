@@ -1,0 +1,3 @@
+// text holds the shared greeting types.
+library text {
+}

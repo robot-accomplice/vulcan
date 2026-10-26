@@ -99,7 +99,15 @@ application, and a formal evaluation).
 roadmap is the [PoC plan](poc/plan.md): a compiler subset, Stockroom-lite in Vulcan and in Go, and
 72 agent runs that compare arm V with plain Go (arm G) by clean success, violations, and cost,
 against thresholds fixed before the runs. Its result is internal evidence; it passes no gate of
-decision 6. Phase P1 (the compiler skeleton) is in progress.
+decision 6.
+
+**Phase P1 (2026-10-26):** the compiler skeleton works. It parses the declaration files, blanks
+code files to Go with lines and columns kept, type-checks with `go/types`, applies the
+architecture, wiring, library, and startup rules, generates `main`, and runs `check`, `build`,
+`run`, and `test`. 50 conformance cases pass (`conformance/`). Contracts are rejected with K0009
+until phase P2. Known limits: the wire-cycle report names the first wire of the cycle only;
+W04 (stop signal) has no case yet, because the test host is Windows; a type error in a
+`system.vulcan` value is reported in the generated `main`, not at its `system.vulcan` position.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

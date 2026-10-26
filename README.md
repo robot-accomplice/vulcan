@@ -10,8 +10,10 @@ together. It is Go with an enforced architecture layer, contracts, and tools aro
   build, and reviewers can audit them.
 - **The tools teach the model** how to use the language, from a primer with a fixed token budget.
 
-**Status:** specification draft. Nothing is implemented. There is no compiler yet. Source files
-end in `.vulcan`, and the command is `vulcan`. The experiments keep the earlier working name, Keel.
+**Status:** specification draft, with a proof-of-concept compiler in progress
+([PoC plan](docs/poc/plan.md)). Phase P1 works: declarations, the architecture and wiring rules,
+generated startup, and `check`, `build`, `run`, and `test`. Contracts come in phase P2. Source
+files end in `.vulcan`, and the command is `vulcan`. The experiments keep the earlier working name, Keel.
 See [Status and handoff](docs/status.md).
 
 ## Why Vulcan
@@ -98,6 +100,11 @@ system.
 | [docs/guide.md](docs/guide.md) | The primer that `vulcan guide` prints for a model. |
 | [docs/status.md](docs/status.md) | Where the work stands, the design rules for new decisions, and the open work in order. |
 | [docs/development-plan.md](docs/development-plan.md) | The plan (accepted): test the rules as Go tools first, check that the final evaluation can give an answer, then build a compiler and a real application, and decide by fixed rules whether the language earns its cost. |
+| [docs/poc/plan.md](docs/poc/plan.md) | The proof of concept: the compiler subset, Stockroom-lite in Vulcan and in Go, and the measurement of an AI agent in each. |
+| [cmd/vulcan](cmd/vulcan), [internal/](internal/) | The PoC compiler: parse declarations, blank code files to Go, type-check with `go/types`, apply the rules, and generate Go. |
+| [vulcan/](vulcan/) | The runtime module, `github.com/robot-accomplice/vulcan/vulcan`. |
+| [conformance/](conformance/) | Conformance cases of [docs/release-1/conformance.md](docs/release-1/conformance.md), one txtar archive each. |
+| [examples/hello](examples/hello) | The smallest program: an entry leaf calls a port of a second leaf. |
 | [experiments/](experiments/) | Spec reviews 8 and 9 with their resolutions, writing test 3, audit 2 of the spec and the test 3 code, audits 3 to 13 of the development plan, and the sizing check of its evaluation. |
 | [experiments/test3/](experiments/test3/) | The same shop system in Go and in Keel, the feature brief, the writers' work, and the hidden grading rules. |
 
@@ -107,9 +114,31 @@ system.
 2. [docs/spec.md](docs/spec.md) §1 to §3 for the purpose and the evidence, then §5 and §7.
 3. [docs/status.md](docs/status.md) for the decisions so far and what comes next.
 
+## Building the compiler
+
+The compiler needs Go 1.26 or later.
+
+```bash
+go build -o vulcan ./cmd/vulcan
+```
+
+```bash
+go test ./...
+```
+
+Run the example from its directory:
+
+```bash
+cd examples/hello && ../../vulcan run -- --who=Ada
+```
+
+The compiler writes Go into `.vulcan/build` and the program into `.vulcan/bin`. Until the
+runtime module is published, the compiler finds it next to its own source, or at
+`$VULCAN_RUNTIME`.
+
 ## Running the experiment code
 
-Only the Go fixtures of test 3 run today. They need Go 1.22 or later.
+The Go fixtures of test 3 need Go 1.22 or later.
 
 ```bash
 cd experiments/test3/base-go && go test ./...
@@ -119,9 +148,9 @@ cd experiments/test3/base-go && go test ./...
 cd experiments/test3/work/go && go test ./...
 ```
 
-The Keel versions (`base-keel`, `work/keel`, written under the working name) cannot build,
-because no compiler exists. They were
-checked by hand against the spec (`base-keel/SELF-CHECK.md`).
+The Keel versions (`base-keel`, `work/keel`, written under the working name) use topics and two
+containers, which the PoC compiler does not support. They were checked by hand against the spec
+(`base-keel/SELF-CHECK.md`).
 
 ## Contributing
 

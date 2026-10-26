@@ -1,0 +1,22 @@
+package web
+
+import (
+	"context"
+	"testing"
+
+	"github.com/robot-accomplice/vulcan/vulcan"
+	"hello/lib/text"
+)
+
+type fixed struct{}
+
+func (fixed) Greet(name string) (text.Greeting, error) {
+	return text.Greeting{To: name, Text: "hi " + name}, nil
+}
+
+func TestStartup(t *testing.T) {
+	vulcan.Bind(t, &Greetings, fixed{})
+	if err := startup(context.Background(), Settings{Who: "ada"}); err != nil {
+		t.Fatal(err)
+	}
+}

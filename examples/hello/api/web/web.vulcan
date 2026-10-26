@@ -1,0 +1,20 @@
+package web
+
+import (
+	"context"
+	"fmt"
+)
+
+// Settings are the settings of Web.
+type Settings struct {
+	Who string
+}
+
+func startup(ctx context.Context, s Settings) error {
+	g, err := Greetings.Greet(s.Who)
+	if err != nil {
+		return err
+	}
+	fmt.Println(g.Text)
+	return nil
+}

@@ -1,0 +1,7 @@
+package text
+
+// Greeting is a sentence for one person.
+type Greeting struct {
+	To   string
+	Text string
+}
