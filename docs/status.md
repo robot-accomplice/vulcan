@@ -93,7 +93,13 @@ fixes. Its two High findings are fixed as the last round, and the final independ
 
 The development plan's milestones and decision 6 were written for a different sequence (a
 compiler-free test in milestone 0.5 before any compiler work, then a release-1 compiler, an
-application, and a formal evaluation). How they map onto this roadmap is still to be decided.
+application, and a formal evaluation).
+
+**Proof of concept (owner, 2026-10-26).** The plan and the spec stay as they are. Step 2 of the
+roadmap is the [PoC plan](poc/plan.md): a compiler subset, Stockroom-lite in Vulcan and in Go, and
+72 agent runs that compare arm V with plain Go (arm G) by clean success, violations, and cost,
+against thresholds fixed before the runs. Its result is internal evidence; it passes no gate of
+decision 6. Phase P1 (the compiler skeleton) is in progress.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
