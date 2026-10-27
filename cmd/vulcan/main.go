@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 
+	vulcanroot "github.com/robot-accomplice/vulcan"
 	"github.com/robot-accomplice/vulcan/internal/check"
 	"github.com/robot-accomplice/vulcan/internal/diag"
 	"github.com/robot-accomplice/vulcan/internal/driver"
@@ -25,13 +26,14 @@ Usage:
 	vulcan test [--json] [-v] [-run re] [Leaf|library ...]
 	                                      check with tests, then run the tests of each leaf and library
 	vulcan mod tidy                       add each module that the code imports to go.mod and go.sum
+	vulcan guide                          print the primer: what Vulcan adds to Go
 
 The project root is the directory that holds system.vulcan; dir defaults to the current one.
 Exit codes: 0 success, 1 diagnostics or failures, 2 a usage error or a command that this release
 does not have.
 `
 
-var deferred = map[string]bool{"fmt": true, "explain": true, "doc": true, "diagram": true, "archdiff": true, "fake": true, "trace": true, "guide": true, "context": true, "query": true, "audit": true}
+var deferred = map[string]bool{"fmt": true, "explain": true, "doc": true, "diagram": true, "archdiff": true, "fake": true, "trace": true, "context": true, "query": true, "audit": true}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -52,6 +54,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return testCmd(rest, stdout, stderr)
 	case "mod":
 		return modCmd(rest, stdout, stderr)
+	case "guide":
+		fmt.Fprint(stdout, vulcanroot.Guide)
+		return 0
 	}
 	if deferred[cmd] {
 		fmt.Fprintf(stderr, "vulcan %s is not in this release of Vulcan (the PoC subset of release 1)\n", cmd)

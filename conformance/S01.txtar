@@ -1,6 +1,6 @@
-A method with three contract lines between its signature and a { on its own line: K0009 at the first requires before contracts are supported.
+A method with three contract lines between its signature and a { on its own line: accepted, and it runs.
 -- want.txt --
-error api/billing/billing.vulcan:13:2 K0009
+run exit=0 stdout=out.txt
 -- api/billing/billing.vulcan --
 package billing
 
@@ -86,6 +86,8 @@ type Money int64
 type Receipt struct {
 	Amount Money
 }
+-- out.txt --
+paid 42
 -- system.vulcan --
 // Shop is the online store.
 system Shop {

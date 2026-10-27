@@ -1,0 +1,116 @@
+A method breaks its invariant for a moment and calls methods through its own receiver: no check on those returns, only on its own.
+-- want.txt --
+run exit=0 stdout=out.txt
+-- api/billing/billing.vulcan --
+package billing
+
+import "shop/lib/money"
+
+// Account holds money.
+type Account struct {
+	Balance int
+}
+	invariant Balance >= 0
+
+// Deposit adds money.
+func (a *Account) Deposit(x int) { a.Balance += x }
+
+// Rebalance passes through a negative balance, then restores it.
+func (a *Account) Rebalance(x int) {
+	a.Balance -= 2 * x
+	a.Deposit(x)
+	a.Deposit(x)
+}
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	acct := &Account{Balance: 1}
+	acct.Rebalance(5)
+	return money.Receipt{Amount: amt + money.Money(acct.Balance) - 1}, nil
+}
+-- api/billing/component.vulcan --
+component Billing {
+}
+-- api/orders/component.vulcan --
+import "shop/lib/money"
+
+component Orders {
+    needs port Checkout {
+        func Pay(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/orders/orders.vulcan --
+package orders
+
+import "shop/lib/money"
+
+// Service places orders.
+type Service struct{}
+
+// NewService returns a Service.
+func NewService() *Service { return &Service{} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return Checkout.Pay(amt)
+}
+-- api/web/component.vulcan --
+import "shop/lib/money"
+
+component Web {
+    entry for Customer
+
+    needs port Orders {
+        func Place(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/web/web.vulcan --
+package web
+
+import (
+	"context"
+	"fmt"
+)
+
+func startup(ctx context.Context) error {
+	r, err := Orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- lib/money/library.vulcan --
+// money holds amounts.
+library money {
+}
+-- lib/money/money.vulcan --
+package money
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+-- out.txt --
+paid 42
+-- system.vulcan --
+// Shop is the online store.
+system Shop {
+    person Customer "Buys goods"
+
+    container Api {
+        Web, Orders, Billing
+
+        Web.Orders:      Orders.NewService
+        Orders.Checkout: Billing.NewPayer
+    }
+}

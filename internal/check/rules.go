@@ -33,11 +33,11 @@ func (c *Checker) Rules() {
 				continue
 			}
 			c.imports(pkg, f)
-			c.names(gp.TypesInfo, f)
 			if pkg.IsLeaf {
 				c.leafRules(pkg, gp.TypesInfo, f, ports)
 			}
 			c.libVarAssigns(pkg, gp.TypesInfo, f, libVars)
+			c.network(pkg, gp.TypesInfo, f)
 		}
 		if pkg.IsLeaf {
 			var files []*ast.File
@@ -88,6 +88,9 @@ func packageVars(p *types.Package) map[types.Object]bool {
 // imports applies rule 1 (K0101), K0204, and K0118 to the imports of one file.
 func (c *Checker) imports(pkg *project.Package, f *ast.File) {
 	for _, imp := range f.Imports {
+		if imp.Name != nil && imp.Name.Name == "vulcan_rt" {
+			continue // inserted by the lowering of contracts; K0005 stops code from naming it
+		}
 		path, _ := strconv.Unquote(imp.Path.Value)
 		pos := c.Pos(imp.Path.Pos())
 		if path == RuntimeRT || strings.HasPrefix(path, RuntimeRT+"/") {
@@ -102,18 +105,6 @@ func (c *Checker) imports(pkg *project.Package, f *ast.File) {
 			c.D.Errorf(pos, "K0101", "leaf %s imports leaf %s; a leaf uses another leaf only through a port that it needs (declare one in %s/component.vulcan, and wire it in system.vulcan)", pkg.Name, target.Name, pkg.Dir)
 		} else {
 			c.D.Errorf(pos, "K0204", "library %s imports leaf %s; a library imports only libraries", pkg.GoName, target.Name)
-		}
-	}
-}
-
-// names applies the reserved-name rule (K0005).
-func (c *Checker) names(info *types.Info, f *ast.File) {
-	for id := range info.Defs {
-		if id == nil || c.Fset.File(id.Pos()) != c.Fset.File(f.Pos()) {
-			continue
-		}
-		if strings.HasPrefix(id.Name, "vulcan_") || strings.HasPrefix(id.Name, "Vulcan_") {
-			c.D.Errorf(c.Pos(id.Pos()), "K0005", "the name %s starts with %s, which is reserved for generated code", id.Name, id.Name[:7])
 		}
 	}
 }
@@ -410,4 +401,4 @@ func (c *Checker) contractsDeferred() {
 }
 
 // ContractsEnabled turns on contracts (phase P2).
-var ContractsEnabled = false
+var ContractsEnabled = true

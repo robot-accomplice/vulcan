@@ -15,6 +15,7 @@ import (
 	"github.com/robot-accomplice/vulcan/internal/check"
 	"github.com/robot-accomplice/vulcan/internal/decl"
 	"github.com/robot-accomplice/vulcan/internal/gen"
+	"github.com/robot-accomplice/vulcan/internal/lower"
 	"github.com/robot-accomplice/vulcan/internal/project"
 )
 
@@ -159,7 +160,13 @@ func writeMain(p *project.Project, plan *check.Plan, dir string, funcs map[*proj
 			}
 			for _, b := range plan.Binds {
 				if b.Inst == inst {
-					fmt.Fprintf(&body, "\t%s.%s = %s\n", w.alias(b.Need.ImportPath), b.Port, v)
+					a := w.alias(b.Need.ImportPath)
+					if port := findPort(b.Need, b.Port); port != nil && lower.HasContracts(port) {
+						// The port's contract is checked at each call (§5.3, Appendix F).
+						fmt.Fprintf(&body, "\t%s.%s = %s.%s{Impl: %s}\n", a, b.Port, a, lower.WrapType(b.Port), v)
+					} else {
+						fmt.Fprintf(&body, "\t%s.%s = %s\n", a, b.Port, v)
+					}
 				}
 			}
 			fmt.Fprintf(&body, "\t_ = %s\n", v)
@@ -202,8 +209,12 @@ func writeMain(p *project.Project, plan *check.Plan, dir string, funcs map[*proj
 		fmt.Fprintf(&b, "\t%s\n", line)
 	}
 	b.WriteString(")\n\nvar _ = time.Second\nvar _ context.Context\n\n")
-	fmt.Fprintf(&b, "func main() {\n\tos.Exit(rt.Main(rt.Program{\n\t\tName: %q,\n\t\tShutdownTimeout: %s,\n\t\tFlags: []rt.FlagSpec{\n%s\t\t},\n\t\tConstruct: vulcan_construct,\n\t\tSetups: %s,\n\t\tStartups: %s,\n\t}))\n}\n\n",
-		p.System.Name+"/"+p.Container.Name, timeout, flags.String(), setups, startups)
+	mode := "panic"
+	if v := p.Config("on_contract_failure"); v != nil && v.Lit != "" {
+		mode = v.Lit
+	}
+	fmt.Fprintf(&b, "func main() {\n\tos.Exit(rt.Main(rt.Program{\n\t\tName: %q,\n\t\tShutdownTimeout: %s,\n\t\tFlags: []rt.FlagSpec{\n%s\t\t},\n\t\tConstruct: vulcan_construct,\n\t\tSetups: %s,\n\t\tStartups: %s,\n\t\tOnContractFailure: %q,\n\t}))\n}\n\n",
+		p.System.Name+"/"+p.Container.Name, timeout, flags.String(), setups, startups, mode)
 	b.Write(body.Bytes())
 	main := filepath.Join(dir, gen.MainDir)
 	if err := os.MkdirAll(main, 0o755); err != nil {
@@ -219,4 +230,16 @@ func formatted(b []byte) []byte {
 		return f
 	}
 	return b
+}
+
+func findPort(l *project.Package, name string) *decl.Port {
+	if l.Comp == nil {
+		return nil
+	}
+	for _, p := range l.Comp.Ports {
+		if p.Name == name {
+			return p
+		}
+	}
+	return nil
 }

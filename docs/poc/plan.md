@@ -197,7 +197,9 @@ for Stockroom-lite and its tasks. It follows decision 4: staged, reusing `go/par
 | Commands | `check`, `build`, `test`, `run`, `guide`, with `--json` diagnostics; source positions mapped back to `.vulcan` files by `//line` directives | |
 
 Deferred in the PoC, and rejected with K0009: strict mode, the rules of §7.3 beyond the return
-check, K0525, `audit`, `context`, `query`, and everything that release 1 defers.
+check, K0525, `audit`, `context`, `query`, and everything that release 1 defers. The deviations of
+the built compiler from §7 are listed in `docs/status.md` (phase P2). The agents of arm V read
+[guide.md](guide.md), the primer cut to what the PoC accepts.
 
 ## 11. Who does what
 

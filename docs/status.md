@@ -116,6 +116,28 @@ nothing else that keeps it alive). Open after P1: W04 (stop signal) needs a host
 the differential runner of conformance.md; flags for named types; `-trimpath` and relative
 `//line` paths.
 
+**Phase P2 (2026-10-27):** contracts, the network rule, and `vulcan guide`. `requires`,
+`ensures`, `old`, `err`, `result`, and `result.N` on functions, methods, and port methods; struct
+invariants, checked after each outer method call and on each struct literal, with unchecked twins
+for calls through the method's own receiver (§7.2); port contracts checked through a wrapper that
+`main` and `vulcan.Bind` use (C13); `on_contract_failure: exit`. Compile-time rules: K0501
+(constant arguments), K0502, K0506 (zero value), K0507, K0508, K0509, K0510, K0511, K0512, K0514,
+K0120. K0205 and K0203 check the network and acquiring functions of Appendix D that the project's
+code uses. `vulcan guide` prints [the PoC primer](poc/guide.md). 108 conformance cases pass.
+
+PoC deviations from §7 and §5.4c, to know when reading results:
+
+- `ensures` and the invariant are checked once, after the body and its deferred calls return
+  (the body runs in a generated closure). This is the second check point of §7.3 for every
+  function; the first check point, before the deferred calls, is not separate.
+- Contract arithmetic is Go arithmetic, not exact (C08 is not met). The proof rule is not
+  implemented: K0504 (an unproved index or dereference) is not reported, and a contract that
+  panics panics as Go does. K0109 (provider and port contracts) is not checked.
+- A panic that leaves a method with its invariant false is not turned into a contract failure
+  (§7.3 rule 5). Calls that receive a struct (`json.Unmarshal(b, a)`) are not followed by a check.
+- K0205 and K0203 look at the project's own code; they do not follow calls into other modules
+  (N02 is not met).
+
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
 3. **Optional review 10.** Reviews 8 and 9 changed much text. The trend is 55, then 29 findings,

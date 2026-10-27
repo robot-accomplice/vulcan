@@ -122,6 +122,8 @@ type Program struct {
 	// Setups and Startups are filled by Construct's caller, after Construct returns.
 	Setups   func(f *Flags) []Step
 	Startups func(f *Flags) []Step
+	// OnContractFailure is "panic" or "exit" (config on_contract_failure, §7.4).
+	OnContractFailure string
 }
 
 // Main runs a program and returns the process exit code.
@@ -130,7 +132,24 @@ func Main(p Program) int {
 		fmt.Fprintf(os.Stderr, "%s: %s failed:\n%v\n", p.Name, stage, err)
 		return 1
 	}
-	flags, err := ParseFlags(p.Flags, os.Args[1:])
+	// --on-contract-failure=panic|exit overrides the config key (§7.4).
+	mode := p.OnContractFailure
+	var args []string
+	for _, a := range os.Args[1:] {
+		if v, ok := strings.CutPrefix(a, "--on-contract-failure="); ok {
+			mode = v
+			continue
+		}
+		args = append(args, a)
+	}
+	switch mode {
+	case "exit":
+		ExitOnFailure = true
+	case "", "panic":
+	default:
+		return report("reading flags", fmt.Errorf("--on-contract-failure is panic or exit, not %q", mode))
+	}
+	flags, err := ParseFlags(p.Flags, args)
 	if err != nil {
 		return report("reading flags", err)
 	}

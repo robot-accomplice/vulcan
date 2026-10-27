@@ -4,6 +4,7 @@ package rt
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -44,8 +45,17 @@ func (f *ContractFailure) Unwrap() error {
 
 // Fail panics with a *ContractFailure.
 func Fail(kind, contract, position, caller string, values ...Value) {
-	panic(&ContractFailure{Kind: kind, Contract: contract, Position: position, Caller: caller, Values: values})
+	f := &ContractFailure{Kind: kind, Contract: contract, Position: position, Caller: caller, Values: values}
+	if ExitOnFailure {
+		// on_contract_failure: exit (§7.4): no deferred call and no recover runs.
+		fmt.Fprintln(os.Stderr, f.Error())
+		os.Exit(3)
+	}
+	panic(f)
 }
+
+// ExitOnFailure makes a contract failure end the process with exit code 3 (§7.4).
+var ExitOnFailure bool
 
 // Show formats a value for a contract failure report.
 func Show(name string, v any) Value {

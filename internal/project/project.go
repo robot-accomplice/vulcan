@@ -65,6 +65,9 @@ type Package struct {
 	// Libraries only.
 	Lib    *decl.Library
 	LibSrc *Source
+
+	// Olds maps each generated old() variable to its contract's position (K0509).
+	Olds map[string]diag.Pos
 }
 
 // Project is a loaded project.

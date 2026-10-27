@@ -24,6 +24,10 @@ func Bind[P any](t testing.TB, port *P, impl any) {
 		panic(fmt.Sprintf("vulcan.Bind: %T does not satisfy the port", impl))
 	}
 	old := *port
+	// A port with a contract is bound through its wrapper, so the fake meets the contract.
+	if w, ok := any(old).(interface{ Vulcan_wrap(any) any }); ok {
+		v = w.Vulcan_wrap(v).(P)
+	}
 	*port = v
 	t.Cleanup(func() { *port = old })
 }

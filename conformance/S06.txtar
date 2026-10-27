@@ -1,6 +1,5 @@
 A body with a Go type error, inside a file with contracts above it: K0008 at the true .vulcan position.
 -- want.txt --
-error api/billing/billing.vulcan:13:2 K0009
 error api/billing/billing.vulcan:15:17 K0008
 -- api/billing/billing.vulcan --
 package billing

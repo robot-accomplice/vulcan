@@ -284,10 +284,10 @@ case("A17", "A wire names a group.",
      "error system.vulcan:@@Back.NewPayer@ K0113")
 
 # ---- Lexing and positions
-case("S01", "A method with three contract lines between its signature and a { on its own line: K0009 at the first requires before contracts are supported.",
+case("S01", "A method with three contract lines between its signature and a { on its own line: accepted, and it runs.",
      [("api/billing/billing.vulcan", "func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {",
        "func (p *Payer) Pay(amt money.Money) (money.Receipt, error)\n\trequires amt > 0\n\trequires amt < 1_000_000\n\tensures err == nil => result.Amount == amt\n{")],
-     "error api/billing/billing.vulcan:@@requires@ K0009")
+     "run exit=0 stdout=out.txt", {"out.txt": "paid 42\n"})
 
 case("S02", "func F() requires { … }: a result of a type named requires.",
      [("api/billing/billing.vulcan", "// Payer takes payments.", "type requires *int\n\nfunc f() requires { return nil }\n\nvar _ = f\n\n// Payer takes payments.")],
@@ -308,7 +308,7 @@ case("S05", "A declared name vulcan_x.",
 case("S06", "A body with a Go type error, inside a file with contracts above it: K0008 at the true .vulcan position.",
      [("api/billing/billing.vulcan", "func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {\n\treturn money.Receipt{Amount: amt}, nil",
        "func (p *Payer) Pay(amt money.Money) (money.Receipt, error)\n\trequires amt > 0\n{\n\tvar s string = amt; _ = s\n\treturn money.Receipt{Amount: amt}, nil")],
-     "error api/billing/billing.vulcan:@@requires@ K0009\nerror api/billing/billing.vulcan:@@amt; _@ K0008")
+     "error api/billing/billing.vulcan:@@amt; _@ K0008")
 
 for sid, doc, edits, marker, path in (
     ("S08a", "A topic: publishes.", [("api/orders/component.vulcan", "    needs port Checkout {", "    publishes Placed topic[money.Receipt]\n\n    needs port Checkout {")], "publishes", "api/orders/component.vulcan"),
@@ -489,6 +489,110 @@ case("P43", "A wire that names a type takes no settings.",
 case("S07", "A panic in a body: the stack trace names the .vulcan file and line.",
      [("api/web/web.vulcan", "\tr, err := Orders.Place(42)", "\tdone := make(chan bool)\n\tgo func() {\n\t\tvar m map[string]int\n\t\tm[\"x\"] = 1\n\t\tdone <- true\n\t}()\n\t<-done\n\tr, err := Orders.Place(42)")],
      "run exit=2 contains=want-trace.txt", {"want-trace.txt": "assignment to entry in nil map\napi/web/web.vulcan:12\n"})
+
+# ---- Phase P2: contracts, the network rule, guide
+PAY = "func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {"
+def pay_contract(clauses):
+    return ("api/billing/billing.vulcan", PAY, "func (p *Payer) Pay(amt money.Money) (money.Receipt, error)\n" + "".join("\t" + c + "\n" for c in clauses) + "{")
+ZERO_CALL = ("api/web/web.vulcan", "\tr, err := Orders.Place(42)", "\tvar amt money.Money\n\tr, err := Orders.Place(amt)")
+WEB_MONEY = ("api/web/web.vulcan", 'import (\n\t"context"\n\t"fmt"\n)', 'import (\n\t"context"\n\t"fmt"\n\n\t"shop/lib/money"\n)')
+case("C01", "requires amt > 0, and a caller passes 0 at runtime: a contract failure that names the clause and the value.",
+     [pay_contract(["requires amt > 0"]), ZERO_CALL, WEB_MONEY],
+     "run exit=1 contains=want.out", {"want.out": "contract failure: Payer.Pay requires: amt > 0 (api/billing/billing.vulcan:13:11)\namt = 0\n"})
+case("C02", "requires amt > 0, and a caller passes the constant 0: K0501 at the call.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "func charge(amt money.Money) money.Money\n\trequires amt > 0\n{\n\treturn amt\n}\n\nvar _ = func() money.Money { return charge(0) }\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@charge(0)@ K0501")
+case("C03", "ensures err == nil => result.Amount == amt, and the body returns a wrong amount.",
+     [pay_contract(["ensures err == nil => result.Amount == amt"]),
+      ("api/billing/billing.vulcan", "return money.Receipt{Amount: amt}, nil", "return money.Receipt{Amount: amt + 1}, nil")],
+     "run exit=1 contains=want.out", {"want.out": "contract failure: Payer.Pay ensures: err == nil => result.Amount == amt\nresult = money.Receipt{Amount:43}\n"})
+case("C04", "ensures result.Amount == amt in a function with an error result: K0502.",
+     [pay_contract(["ensures result.Amount == amt"])],
+     "error api/billing/billing.vulcan:@@result.Amount == amt@ K0502")
+case("C06", "requires len(xs) > 0 && xs[0] > 0: accepted.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "func first(xs []int) int\n\trequires len(xs) > 0 && xs[0] > 0\n{\n\treturn xs[0]\n}\n\nvar _ = first\n\n// Payer takes payments.")],
+     "accept")
+case("C07", "old(xs) with a slice xs: K0509.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "func grow(xs []int) []int\n\tensures len(result) == len(old(xs)) + 1\n{\n\treturn append(xs, 1)\n}\n\nvar _ = grow\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@len(result)@ K0509")
+WINDOW = ("api/billing/billing.vulcan", "// Payer takes payments.", "// Window is a range.\ntype Window struct {\n\tLo, Hi int\n}\n\tinvariant Lo <= Hi\n\n// Payer takes payments.")
+case("C09", "invariant Lo < Hi: K0506, because the zero value breaks it.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "// Window is a range.\ntype Window struct {\n\tLo, Hi int\n}\n\tinvariant Lo < Hi\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@Lo < Hi@ K0506")
+case("C10", "A field of a struct with an invariant written from a function that is not its method: K0507.",
+     [WINDOW, ("api/billing/billing.vulcan", "// Payer takes payments.\ntype Payer", "func widen(w *Window) { w.Hi = w.Hi + 1 }\n\nvar _ = widen\n\n// Payer takes payments.\ntype Payer")],
+     "error api/billing/billing.vulcan:@@w.Hi =@ K0507")
+case("C11", "&w.Lo outside the methods: K0508.",
+     [WINDOW, ("api/billing/billing.vulcan", "// Payer takes payments.\ntype Payer", "func low(w *Window) *int { return &w.Lo }\n\nvar _ = low\n\n// Payer takes payments.\ntype Payer")],
+     "error api/billing/billing.vulcan:@@&w.Lo@ K0508")
+ACCOUNT = '''// Account holds money.
+type Account struct {
+	Balance int
+}
+	invariant Balance >= 0
+
+// Deposit adds money.
+func (a *Account) Deposit(x int) { a.Balance += x }
+
+// Rebalance passes through a negative balance, then restores it.
+func (a *Account) Rebalance(x int) {
+	a.Balance -= 2 * x
+	a.Deposit(x)
+	a.Deposit(x)
+}
+
+// Payer takes payments.'''
+case("C12", "A method breaks its invariant for a moment and calls methods through its own receiver: no check on those returns, only on its own.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", ACCOUNT),
+      ("api/billing/billing.vulcan", "return money.Receipt{Amount: amt}, nil", "acct := &Account{Balance: 1}\n\tacct.Rebalance(5)\n\treturn money.Receipt{Amount: amt + money.Money(acct.Balance) - 1}, nil")],
+     "run exit=0 stdout=out.txt", {"out.txt": "paid 42\n"})
+case("C12b", "A call through another expression is checked at its return: the invariant of the other account fails.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", ACCOUNT),
+      ("api/billing/billing.vulcan", "return money.Receipt{Amount: amt}, nil", "acct := &Account{Balance: 1}\n\tacct.Deposit(-5)\n\treturn money.Receipt{Amount: amt}, nil")],
+     "run exit=1 contains=want.out", {"want.out": "contract failure: Account invariant: Balance >= 0\nBalance = -4\n"})
+case("C13", "A port contract, and a fake bound with vulcan.Bind that breaks it: the test fails at the port.",
+     [("api/orders/component.vulcan", "func Pay(amt money.Money) (money.Receipt, error)", "func Pay(amt money.Money) (money.Receipt, error)\n            ensures err == nil => result.Amount == amt")],
+     "accept\ncmd exit=1 say=contract-failure:-Orders.Checkout.Pay-ensures vulcan test Orders",
+     {"api/orders/orders_test.vulcan": 'package orders\n\nimport (\n\t"testing"\n\n\t"github.com/robot-accomplice/vulcan/vulcan"\n\t"shop/lib/money"\n)\n\ntype double struct{}\n\nfunc (double) Pay(amt money.Money) (money.Receipt, error) { return money.Receipt{Amount: amt * 2}, nil }\n\nfunc TestPlace(t *testing.T) {\n\tvulcan.Bind(t, &Checkout, double{})\n\tNewService().Place(2)\n}\n'})
+case("C17", "A type assertion in a contract: K0512.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "func name(v any) string\n\trequires v.(string) != \"\"\n{\n\treturn \"\"\n}\n\nvar _ = name\n\n// Payer takes payments.")],
+     'error api/billing/billing.vulcan:@@v.(string)@ K0512')
+case("C18", "A struct literal that breaks its invariant fails where the code builds it.",
+     [WINDOW, ("api/billing/billing.vulcan", "return money.Receipt{Amount: amt}, nil", "w := Window{Lo: int(amt), Hi: 1}\n\t_ = w\n\treturn money.Receipt{Amount: amt}, nil")],
+     "run exit=1 contains=want.out", {"want.out": "contract failure: Window invariant: Lo <= Hi\nLo = 42\n"})
+case("P50", "Plain result in a function with two results other than error: K0510.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "func split(n int) (int, int)\n\tensures result >= 0\n{\n\treturn n, n\n}\n\nvar _ = split\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@result >= 0@ K0510")
+case("P51", "A function with a contract that names a parameter result: K0511.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "func keep(result int) int\n\trequires result > 0\n{\n\treturn result\n}\n\nvar _ = keep\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@requires@ K0511\nerror api/billing/billing.vulcan:@@result > 0@ K0510")
+case("P52", "A port contract that names an identifier of its own leaf: K0120.",
+     [("api/orders/component.vulcan", "func Pay(amt money.Money) (money.Receipt, error)", "func Pay(amt money.Money) (money.Receipt, error)\n            requires amt < MaxAmount"),
+      ("api/orders/orders.vulcan", "// Service places orders.", "// MaxAmount is the largest payment.\nconst MaxAmount = 1000\n\n// Service places orders.")],
+     "error api/orders/component.vulcan:@@MaxAmount@ K0120")
+case("P53", "Named results can be used by name in ensures; error wrapping in a deferred call keeps the result.",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "func half(n int) (h int, e error)\n\trequires n >= 0\n\tensures err == nil => h*2 <= n\n{\n\tdefer func() {\n\t\tif e != nil {\n\t\t\te = fmt.Errorf(\"half: %w\", e)\n\t\t}\n\t}()\n\th = n / 2\n\treturn\n}\n\n// Payer takes payments."),
+      ("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"fmt"\n\n\t"shop/lib/money"\n)'),
+      ("api/billing/billing.vulcan", "return money.Receipt{Amount: amt}, nil", "h, err := half(int(amt))\n\treturn money.Receipt{Amount: money.Money(h * 2)}, err")],
+     "run exit=0 stdout=out.txt", {"out.txt": "paid 42\n"})
+case("E04", "on_contract_failure: exit: a contract failure ends the process with exit code 3.",
+     [pay_contract(["requires amt > 0"]), ZERO_CALL, WEB_MONEY,
+      ("system.vulcan", '    person Customer "Buys goods"', '    person Customer "Buys goods"\n\n    config { on_contract_failure: exit }')],
+     "run exit=3 contains=want.out", {"want.out": "contract failure: Payer.Pay requires: amt > 0\n"})
+NET_BILLING = [("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"net/http"\n\n\t"shop/lib/money"\n)\n\nfunc ping() error {\n\t_, err := http.Get("https://example.com")\n\treturn err\n}\n\nvar _ = ping')]
+case("N01", "A leaf that is not a gateway or an entry leaf calls http.Get: K0205.",
+     NET_BILLING, "error api/billing/billing.vulcan:@@Get@ K0205")
+case("N01b", "Near miss: a gateway leaf calls http.Get.",
+     NET_BILLING + [("system.vulcan", '    person Customer "Buys goods"', '    person Customer "Buys goods"\n    external Bank "Card network"'),
+                    ("api/billing/component.vulcan", "component Billing {", "component Billing {\n    gateway for Bank")],
+     "accept")
+case("N03", "A library calls os.Open: K0203.",
+     [("lib/money/money.vulcan", "package money\n", 'package money\n\nimport "os"\n\n// Load opens a rate file.\nfunc Load() error {\n\t_, err := os.Open("rates.txt")\n\treturn err\n}\n')],
+     "error lib/money/money.vulcan:@@Open@ K0203")
+case("N04", "A library queries through a *sql.DB that it receives: accepted.",
+     [("lib/money/money.vulcan", "package money\n", 'package money\n\nimport "database/sql"\n\n// Count counts the receipts.\nfunc Count(db *sql.DB) (int, error) {\n\tvar n int\n\terr := db.QueryRow("select count(*) from receipts").Scan(&n)\n\treturn n, err\n}\n')],
+     "accept")
+case("T05", "vulcan guide prints the primer.", [], "cmd exit=0 say=Vulcan-primer vulcan guide")
 
 os.makedirs(OUT, exist_ok=True)
 for f in os.listdir(OUT):

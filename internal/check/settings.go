@@ -341,4 +341,12 @@ func (c *Checker) config() {
 		}
 		c.constant(v, t, "config "+key)
 	}
+	if v := c.P.Config("on_contract_failure"); v != nil {
+		mode := strings.Trim(v.Text, `"`)
+		if v.Kind != decl.ExprValue || mode != "panic" && mode != "exit" {
+			c.D.Errorf(c.P.SysSrc.Pos(v.Pos), "K0606", "config on_contract_failure is panic or exit (§7.4)")
+		} else {
+			v.Lit = mode
+		}
+	}
 }

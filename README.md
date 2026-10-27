@@ -11,8 +11,9 @@ together. It is Go with an enforced architecture layer, contracts, and tools aro
 - **The tools teach the model** how to use the language, from a primer with a fixed token budget.
 
 **Status:** specification draft, with a proof-of-concept compiler in progress
-([PoC plan](docs/poc/plan.md)). Phase P1 works: declarations, the architecture and wiring rules,
-generated startup, and `check`, `build`, `run`, and `test`. Contracts come in phase P2. Source
+([PoC plan](docs/poc/plan.md)). Phases P1 and P2 work: declarations, the architecture and wiring rules,
+contracts and invariants, the network rule, generated startup, and `check`, `build`, `run`,
+`test`, `mod tidy`, and `guide`. Next is the application (P3) and the measurement harness (P4). Source
 files end in `.vulcan`, and the command is `vulcan`. The experiments keep the earlier working name, Keel.
 See [Status and handoff](docs/status.md).
 
