@@ -151,7 +151,14 @@ from the functional description [stockroom.md](poc/stockroom.md), with the test 
 `poc/fakepay`. Both pass the shared black-box suite `poc/acceptance`. The independent
 [parity review](../experiments/poc/parity-p3.md) found 2 High, 4 Medium, and 5 Low differences;
 all but one Low are fixed. From the review: `vulcan check` now runs `go vet` (K0706), and K0607
-warns of a second instance of one constructor. Next: the harness (P4).
+warns of a second instance of one constructor.
+
+**Phase P4 (2026-10-27):** the harness, `poc/harness` (its README). It runs headless Claude Code
+in a fresh workspace with a budget, reads the stream (turns, tokens, the check loop), grades
+(build, acceptance, rule tests, detectors, holdout), seals the hidden material, and holds the
+frozen analysis of plan section 9. The analysis reads four synthetic scenarios right, and the
+pipeline ran end to end with a scripted agent on demo material in both arms. Next: phase P5, the
+hidden material from separate sessions, its validation, and two pilot tasks with the real agent.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

@@ -172,7 +172,11 @@ Compare the arms by the paired per-task difference (V minus G).
   p-value. Reported for all tasks, for tempting and ordinary tasks apart, and for each rule class.
 - For M4: the geometric mean over tasks of the ratio V / G.
 - The analysis script is written and frozen before the runs, and runs on a synthetic data set
-  first.
+  first. It is `poc/harness/analysis` (phase P4). Its package comment makes the reading rules
+  below exact: "points" are percentage points of per-task rates; the cost ratio is the geometric
+  mean of tokens (input with cache, and output); class D is "about equal" within ±10 points of
+  runs that break a class D rule; "the gain comes only from analyzer-decidable rules" when the
+  tempting gain with only the other targeted rules is below 10 points.
 
 With 12 tasks, the PoC can show a large effect, not a small one. It is a screen, not a proof.
 

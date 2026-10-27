@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	vulcanroot "github.com/robot-accomplice/vulcan"
@@ -115,6 +116,9 @@ func checkOrBuild(cmd string, args []string, stdout, stderr io.Writer) int {
 		bin := driver.Binary(r.P)
 		if out != "" {
 			b, err := os.ReadFile(bin)
+			if err == nil {
+				err = os.MkdirAll(filepath.Dir(out), 0o755)
+			}
 			if err == nil {
 				err = os.WriteFile(out, b, 0o755)
 			}

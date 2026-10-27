@@ -4,3 +4,4 @@ docs/superpowers/
 __pycache__/
 .vulcan/
 *.db
+.harness/

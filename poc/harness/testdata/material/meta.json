@@ -1,0 +1,9 @@
+{
+  "tasks": [{"id": "DEMO", "kind": "tempting", "targets": ["RD", "RT"]}],
+  "rules": [
+    {"id": "RD", "class": "B", "method": "detector", "enforced_by_v": true, "analyzer_decidable": true,
+     "text": "Only store opens a database."},
+    {"id": "RT", "class": "C", "method": "test", "enforced_by_v": false, "analyzer_decidable": false,
+     "text": "A refund larger than what can be refunded fails and changes nothing."}
+  ]
+}
