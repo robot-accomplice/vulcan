@@ -5,6 +5,7 @@ package lex
 import (
 	"go/scanner"
 	"go/token"
+	"strings"
 )
 
 // Tok is one token. Off and End are byte offsets in the source. A semicolon that the scanner
@@ -28,7 +29,11 @@ type Error struct {
 	Msg string
 }
 
-// Scan returns the tokens of src, ending with an EOF token, and the lexical errors.
+// Pad is the number of EOF tokens at the end of a scan, so that a lookahead of a few tokens
+// after a truncated input never runs past the slice.
+const Pad = 4
+
+// Scan returns the tokens of src, ending with Pad EOF tokens, and the lexical errors.
 func Scan(src []byte) ([]Tok, []Error) {
 	fset := token.NewFileSet()
 	file := fset.AddFile("", -1, len(src))
@@ -52,8 +57,13 @@ func Scan(src []byte) ([]Tok, []Error) {
 		default:
 			t.End = off + len(tok.String())
 		}
+		// The scanner gives an invalid byte the 3-byte literal U+FFFD.
+		t.End = min(t.End, len(src))
 		toks = append(toks, t)
 		if tok == token.EOF {
+			for range Pad - 1 {
+				toks = append(toks, t)
+			}
 			return toks, errs
 		}
 	}
@@ -82,6 +92,32 @@ func Match(toks []Tok, i int) int {
 		}
 	}
 	return len(toks) - 1
+}
+
+// Directives returns the offsets of each //go:<name> comment that starts a line.
+func Directives(src []byte, name string) []int {
+	fset := token.NewFileSet()
+	file := fset.AddFile("", -1, len(src))
+	var s scanner.Scanner
+	s.Init(file, src, func(token.Position, string) {}, scanner.ScanComments)
+	var out []int
+	for {
+		pos, tok, lit := s.Scan()
+		if tok == token.EOF {
+			return out
+		}
+		if tok != token.COMMENT || !strings.HasPrefix(lit, "//go:"+name) {
+			continue
+		}
+		off := file.Offset(pos)
+		start := off
+		for start > 0 && (src[start-1] == ' ' || src[start-1] == '\t') {
+			start--
+		}
+		if start == 0 || src[start-1] == '\n' {
+			out = append(out, off)
+		}
+	}
 }
 
 // ContractWords are the identifiers that start a contract clause after a signature.
@@ -166,8 +202,11 @@ func Clauses(toks []Tok, k int, words map[string]bool) ([]Clause, int) {
 		end := k
 		for ; k < len(toks); k++ {
 			t := toks[k]
+			if t.Tok == token.EOF {
+				break
+			}
 			if depth == 0 {
-				if t.Tok == token.LBRACE || t.Tok == token.EOF || t.Tok == token.RBRACE {
+				if t.Tok == token.LBRACE || t.Tok == token.RBRACE {
 					break
 				}
 				if t.Tok == token.SEMICOLON {

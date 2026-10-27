@@ -1,12 +1,12 @@
 Each deferred command prints that it is not in the release, and exits 2.
 -- want.txt --
-cmd exit=2 vulcan fmt
-cmd exit=2 vulcan explain
-cmd exit=2 vulcan doc
-cmd exit=2 vulcan diagram
-cmd exit=2 vulcan archdiff
-cmd exit=2 vulcan fake
-cmd exit=2 vulcan trace
+cmd exit=2 say=not-in-this-release vulcan fmt
+cmd exit=2 say=not-in-this-release vulcan explain
+cmd exit=2 say=not-in-this-release vulcan doc
+cmd exit=2 say=not-in-this-release vulcan diagram
+cmd exit=2 say=not-in-this-release vulcan archdiff
+cmd exit=2 say=not-in-this-release vulcan fake
+cmd exit=2 say=not-in-this-release vulcan trace
 -- api/billing/billing.vulcan --
 package billing
 

@@ -153,35 +153,35 @@ func Main(p Program) int {
 	if timeout == 0 {
 		timeout = 30 * time.Second
 	}
-	var firstErr error
+	// stopRest cancels the startup functions that still run, and waits for them for at most the
+	// shutdown timeout (§6, stop steps 1 to 3).
+	stopRest := func(remaining int) {
+		cancel()
+		deadline := time.After(timeout)
+		for ; remaining > 0; remaining-- {
+			select {
+			case <-done:
+			case <-deadline:
+				fmt.Fprintf(os.Stderr, "%s: %d startup functions did not stop within %s\n", p.Name, remaining, timeout)
+				return
+			}
+		}
+	}
 	for remaining := len(steps); remaining > 0; {
 		select {
 		case err := <-done:
 			remaining--
-			if err != nil && firstErr == nil {
-				firstErr = err
-				cancel()
+			if err != nil {
+				// A failed startup function: report at once, stop the rest, exit 1.
+				code := report("startup", err)
+				stopRest(remaining)
+				return code
 			}
 		case <-ctx.Done():
-			cancel()
-			deadline := time.After(timeout)
-			for remaining > 0 {
-				select {
-				case <-done:
-					remaining--
-				case <-deadline:
-					fmt.Fprintf(os.Stderr, "%s: %d startup functions did not stop within %s\n", p.Name, remaining, timeout)
-					return 1
-				}
-			}
-			if firstErr != nil {
-				return report("startup", firstErr)
-			}
+			// A stop signal: exit 0, also when a startup function does not stop in time.
+			stopRest(remaining)
 			return 0
 		}
-	}
-	if firstErr != nil {
-		return report("startup", firstErr)
 	}
 	return 0
 }

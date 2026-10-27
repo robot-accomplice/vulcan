@@ -4,6 +4,9 @@ package project
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path"
 	"path/filepath"
@@ -78,6 +81,8 @@ type Project struct {
 	ByName    map[string]*Package // leaves by component name
 	ByPath    map[string]*Package // leaves and libraries by import path
 	Diags     *diag.List
+	// Fatal is set by an error after which the Go stages would only repeat it.
+	Fatal bool
 }
 
 // Deferred reports a construct that the release does not support (K0009).
@@ -135,6 +140,7 @@ func (p *Project) problems(s *Source, probs []decl.Problem) {
 // scan walks the directories and loads each leaf and library.
 func (p *Project) scan() error {
 	dirs := map[string][]string{} // rel dir -> .vulcan file names
+	var goFiles []string
 	err := filepath.WalkDir(p.Root, func(full string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -144,6 +150,11 @@ func (p *Project) scan() error {
 			if full != p.Root && (strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" || name == "vendor") {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if strings.HasSuffix(name, ".go") {
+			rel, _ := filepath.Rel(p.Root, full)
+			goFiles = append(goFiles, filepath.ToSlash(rel))
 			return nil
 		}
 		if !strings.HasSuffix(name, ".vulcan") {
@@ -197,6 +208,9 @@ func (p *Project) scan() error {
 				return err
 			}
 		case isLib:
+			if !strings.HasPrefix(dir, "lib/") {
+				p.Diags.Errorf(diag.Pos{File: dir + "/library.vulcan", Line: 1, Col: 1}, "K0003", "library directory %s is outside lib/; libraries are in lib/ (§5.2)", dir)
+			}
 			if err := p.loadPackage(dir, names, false); err != nil {
 				return err
 			}
@@ -205,6 +219,9 @@ func (p *Project) scan() error {
 				p.Diags.Errorf(diag.Pos{File: dir + "/" + n}, "K0002", "a code file outside a leaf or a library: directory %s has no component.vulcan or library.vulcan", dir)
 			}
 		}
+	}
+	for _, f := range goFiles {
+		p.Diags.Errorf(diag.Pos{File: f, Line: 1, Col: 1}, "K0002", "%s is a Go file, which Vulcan does not compile; code files end in .vulcan, so rename it to %s", f, strings.TrimSuffix(path.Base(f), ".go")+".vulcan")
 	}
 	return nil
 }
@@ -227,6 +244,7 @@ func (p *Project) loadPackage(dir string, names []string, leaf bool) error {
 			for _, d := range c.Deferred {
 				p.Deferred(src.Pos(d.Pos), d.What, d.Section)
 			}
+			p.checkPorts(c, src)
 			if c.Name != "" && !strings.EqualFold(c.Name, pkg.GoName) {
 				p.Diags.Errorf(src.Pos(c.Pos), "K0004", "component %s is in directory %s; the name must match the directory, ignoring case", c.Name, dir)
 			}
@@ -245,6 +263,7 @@ func (p *Project) loadPackage(dir string, names []string, leaf bool) error {
 		}
 	}
 	if leaf {
+		p.portClashes(pkg)
 		p.Leaves = append(p.Leaves, pkg)
 	} else {
 		p.Libs = append(p.Libs, pkg)
@@ -317,9 +336,9 @@ func (p *Project) checkSystem() {
 		nodes[n.Name] = "external"
 	}
 	// Leaves in the system, and their directories.
-	byDir := map[string]*Package{}
+	byDir := map[string]*Package{} // by lower-case directory: B.2 matches names ignoring case
 	for _, l := range p.Leaves {
-		byDir[l.Dir] = l
+		byDir[strings.ToLower(l.Dir)] = l
 	}
 	groups := map[string]bool{}
 	listed := map[string]bool{}
@@ -341,7 +360,7 @@ func (p *Project) checkSystem() {
 				}
 				continue
 			}
-			listed[dir] = true
+			listed[leaf.Dir] = true
 			leaf.Container, leaf.Entry = c.Name, le
 			if leaf.Name != "" && leaf.Name != le.Name {
 				p.Diags.Errorf(pos(le.Pos), "K0003", "system.vulcan lists %s, but %s/component.vulcan declares component %s", le.Name, dir, leaf.Name)
@@ -446,4 +465,70 @@ func (p *Project) Config(key string) *decl.Value {
 		}
 	}
 	return nil
+}
+
+// checkPorts applies rule 7 inside one boundary: each port and each port method is declared
+// once, and a port method is exported, because the provider is in another package (K0110).
+func (p *Project) checkPorts(c *decl.Component, src *Source) {
+	seen := map[string]bool{}
+	for _, port := range c.Ports {
+		if seen[port.Name] {
+			p.Diags.Errorf(src.Pos(port.Pos), "K0110", "port %s is declared twice in component %s; a leaf declares each port once", port.Name, c.Name)
+			p.Fatal = true
+		}
+		seen[port.Name] = true
+		methods := map[string]bool{}
+		for _, m := range port.Methods {
+			if methods[m.Name] {
+				p.Diags.Errorf(src.Pos(m.Pos), "K0110", "port %s declares method %s twice", port.Name, m.Name)
+				p.Fatal = true
+			}
+			methods[m.Name] = true
+			if !token.IsExported(m.Name) {
+				p.Diags.Errorf(src.Pos(m.Pos), "K0110", "port method %s is not exported; a provider in another leaf could never have it, so name it %s", m.Name, strings.ToUpper(m.Name[:1])+m.Name[1:])
+				p.Fatal = true
+			}
+		}
+	}
+}
+
+// portClashes reports a port whose name is also a package-level name of the leaf's code, because
+// a port is a package-level name in the leaf (§5.3) (K0110).
+func (p *Project) portClashes(pkg *Package) {
+	if pkg.Comp == nil {
+		return
+	}
+	names := map[string]token.Position{}
+	for _, f := range pkg.Files {
+		fset := token.NewFileSet()
+		af, err := parser.ParseFile(fset, f.Rel, f.Blank.Go, parser.SkipObjectResolution)
+		if err != nil || af == nil {
+			continue
+		}
+		for _, d := range af.Decls {
+			switch d := d.(type) {
+			case *ast.FuncDecl:
+				if d.Recv == nil {
+					names[d.Name.Name] = fset.Position(d.Name.Pos())
+				}
+			case *ast.GenDecl:
+				for _, sp := range d.Specs {
+					switch sp := sp.(type) {
+					case *ast.TypeSpec:
+						names[sp.Name.Name] = fset.Position(sp.Name.Pos())
+					case *ast.ValueSpec:
+						for _, n := range sp.Names {
+							names[n.Name] = fset.Position(n.Pos())
+						}
+					}
+				}
+			}
+		}
+	}
+	for _, port := range pkg.Comp.Ports {
+		if at, ok := names[port.Name]; ok {
+			p.Diags.Errorf(pkg.CompSrc.Pos(port.Pos), "K0110", "port %s has the name of a declaration in %s:%d; inside the leaf the port is a package-level name, so rename one of them", port.Name, at.Filename, at.Line)
+			p.Fatal = true
+		}
+	}
 }

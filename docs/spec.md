@@ -1924,6 +1924,12 @@ TransportFile = "transport" identifier "{" "go" string_lit "}" .
 - **Scope of a value.** A value can use the package `time` (no import needed), the libraries that
   the file imports, the leaves of the system (in an endpoint), and the exported constants of the
   setting's own type, without qualification (`whenFull: dropOldest`).
+- **A value is a constant.** An expression value is a Go constant of its field's type, for example
+  `5 * time.Second`, `"blue"`, or `money.MaxOrder`. A function literal, a call other than a
+  conversion, or a variable is a compile error (K0606), because `system.vulcan` holds no code
+  (§5.4, rule 2). A flag default follows the same rule.
+- **Every field has a value.** Each exported field of a settings struct gets a value or a flag in
+  `system.vulcan`; a field with none is a compile error (K0603).
 - **Names.** A `library` name is its Go package name. A `transport` name is lower case. A
   `component` name matches its directory name, ignoring case (`Orders` in `api/orders/`).
 - **`Uses`** draws an arrow from the first node to the second, for a relationship that no
@@ -2222,7 +2228,7 @@ the long form.
 | K0107 | E | A wire names a type or a constructor that does not exist or is not exported | §5.3 |
 | K0108 | E | The method set of the supplier does not match the port | §5.4 r5 |
 | K0109 | E | The provider's own contract disproves the port's contract | §5.3 |
-| K0110 | E | A port is declared outside the leaf that requires it, or a boundary names another leaf | §5.4 r7 |
+| K0110 | E | A port is declared outside the leaf that requires it, or twice, or with the name of a declaration of its leaf; a port method is not exported; or a boundary, or `system.vulcan`, names another leaf or imports something other than a library | §5.4 r7 |
 | K0111 | E | A cycle in the wires of one container | §5.4 r8 |
 | K0112 | E | A boundary uses a leaf-private type, or a topic message or remote signature uses a named type that is not from a library (fix-it: move it to a library) | §5.4 r9 |
 | K0113 | E | A wire names a group | §5.3 |
@@ -2247,7 +2253,7 @@ the long form.
 | K0206 | E | `gateway for` names something that is not an `external`, or `entry for` names something that is not a `person` or an `external` | §5.4b |
 | K0207 | E | Two gateway leaves for one external system in one container | §5.4b |
 | K0208 | E | A leaf or a library imports a transport package | §5.5.1 |
-| K0209 | E | A dependency is not in `go.sum` (fix-it: `vulcan mod tidy`) | §6 |
+| K0209 | E | A dependency is not in `go.mod` or `go.sum` (fix-it: `vulcan mod tidy`) | §6 |
 | K0210 | E | Strict mode: the type of a library `var` holds a mutable reference | §5.4d |
 | K0211 | E | Strict mode: code reaches a global mutator | §5.4d, App. D |
 | **K03** | | **Topics, transports, and remote ports** | |
@@ -2300,7 +2306,8 @@ the long form.
 | K0602 | E | One flag name is used with two types, defaults, or maxima, or two flag names give one environment variable | §5.3 |
 | K0603 | E | Settings for a leaf whose `startup` takes none, or a missing settings value | §5.3 |
 | K0604 | E | A constructor has parameters other than one settings struct, or results other than `T` or `(T, error)`; or a wire that names a type has settings | §5.3 |
-| K0605 | E | A literal in a settings field tagged `vulcan:"secret"` | §5.3 |
+| K0605 | E | A literal, or a flag default, in a settings field tagged `vulcan:"secret"` | §5.3 |
+| K0606 | E | A settings value, a flag default, or a `config` value is not a constant of its field's type; a value can use only constants, the package `time`, and the libraries that `system.vulcan` imports | §5.3, App. B.2 |
 | **K07** | | **Warnings on Go code** | |
 | K0701 | W | Unhandled error | §6 |
 | K0702 | W | Error masking | §6 |

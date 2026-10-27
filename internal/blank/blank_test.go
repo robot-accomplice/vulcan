@@ -63,3 +63,43 @@ func (a *Account) Deposit(x int)
 	}
 	_ = f
 }
+
+func TestLimit(t *testing.T) {
+	src := `package p
+
+const limit = 4
+
+type pager struct {
+	fetch func(limit int) []int
+	buf   [limit]byte
+	limit int
+	n     limit2
+	Name  string limit 200 ` + "`json:\"name\"`" + `
+	Note  string
+		limit 300
+}
+
+type limit2 int
+`
+	r := File([]byte(src))
+	if len(r.Deferred) != 2 {
+		t.Fatalf("deferred: %+v", r.Deferred)
+	}
+	if _, err := parser.ParseFile(token.NewFileSet(), "x.go", r.Go, 0); err != nil {
+		t.Fatalf("go parse: %v\n%s", err, r.Go)
+	}
+}
+
+func TestTruncated(t *testing.T) {
+	for _, src := range []string{"package p\n\nfunc (", "package p\n\nfunc F[", "func A()(0000", "package p\ntype T struct {", "package p\nfunc F() requires"} {
+		File([]byte(src))
+	}
+}
+
+func FuzzFile(f *testing.F) {
+	f.Add([]byte("package p\n\nfunc F(x int) (int, error)\n\trequires x > 0\n{\n\treturn x, nil\n}\n"))
+	f.Add([]byte("package p\ntype T struct {\n\tA int limit 3\n}\n\tinvariant A >= 0\n"))
+	f.Fuzz(func(t *testing.T, src []byte) {
+		File(src)
+	})
+}

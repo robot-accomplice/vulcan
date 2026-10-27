@@ -326,7 +326,7 @@ case("S09", "A Go feature newer than Go 1.22 in a body (a range-over-func iterat
      "run exit=0 stdout=out.txt", {"out.txt": "paid 42 0\npaid 42 1\n"})
 
 case("S10", "Each deferred command prints that it is not in the release, and exits 2.", [],
-     "\n".join(f"cmd exit=2 vulcan {c}" for c in ("fmt", "explain", "doc", "diagram", "archdiff", "fake", "trace")))
+     "\n".join(f"cmd exit=2 say=not-in-this-release vulcan {c}" for c in ("fmt", "explain", "doc", "diagram", "archdiff", "fake", "trace")))
 
 # ---- Layout (PoC additions)
 case("P10", "A code file outside a leaf or a library.", [], "error misc/x.vulcan:@@package@ K0002".replace(":@@package@", ""),
@@ -376,6 +376,119 @@ case("P17", "Code imports the runtime package rt, which only generated code may 
 case("P18", "A constructor with a parameter that is not a settings struct.",
      [("api/billing/billing.vulcan", "func NewPayer() *Payer { return &Payer{} }", "func NewPayer(n int) *Payer { return &Payer{} }")],
      "error system.vulcan:@@NewPayer@ K0604")
+
+# ---- Cases added after the P1 audit (experiments/poc/audit-p1.md)
+WEB_SETTINGS = [("api/web/web.vulcan", "func startup(ctx context.Context) error {", "// Settings configure Web.\ntype Settings struct {\n\tWait time.Duration\n}\n\nfunc startup(ctx context.Context, s Settings) error {"),
+                ("api/web/web.vulcan", 'fmt.Println("paid", r.Amount)', 'fmt.Println("paid", r.Amount, s.Wait)'),
+                ("api/web/web.vulcan", 'import (\n\t"context"\n\t"fmt"\n)', 'import (\n\t"context"\n\t"fmt"\n\t"time"\n)')]
+case("P20", "A leaf setting of type time.Duration, given as a constant that uses time (audit H1).",
+     WEB_SETTINGS + [("system.vulcan", "Web, Orders, Billing", "Web{ Wait: 2 * time.Second }, Orders, Billing")],
+     "run exit=0 stdout=out.txt", {"out.txt": "paid 42 2s\n"})
+case("P21", "The identifier limit in valid Go: a parameter, an array length, a field name (audit H2).",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "const limit = 4\n\ntype pager struct {\n\tfetch func(limit int) []int\n\tbuf   [limit]byte\n\tlimit int\n}\n\nvar _ = pager{}\n\n// Payer takes payments.")],
+     "accept")
+LIB_STATE = ("lib/money/money.vulcan", "// Money is an amount in cents.", "// Config holds fees.\ntype Config struct{ Fee Money }\n\n// Default is the default config.\nvar Default = Config{Fee: 1}\n\n// Rates are the tax rates.\nvar Rates = [2]Money{1, 2}\n\n// Limit is the largest order.\nvar Limit Money = 100\n\n// Fees are the fees by country.\nvar Fees = map[string]Money{}\n\n// Money is an amount in cents.")
+case("A15b", "A field of a library struct var assigned in a leaf (audit H3).",
+     [LIB_STATE, ("api/billing/billing.vulcan", "// Payer takes payments.", "func tweak() { money.Default.Fee = 99 }\n\nvar _ = tweak\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@money.Default.Fee@ K0202")
+case("A15c", "An element of a library array var assigned (audit H3).",
+     [LIB_STATE, ("api/billing/billing.vulcan", "// Payer takes payments.", "func tweak() { money.Rates[0] = 7 }\n\nvar _ = tweak\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@money.Rates[0]@ K0202")
+case("A15d", "A library var assigned in package-level function literals (audit H3).",
+     [LIB_STATE, ("api/billing/billing.vulcan", "// Payer takes payments.", "var _ = func() bool { money.Limit = 1; return true }()\n\nvar reset = func() { money.Limit = 0 }\n\n// Payer takes payments.")],
+     "error api/billing/billing.vulcan:@@money.Limit = 1@ K0202\nerror api/billing/billing.vulcan:@@money.Limit = 0@ K0202")
+case("A15e", "Near miss: reading library vars, copying one, and writing through a map are not assignments to the var.",
+     [LIB_STATE, ("api/billing/billing.vulcan", "// Payer takes payments.", "func use() money.Money {\n\tc := money.Default\n\tc.Fee = 5\n\tmoney.Fees[\"ch\"] = 3\n\treturn c.Fee + money.Limit + money.Rates[1]\n}\n\nvar _ = use\n\n// Payer takes payments.")],
+     "accept")
+case("A12b", "A package-level var whose initializer reaches a port through a function (audit M2).",
+     [("api/orders/orders.vulcan", "// Service places orders.", "func warm() money.Receipt {\n\tr, _ := Checkout.Pay(1)\n\treturn r\n}\n\nvar first = warm()\n\n// Service places orders.")],
+     "error api/orders/orders.vulcan:@2@warm()@ K0117")
+case("A12c", "Near miss: a package-level var that stores a function literal, which calls a port later.",
+     [("api/orders/orders.vulcan", "// Service places orders.", "var later = func() { _, _ = Checkout.Pay(2) }\n\n// Service places orders.")],
+     "accept")
+case("A10b", "A range statement that assigns to a port (audit L1).",
+     [("api/orders/orders.vulcan", "return Checkout.Pay(amt)", "var ch chan interface {\n\t\tPay(money.Money) (money.Receipt, error)\n\t}\n\tfor Checkout = range ch {\n\t}\n\treturn money.Receipt{}, nil")],
+     "error api/orders/orders.vulcan:@@Checkout = range@ K0116")
+case("A10c", "Near miss: a local variable named like the port.",
+     [("api/orders/orders.vulcan", "return Checkout.Pay(amt)", "r, err := Checkout.Pay(amt)\n\tCheckout := 3\n\tCheckout = 4\n\t_ = Checkout\n\treturn r, err")],
+     "accept")
+case("A06b", "The provider lacks the port method.",
+     [("api/billing/billing.vulcan", "// Pay takes a payment.\nfunc (p *Payer) Pay(", "// Charge takes a payment.\nfunc (p *Payer) Charge(")],
+     "error system.vulcan:@@NewPayer@ K0108")
+case("P22", "A string constant for a time.Duration setting (audit H4).",
+     WEB_SETTINGS + [("system.vulcan", "Web, Orders, Billing", 'Web{ Wait: "soon" }, Orders, Billing')],
+     'error system.vulcan:@@"soon"@ K0606')
+case("P23", "A flag default of the wrong type for a time.Duration setting (audit H4).",
+     WEB_SETTINGS + [("system.vulcan", "Web, Orders, Billing", 'Web{ Wait: flag("wait", default: "5s") }, Orders, Billing')],
+     'error system.vulcan:@@"5s"@ K0606')
+case("P24", "A constructor whose settings type is not exported (audit H4).",
+     [("api/billing/billing.vulcan", "func NewPayer() *Payer { return &Payer{} }", "type opts struct{ Fee int }\n\nfunc NewPayer(o opts) *Payer { return &Payer{} }")],
+     "error system.vulcan:@@NewPayer@ K0604")
+case("P25", "import \"time\" in system.vulcan is harmless; a flag default uses time (audit H4).",
+     WEB_SETTINGS + [("system.vulcan", "// Shop is the online store.", 'import "time"\n\n// Shop is the online store.'),
+                     ("system.vulcan", "Web, Orders, Billing", 'Web{ Wait: flag("wait", default: 2 * time.Second) }, Orders, Billing')],
+     "run exit=0 arg=--wait=3s stdout=out.txt", {"out.txt": "paid 42 3s\n"})
+case("P26", "A truncated code file gives a syntax error, not a crash (audit M1).",
+     [], "error api/billing/extra.vulcan:3:8 K0001", {"api/billing/extra.vulcan": "package billing\n\nfunc ("})
+case("P27", "A leaf setting with no value in system.vulcan (audit M3).",
+     WEB_SETTINGS, "error system.vulcan:@@Web,@ K0603")
+case("P28", "A failed startup while another startup ignores ctx: report and exit 1 within shutdown_timeout (audit M4).",
+     [("system.vulcan", '    person Customer "Buys goods"', '    person Customer "Buys goods"\n\n    config { shutdown_timeout: 1 * time.Second }'),
+      ("api/web/web.vulcan", "\tr, err := Orders.Place(42)", "\tif ctx != nil {\n\t\treturn fmt.Errorf(\"boom\")\n\t}\n\tr, err := Orders.Place(42)"),
+      ("api/billing/billing.vulcan", "// Payer takes payments.", "func startup(ctx context.Context) error {\n\tselect {}\n}\n\n// Payer takes payments."),
+      ("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"context"\n\n\t"shop/lib/money"\n)')],
+     "run exit=1 stdout=out.txt", {"out.txt": "Shop/Api: startup failed:\nWeb: boom\nShop/Api: 1 startup functions did not stop within 1s\n"})
+case("P29", "A .go file in a leaf directory (audit M5).",
+     [], "error api/billing/helper.go:1:1 K0002", {"api/billing/helper.go": "package billing\n\nfunc fee() int { return 1 }\n"})
+case("P30", "A test reads a file in testdata (audit M5).",
+     [], "accept\ncmd exit=0 vulcan test Billing",
+     {"api/billing/testdata/fee.txt": "7\n",
+      "api/billing/billing_test.vulcan": 'package billing\n\nimport (\n\t"os"\n\t"testing"\n)\n\nfunc TestFee(t *testing.T) {\n\tb, err := os.ReadFile("testdata/fee.txt")\n\tif err != nil || string(b[:1]) != "7" {\n\t\tt.Fatal(err)\n\t}\n}\n'})
+case("P31", "An import of a module that go.mod does not require (audit M6).",
+     [("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"example.com/notreal/pkg"\n\n\t"shop/lib/money"\n)\n\nvar _ = pkg.X')],
+     'error api/billing/billing.vulcan:@@"example.com/notreal/pkg"@ K0209')
+case("P32", "A function literal in a system.vulcan value (audit M7).",
+     [("system.vulcan", "Orders.Checkout: Billing.NewPayer", "Orders.Checkout: Billing.NewPayer{ Fee: func() int64 { return 1 }() }"),
+      ("api/billing/billing.vulcan", "func NewPayer() *Payer { return &Payer{} }", "// Settings configure a Payer.\ntype Settings struct {\n\tFee int64\n}\n\nfunc NewPayer(s Settings) *Payer { return &Payer{} }")],
+     "error system.vulcan:@@func()@ K0606")
+case("P33", "system.vulcan imports a leaf (audit M7).",
+     [("system.vulcan", "// Shop is the online store.", 'import "shop/api/billing"\n\n// Shop is the online store.')],
+     'error system.vulcan:@@"shop/api/billing"@ K0110')
+case("P34", "A port declared twice in one component (audit M8).",
+     [("api/orders/component.vulcan", "    needs port Checkout {", "    needs port Checkout {\n        func Refund(amt money.Money) error\n    }\n\n    needs port Checkout {")],
+     "error api/orders/component.vulcan:@2@Checkout@ K0110")
+case("P35", "A port with the name of a function of its leaf (audit M8).",
+     [("api/orders/orders.vulcan", "// Service places orders.", "func Checkout() {}\n\n// Service places orders.")],
+     "error api/orders/component.vulcan:@@Checkout@ K0110")
+case("P36", "An unexported port method (audit L10).",
+     [("api/orders/component.vulcan", "func Pay(amt money.Money) (money.Receipt, error)", "func pay(amt money.Money) (money.Receipt, error)")],
+     "error api/orders/component.vulcan:@@pay@ K0110")
+case("P37", "vulcan.Bind with a fake that does not satisfy the port (audit L2).",
+     [], "error api/orders/orders_test.vulcan:@@fake{}@ K0108",
+     {"api/orders/orders_test.vulcan": 'package orders\n\nimport (\n\t"testing"\n\n\t"github.com/robot-accomplice/vulcan/vulcan"\n)\n\ntype fake struct{}\n\nfunc (fake) Pay(amt int) error { return nil }\n\nfunc TestPlace(t *testing.T) {\n\tvulcan.Bind(t, &Checkout, fake{})\n}\n'})
+case("P38", "Near miss: //go:linkname inside a raw string (audit L4).",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "var doc = `\n//go:linkname x y\n`\n\nvar _ = doc\n\n// Payer takes payments.")],
+     "accept")
+case("P39", "Near miss: a type named invariant in a type group (audit L5).",
+     [("api/billing/billing.vulcan", "// Payer takes payments.", "type (\n\tlevel     int\n\tinvariant func() bool\n)\n\nvar _ level\nvar _ invariant\n\n// Payer takes payments.")],
+     "accept")
+case("P40", "A library outside lib/ (audit L9).",
+     [], "error api/util/library.vulcan:1:1 K0003",
+     {"api/util/library.vulcan": "library util {\n}\n", "api/util/util.vulcan": "package util\n\n// One is one.\nconst One = 1\n"})
+case("P41", "A library that declares a port.",
+     [("lib/money/library.vulcan", "library money {\n}", "library money {\n    needs port Rates {\n        func Get() int\n    }\n}")],
+     "error lib/money/library.vulcan:@@needs@ K0201")
+case("P42", "One flag with two types.",
+     [("system.vulcan", "Orders.Checkout: Billing.NewPayer", 'Orders.Checkout: Billing.NewPayer{ Key: flag("card"), Max: flag("card") }'),
+      ("api/billing/billing.vulcan", "func NewPayer() *Payer { return &Payer{} }",
+       '// Settings configure a Payer.\ntype Settings struct {\n\tKey string\n\tMax int\n}\n\nfunc NewPayer(s Settings) *Payer { return &Payer{} }')],
+     'error system.vulcan:@2@"card"@ K0602')
+case("P43", "A wire that names a type takes no settings.",
+     [("system.vulcan", "Orders.Checkout: Billing.NewPayer", "Orders.Checkout: Billing.Payer{ Fee: 1 }")],
+     "error system.vulcan:@@{ Fee: 1 }@ K0604")
+case("S07", "A panic in a body: the stack trace names the .vulcan file and line.",
+     [("api/web/web.vulcan", "\tr, err := Orders.Place(42)", "\tdone := make(chan bool)\n\tgo func() {\n\t\tvar m map[string]int\n\t\tm[\"x\"] = 1\n\t\tdone <- true\n\t}()\n\t<-done\n\tr, err := Orders.Place(42)")],
+     "run exit=2 contains=want-trace.txt", {"want-trace.txt": "assignment to entry in nil map\napi/web/web.vulcan:12\n"})
 
 os.makedirs(OUT, exist_ok=True)
 for f in os.listdir(OUT):

@@ -39,6 +39,15 @@ func (c *Checker) Rules() {
 			}
 			c.libVarAssigns(pkg, gp.TypesInfo, f, libVars)
 		}
+		if pkg.IsLeaf {
+			var files []*ast.File
+			for _, f := range gp.Syntax {
+				if !c.Generated(f) && !strings.HasSuffix(c.Fset.PositionFor(f.Package, false).Filename, "_test.go") {
+					files = append(files, f)
+				}
+			}
+			c.initReach(pkg, files, gp.TypesInfo, ports)
+		}
 	}
 	c.componentImports()
 	c.contractsDeferred()
@@ -131,35 +140,29 @@ func (c *Checker) leafRules(pkg *project.Package, info *types.Info, f *ast.File,
 		return name, ok
 	}
 	for _, d := range f.Decls {
-		switch d := d.(type) {
-		case *ast.FuncDecl:
-			if d.Recv == nil && d.Name.Name == "init" {
-				c.D.Errorf(c.Pos(d.Name.Pos()), "K0117", "leaf %s declares init, which would run before its ports are bound; use a constructor, setup, or startup (§5.4 rule 12)", pkg.Name)
-			}
-		case *ast.GenDecl:
-			if d.Tok != token.VAR {
-				continue
-			}
-			for _, s := range d.Specs {
-				for _, v := range s.(*ast.ValueSpec).Values {
-					ast.Inspect(v, func(n ast.Node) bool {
-						if id, ok := n.(*ast.Ident); ok {
-							if name, ok := ports[info.Uses[id]]; ok {
-								c.D.Errorf(c.Pos(id.Pos()), "K0117", "the initializer of a package-level variable uses port %s, which is not bound yet when it runs (§5.4 rule 12)", name)
-							}
-						}
-						return true
-					})
-				}
-			}
+		if fd, ok := d.(*ast.FuncDecl); ok && fd.Recv == nil && fd.Name.Name == "init" {
+			c.D.Errorf(c.Pos(fd.Name.Pos()), "K0117", "leaf %s declares init, which would run before its ports are bound; use a constructor, setup, or startup (§5.4 rule 12)", pkg.Name)
+		}
+	}
+	assigned := func(l ast.Expr) {
+		if name, ok := portOf(l); ok {
+			c.D.Errorf(c.Pos(l.Pos()), "K0116", "code assigns to port %s; a port is bound once, at startup (in a test, use vulcan.Bind)", name)
 		}
 	}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch n := n.(type) {
 		case *ast.AssignStmt:
-			for _, l := range n.Lhs {
-				if name, ok := portOf(l); ok && n.Tok != token.DEFINE {
-					c.D.Errorf(c.Pos(l.Pos()), "K0116", "code assigns to port %s; a port is bound once, at startup (in a test, use vulcan.Bind)", name)
+			if n.Tok != token.DEFINE {
+				for _, l := range n.Lhs {
+					assigned(l)
+				}
+			}
+		case *ast.RangeStmt:
+			if n.Tok == token.ASSIGN {
+				for _, l := range []ast.Expr{n.Key, n.Value} {
+					if l != nil {
+						assigned(l)
+					}
 				}
 			}
 		case *ast.UnaryExpr:
@@ -168,9 +171,111 @@ func (c *Checker) leafRules(pkg *project.Package, info *types.Info, f *ast.File,
 					c.D.Errorf(c.Pos(n.Pos()), "K0116", "code takes the address of port %s; only vulcan.Bind may", name)
 				}
 			}
+		case *ast.CallExpr:
+			c.bindFake(info, n, portOf)
 		}
 		return true
 	})
+}
+
+// bindFake checks the fake of vulcan.Bind(t, &Port, fake) against the port (K0108).
+func (c *Checker) bindFake(info *types.Info, call *ast.CallExpr, portOf func(ast.Expr) (string, bool)) {
+	fn := calledFunc(info, call)
+	if fn == nil || fn.Pkg() == nil || fn.Pkg().Path() != gen.RuntimeModule || fn.Name() != "Bind" || len(call.Args) != 3 {
+		return
+	}
+	u, ok := ast.Unparen(call.Args[1]).(*ast.UnaryExpr)
+	if !ok || u.Op != token.AND {
+		return
+	}
+	name, ok := portOf(u.X)
+	if !ok {
+		return
+	}
+	iface, ok := info.TypeOf(u.X).Underlying().(*types.Interface)
+	impl := info.TypeOf(call.Args[2])
+	if !ok || impl == nil || types.Implements(impl, iface) {
+		return
+	}
+	c.D.Errorf(c.Pos(call.Args[2].Pos()), "K0108", "%s", missingMessage(impl, iface, "the fake", name))
+}
+
+// initReach applies the second half of rule 12: the initializer of a package-level variable in
+// a leaf cannot reach a port use, directly or through the leaf's functions and methods (K0117).
+// A function literal that the initializer stores, and does not call, is not followed.
+func (c *Checker) initReach(pkg *project.Package, files []*ast.File, info *types.Info, ports map[types.Object]string) {
+	decls := map[*types.Func]*ast.FuncDecl{}
+	for _, f := range files {
+		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok && fd.Body != nil {
+				if fn, ok := info.Defs[fd.Name].(*types.Func); ok {
+					decls[fn] = fd
+				}
+			}
+		}
+	}
+	type hit struct {
+		port string
+		via  []string
+	}
+	done := map[*types.Func]*hit{}
+	var reach func(n ast.Node) *hit
+	reach = func(root ast.Node) *hit {
+		var found *hit
+		called := map[*ast.FuncLit]bool{}
+		ast.Inspect(root, func(n ast.Node) bool {
+			if found != nil {
+				return false
+			}
+			switch n := n.(type) {
+			case *ast.FuncLit:
+				return called[n]
+			case *ast.CallExpr:
+				if lit, ok := ast.Unparen(n.Fun).(*ast.FuncLit); ok {
+					called[lit] = true
+				}
+				if fn := calledFunc(info, n); fn != nil {
+					if fd := decls[fn]; fd != nil {
+						h, seen := done[fn]
+						if !seen {
+							done[fn] = nil // a cycle reaches nothing new
+							h = reach(fd.Body)
+							done[fn] = h
+						}
+						if h != nil {
+							found = &hit{port: h.port, via: append([]string{fn.Name()}, h.via...)}
+							return false
+						}
+					}
+				}
+			case *ast.Ident:
+				if name, ok := ports[info.Uses[n]]; ok {
+					found = &hit{port: name}
+				}
+			}
+			return true
+		})
+		return found
+	}
+	for _, f := range files {
+		for _, d := range f.Decls {
+			gd, ok := d.(*ast.GenDecl)
+			if !ok || gd.Tok != token.VAR {
+				continue
+			}
+			for _, s := range gd.Specs {
+				for _, v := range s.(*ast.ValueSpec).Values {
+					if h := reach(v); h != nil {
+						path := ""
+						if len(h.via) > 0 {
+							path = " through " + strings.Join(h.via, " -> ")
+						}
+						c.D.Errorf(c.Pos(v.Pos()), "K0117", "the initializer of a package-level variable reaches port %s%s; ports are not bound yet when it runs, so do this in a constructor, setup, or startup (§5.4 rule 12)", h.port, path)
+					}
+				}
+			}
+		}
+	}
 }
 
 func calledFunc(info *types.Info, call *ast.CallExpr) *types.Func {
@@ -194,8 +299,31 @@ func calledFunc(info *types.Info, call *ast.CallExpr) *types.Func {
 	return fn
 }
 
-// libVarAssigns applies §5.4a rule 1: a library var is not assigned after startup (K0202).
+// libVarAssigns applies §5.4a rule 1: a library var is not assigned after startup (K0202). An
+// assignment to the var, to a field of a struct var, or to an element of an array var assigns
+// the var itself. A change through a pointer, a slice, a map, or a method is not tracked.
 func (c *Checker) libVarAssigns(pkg *project.Package, info *types.Info, f *ast.File, own map[types.Object]bool) {
+	var root func(e ast.Expr) types.Object
+	root = func(e ast.Expr) types.Object {
+		switch e := ast.Unparen(e).(type) {
+		case *ast.Ident:
+			return info.Uses[e]
+		case *ast.SelectorExpr:
+			if v, ok := info.Uses[e.Sel].(*types.Var); ok && v.Pkg() != nil && v.Parent() == v.Pkg().Scope() {
+				return v // a qualified package-level var
+			}
+			if sel := info.Selections[e]; sel != nil && sel.Kind() == types.FieldVal && !sel.Indirect() {
+				if _, ptr := info.TypeOf(e.X).Underlying().(*types.Pointer); !ptr {
+					return root(e.X)
+				}
+			}
+		case *ast.IndexExpr:
+			if _, isArray := info.TypeOf(e.X).Underlying().(*types.Array); isArray {
+				return root(e.X)
+			}
+		}
+		return nil
+	}
 	isLibVar := func(obj types.Object) bool {
 		v, ok := obj.(*types.Var)
 		if !ok || v.Pkg() == nil || v.Parent() != v.Pkg().Scope() {
@@ -204,44 +332,36 @@ func (c *Checker) libVarAssigns(pkg *project.Package, info *types.Info, f *ast.F
 		lib := c.P.ByPath[v.Pkg().Path()]
 		return lib != nil && !lib.IsLeaf
 	}
-	for _, d := range f.Decls {
-		fd, ok := d.(*ast.FuncDecl)
-		if !ok || fd.Body == nil {
-			continue
+	check := func(l ast.Expr, inInit bool) {
+		obj := root(l)
+		if !isLibVar(obj) || inInit && own[obj] {
+			return
 		}
-		inInit := fd.Recv == nil && fd.Name.Name == "init"
-		ast.Inspect(fd.Body, func(n ast.Node) bool {
-			var lhs []ast.Expr
+		c.D.Errorf(c.Pos(l.Pos()), "K0202", "library variable %s is assigned after startup; a library var is set once, in its initializer or in an init function of its library (§5.4a rule 1)", obj.Name())
+	}
+	for _, d := range f.Decls {
+		inInit := false
+		if fd, ok := d.(*ast.FuncDecl); ok {
+			inInit = fd.Recv == nil && fd.Name.Name == "init"
+		}
+		ast.Inspect(d, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.AssignStmt:
-				if n.Tok == token.DEFINE {
-					return true
+				if n.Tok != token.DEFINE {
+					for _, l := range n.Lhs {
+						check(l, inInit)
+					}
 				}
-				lhs = n.Lhs
 			case *ast.IncDecStmt:
-				lhs = []ast.Expr{n.X}
-			default:
-				return true
-			}
-			for _, l := range lhs {
-				var id *ast.Ident
-				switch l := ast.Unparen(l).(type) {
-				case *ast.Ident:
-					id = l
-				case *ast.SelectorExpr:
-					id = l.Sel
+				check(n.X, inInit)
+			case *ast.RangeStmt:
+				if n.Tok == token.ASSIGN {
+					for _, l := range []ast.Expr{n.Key, n.Value} {
+						if l != nil {
+							check(l, inInit)
+						}
+					}
 				}
-				if id == nil {
-					continue
-				}
-				obj := info.Uses[id]
-				if !isLibVar(obj) {
-					continue
-				}
-				if inInit && own[obj] {
-					continue
-				}
-				c.D.Errorf(c.Pos(id.Pos()), "K0202", "library variable %s is assigned after startup; a library var is set once, in its initializer or in init (§5.4a rule 1)", obj.Name())
 			}
 			return true
 		})

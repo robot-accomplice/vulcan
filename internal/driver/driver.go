@@ -51,7 +51,7 @@ func Check(root string, tests bool) (*Result, error) {
 		return nil, err
 	}
 	r := &Result{P: p, Diags: p.Diags}
-	if p.System == nil || p.Container == nil || stops(p.Diags) {
+	if p.System == nil || p.Container == nil || p.Fatal || stops(p.Diags) {
 		r.Diags.Sort()
 		return r, nil
 	}
@@ -107,7 +107,7 @@ func goBuild(p *project.Project, d *diag.List) {
 	found := false
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	for sc.Scan() {
-		line := sc.Text()
+		line := strings.TrimSpace(sc.Text())
 		m := goErrLine.FindStringSubmatch(line)
 		if m == nil {
 			continue

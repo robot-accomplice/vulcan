@@ -6,7 +6,6 @@ package blank
 import (
 	"bytes"
 	"go/token"
-	"regexp"
 
 	"github.com/robot-accomplice/vulcan/internal/lex"
 )
@@ -61,15 +60,11 @@ type edit struct {
 var funcWords = lex.ContractWords
 var invWords = map[string]bool{"invariant": true}
 
-var linkname = regexp.MustCompile(`(?m)^[ \t]*//go:linkname\b`)
-
 // File blanks src.
 func File(src []byte) *Result {
 	toks, errs := lex.Scan(src)
 	r := &Result{LexErrors: errs}
-	for _, m := range linkname.FindAllIndex(src, -1) {
-		r.Linknames = append(r.Linknames, m[0]+bytes.Index(src[m[0]:m[1]], []byte("//")))
-	}
+	r.Linknames = lex.Directives(src, "linkname")
 	var edits []edit
 	blankRange := func(off, end int) {
 		edits = append(edits, edit{off: off, end: end})
@@ -172,7 +167,8 @@ func typeDecl(src []byte, toks []lex.Tok, i int, r *Result, edits *[]edit) int {
 	if toks[j].Tok == token.LPAREN {
 		end := lex.Match(toks, j)
 		for k := j; k < end; k++ {
-			if toks[k].Is("invariant") && k > 0 && toks[k-1].AutoSemi() {
+			// "invariant expr" after a struct type; a spec named invariant is followed by a type.
+			if toks[k].Is("invariant") && k > 1 && toks[k-1].AutoSemi() && toks[k-2].Tok == token.RBRACE && !startsType(toks[k+1]) {
 				r.Misplaced = append(r.Misplaced, Clause{Word: "invariant", WordOff: toks[k].Off})
 			}
 		}
@@ -187,7 +183,7 @@ func typeDecl(src []byte, toks []lex.Tok, i int, r *Result, edits *[]edit) int {
 	k := j + 1
 	for ; k < len(toks); k++ {
 		t := toks[k]
-		if depth == 0 && (t.Tok == token.SEMICOLON || t.Tok == token.EOF) {
+		if t.Tok == token.EOF || depth == 0 && t.Tok == token.SEMICOLON {
 			break
 		}
 		switch t.Tok {
@@ -220,7 +216,7 @@ func invClauses(toks []lex.Tok, k int) ([]lex.Clause, int) {
 		last := k
 		for ; k < len(toks); k++ {
 			t := toks[k]
-			if depth == 0 && (t.Tok == token.SEMICOLON || t.Tok == token.EOF) {
+			if t.Tok == token.EOF || depth == 0 && t.Tok == token.SEMICOLON {
 				break
 			}
 			switch t.Tok {
@@ -265,29 +261,70 @@ func apply(src []byte, edits []edit) []byte {
 	return out
 }
 
-// limits finds "limit" on struct fields between toks[from] and toks[to], reports it as deferred,
-// and blanks it to the end of its line or the field's tag. A field named limit, "limit int", is
-// left alone: there "limit" starts the line and is not followed by a number.
+// startsType reports whether t can start a type.
+func startsType(t lex.Tok) bool {
+	switch t.Tok {
+	case token.FUNC, token.STRUCT, token.INTERFACE, token.MAP, token.CHAN, token.LBRACK, token.MUL, token.LPAREN, token.ARROW, token.IDENT:
+		return true
+	}
+	return false
+}
+
+// limits finds "limit" clauses on struct fields between toks[from] and toks[to] (Appendix B.3),
+// reports each one as deferred, and blanks it up to the field's tag or the end of its line. A
+// clause is "limit" directly inside a struct's braces, after at least the field's type, and
+// followed by an expression. A field named limit, a parameter named limit, and an array length
+// named limit are left alone.
 func limits(toks []lex.Tok, from, to int, r *Result, edits *[]edit) {
-	inStruct := 0
+	var stack []bool // one entry for each open bracket: true for the "{" of a struct
+	fieldToks := 0   // tokens of the current field so far, at the struct's own level
 	for k := from; k < to && k < len(toks); k++ {
 		t := toks[k]
-		if t.Tok == token.STRUCT && toks[k+1].Tok == token.LBRACE {
-			inStruct++
-		}
-		if inStruct == 0 || !t.Is("limit") {
+		inStruct := len(stack) > 0 && stack[len(stack)-1]
+		switch t.Tok {
+		case token.LBRACE, token.LPAREN, token.LBRACK:
+			if inStruct {
+				fieldToks++
+			}
+			stack = append(stack, t.Tok == token.LBRACE && k > 0 && toks[k-1].Tok == token.STRUCT)
+			if stack[len(stack)-1] {
+				fieldToks = 0
+			}
+			continue
+		case token.RPAREN, token.RBRACK, token.RBRACE:
+			if len(stack) > 0 {
+				stack = stack[:len(stack)-1]
+			}
+			continue
+		case token.SEMICOLON:
+			if inStruct {
+				fieldToks = 0
+			}
 			continue
 		}
-		prev, next := toks[k-1], toks[k+1]
-		fieldStart := prev.Tok == token.SEMICOLON || prev.Tok == token.LBRACE || prev.Tok == token.COMMA
-		if fieldStart && next.Tok != token.INT {
+		if !inStruct {
 			continue
 		}
-		r.Deferred = append(r.Deferred, Deferred{What: "limit on a field", Section: "§5.5.1", Off: t.Off})
-		end := k
-		for end+1 < len(toks) && toks[end+1].Tok != token.SEMICOLON && toks[end+1].Tok != token.STRING && toks[end+1].Tok != token.RBRACE {
-			end++
+		// At the start of a line, "limit 10" is a clause (a field named limit has a type next).
+		if t.Is("limit") && (fieldToks >= 1 || toks[k+1].Tok == token.INT) && toks[k-1].Tok != token.PERIOD && toks[k-1].Tok != token.COMMA && startsExpr(toks[k+1]) {
+			r.Deferred = append(r.Deferred, Deferred{What: "limit on a field", Section: "§5.5.1", Off: t.Off})
+			end := k
+			for toks[end+1].Tok != token.SEMICOLON && toks[end+1].Tok != token.STRING && toks[end+1].Tok != token.RBRACE && toks[end+1].Tok != token.EOF {
+				end++
+			}
+			*edits = append(*edits, edit{off: t.Off, end: toks[end].End})
+			k = end
+			continue
 		}
-		*edits = append(*edits, edit{off: t.Off, end: toks[end].End})
+		fieldToks++
 	}
+}
+
+// startsExpr reports whether t can start the bound of a limit clause.
+func startsExpr(t lex.Tok) bool {
+	switch t.Tok {
+	case token.INT, token.IDENT, token.LPAREN:
+		return true
+	}
+	return false
 }

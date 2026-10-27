@@ -9,7 +9,6 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -24,7 +23,6 @@ var flagTypes = map[string]string{"String": "string", "Int": "int", "Int64": "in
 type writer struct {
 	p       *project.Project
 	aliases map[string]string // import path -> alias
-	exprs   []string          // expression texts, to find the imports they use
 	b       bytes.Buffer
 }
 
@@ -50,10 +48,12 @@ func (w *writer) qual(self string) types.Qualifier {
 	}
 }
 
-// expr writes a value from system.vulcan. It carries no //line directive, because a directive
-// would also move every later position in the generated file.
+// expr writes a value from system.vulcan: the constant that the checker computed, so that the
+// generated code needs none of system.vulcan's imports.
 func (w *writer) expr(v *decl.Value) string {
-	w.exprs = append(w.exprs, v.Text)
+	if v.Lit != "" {
+		return v.Lit
+	}
 	return "(" + v.Text + ")"
 }
 
@@ -77,26 +77,6 @@ func (w *writer) settings(s *decl.Settings, t types.Type, self string, flagVar s
 		}
 	}
 	return fmt.Sprintf("%s{%s}", types.TypeString(t, w.qual(self)), strings.Join(parts, ", "))
-}
-
-// systemImports returns the import lines that the expressions use: time, and system.vulcan's.
-func (w *writer) systemImports() []string {
-	all := strings.Join(w.exprs, "\n")
-	var out []string
-	for _, imp := range w.p.System.Imports {
-		name := imp.Name
-		if name == "" {
-			if pkg := w.p.ByPath[imp.Path]; pkg != nil {
-				name = pkg.GoName
-			} else {
-				name = filepath.Base(imp.Path)
-			}
-		}
-		if regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\.`).MatchString(all) {
-			out = append(out, fmt.Sprintf("%s %q", name, imp.Path))
-		}
-	}
-	return out
 }
 
 // Write generates main and the registration files into the build directory.
@@ -148,7 +128,7 @@ func (w *writer) imports(self string) []string {
 			out = append(out, fmt.Sprintf("%s %q", a, path))
 		}
 	}
-	return append(out, w.systemImports()...)
+	return out
 }
 
 func writeMain(p *project.Project, plan *check.Plan, dir string, funcs map[*project.Package][]check.LeafFunc) error {

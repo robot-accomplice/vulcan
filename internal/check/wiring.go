@@ -3,7 +3,6 @@ package check
 import (
 	"fmt"
 	"go/types"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -64,6 +63,8 @@ func (c *Checker) Wiring() *Plan {
 	if ct == nil {
 		return plan
 	}
+	c.systemImports()
+	c.config()
 	sysPos := c.P.SysSrc.Pos
 	type wireKey struct{ leaf, port string }
 	wired := map[wireKey]*decl.Wire{}
@@ -177,11 +178,8 @@ func (c *Checker) instance(sup *project.Package, w *decl.Wire, plan *Plan, seen 
 		c.D.Errorf(sysPos(w.Supply.NamePos), "K0107", "%s.%s %s; a wire names an exported constructor or type of the leaf", sup.Name, name, what)
 		return nil
 	}
-	settingsText := ""
-	if w.Settings != nil {
-		settingsText = string(c.P.SysSrc.Src[w.Settings.Pos:settingsEnd(w.Settings, c.P.SysSrc.Src)])
-	}
-	key := sup.Name + "." + name + settingsText
+	// Two wires share an instance when their settings are the same, ignoring spacing (§5.3).
+	key := sup.Name + "." + name + normalSettings(w.Settings)
 	if inst := seen[key]; inst != nil {
 		return inst
 	}
@@ -204,8 +202,12 @@ func (c *Checker) instance(sup *project.Package, w *decl.Wire, plan *Plan, seen 
 			ok = false
 		} else if sig.Params().Len() == 1 {
 			pt := sig.Params().At(0).Type()
+			n, named := types.Unalias(pt).(*types.Named)
 			if _, isStruct := pt.Underlying().(*types.Struct); !isStruct {
 				ok = false
+			} else if !named || !n.Obj().Exported() {
+				c.D.Errorf(sysPos(w.Supply.NamePos), "K0604", "constructor %s.%s takes settings of type %s, which is not exported; the generated main must name it, so export it", sup.Name, name, types.TypeString(pt, qualifier))
+				return nil
 			} else {
 				inst.SetType = pt
 			}
@@ -228,7 +230,11 @@ func (c *Checker) instance(sup *project.Package, w *decl.Wire, plan *Plan, seen 
 			c.D.Errorf(sysPos(w.Supply.NamePos), "K0604", "constructor %s.%s has the signature %s; a constructor takes nothing or one settings struct, and returns T or (T, error), where T is an exported concrete type or a pointer to one", sup.Name, name, types.TypeString(sig, qualifier))
 			return nil
 		}
-		if inst.SetType != nil && w.Settings != nil {
+		if inst.SetType != nil {
+			if w.Settings == nil {
+				w.Settings = &decl.Settings{Pos: w.Supply.NamePos}
+				inst.Settings = w.Settings
+			}
 			c.settings(w.Settings, inst.SetType, fmt.Sprintf("constructor %s.%s", sup.Name, name), plan)
 		} else if inst.SetType == nil && w.Settings != nil {
 			c.D.Errorf(sysPos(w.Settings.Pos), "K0604", "constructor %s.%s takes no settings", sup.Name, name)
@@ -240,22 +246,6 @@ func (c *Checker) instance(sup *project.Package, w *decl.Wire, plan *Plan, seen 
 	seen[key] = inst
 	plan.Instances = append(plan.Instances, inst)
 	return inst
-}
-
-func settingsEnd(s *decl.Settings, src []byte) int {
-	depth := 0
-	for i := s.Pos; i < len(src); i++ {
-		switch src[i] {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				return i + 1
-			}
-		}
-	}
-	return len(src)
 }
 
 func isError(t types.Type) bool {
@@ -292,24 +282,7 @@ func (c *Checker) methodSet(need *project.Package, port *decl.Port, inst *Instan
 	if types.Implements(inst.Result, iface) {
 		return
 	}
-	m, wrong := types.MissingMethod(inst.Result, iface, true)
-	if m == nil {
-		return
-	}
-	got := types.TypeString(inst.Result, qualifier)
-	want := m.Name() + strings.TrimPrefix(types.TypeString(m.Type(), qualifier), "func")
-	msg := fmt.Sprintf("%s does not satisfy port %s.%s: it has no method %s", got, need.Name, port.Name, want)
-	if wrong {
-		if hm, _, _ := types.LookupFieldOrMethod(inst.Result, true, m.Pkg(), m.Name()); hm != nil {
-			if fn, ok := hm.(*types.Func); ok {
-				have := fn.Name() + strings.TrimPrefix(types.TypeString(fn.Type(), qualifier), "func")
-				msg = fmt.Sprintf("%s does not satisfy port %s.%s: method %s has the signature %s; the port wants %s", got, need.Name, port.Name, m.Name(), have, want)
-				if _, isPtr := inst.Result.(*types.Pointer); !isPtr && types.Implements(types.NewPointer(inst.Result), iface) {
-					msg = fmt.Sprintf("%s does not satisfy port %s.%s: method %s has a pointer receiver, so only *%s has it; return a pointer from the constructor", got, need.Name, port.Name, m.Name(), got)
-				}
-			}
-		}
-	}
+	msg := missingMessage(inst.Result, iface, "", need.Name+"."+port.Name)
 	c.D.Errorf(c.P.SysSrc.Pos(w.Supply.NamePos), "K0108", "%s", msg)
 }
 
@@ -521,90 +494,31 @@ func (c *Checker) leafFuncs(ct *decl.Container, plan *Plan) {
 	}
 }
 
-// settings checks the values of a settings struct, and collects its flags (K0602, K0603, K0605).
-func (c *Checker) settings(s *decl.Settings, t types.Type, owner string, plan *Plan) {
-	st := t.Underlying().(*types.Struct)
-	fields := map[string]int{}
-	for i := 0; i < st.NumFields(); i++ {
-		fields[st.Field(i).Name()] = i
+// missingMessage says why t does not satisfy the port interface iface. what names the value
+// ("the fake for port X"), or is "" for a provider type.
+func missingMessage(t types.Type, iface *types.Interface, what, port string) string {
+	got := types.TypeString(t, qualifier)
+	if what == "" {
+		what = got
+	} else {
+		what += ", " + got + ","
 	}
-	pos := c.P.SysSrc.Pos
-	given := map[string]bool{}
-	for _, it := range s.Items {
-		i, ok := fields[it.Key]
-		if !ok || !st.Field(i).Exported() {
-			c.D.Errorf(pos(it.KeyPos), "K0603", "%s: settings type %s has no exported field %s", owner, types.TypeString(t, qualifier), it.Key)
-			continue
-		}
-		given[it.Key] = true
-		f := st.Field(i)
-		secret := reflect.StructTag(st.Tag(i)).Get("vulcan") == "secret"
-		switch it.Value.Kind {
-		case decl.FlagValue:
-			c.flag(it.Value, f.Type(), owner+" setting "+it.Key, plan)
-		case decl.ExprValue:
-			if secret {
-				c.D.Errorf(pos(it.Value.Pos), "K0605", "%s: setting %s is a secret (tag vulcan:\"secret\"); give it a flag, not a literal", owner, it.Key)
+	m, wrong := types.MissingMethod(t, iface, true)
+	if m == nil {
+		return what + " does not satisfy port " + port
+	}
+	want := m.Name() + strings.TrimPrefix(types.TypeString(m.Type(), qualifier), "func")
+	msg := fmt.Sprintf("%s does not satisfy port %s: it has no method %s", what, port, want)
+	if wrong {
+		if hm, _, _ := types.LookupFieldOrMethod(t, true, m.Pkg(), m.Name()); hm != nil {
+			if fn, ok := hm.(*types.Func); ok {
+				have := fn.Name() + strings.TrimPrefix(types.TypeString(fn.Type(), qualifier), "func")
+				msg = fmt.Sprintf("%s does not satisfy port %s: method %s has the signature %s; the port wants %s", what, port, m.Name(), have, want)
+				if _, isPtr := t.(*types.Pointer); !isPtr && types.Implements(types.NewPointer(t), iface) {
+					msg = fmt.Sprintf("%s does not satisfy port %s: method %s has a pointer receiver, so only *%s has it; use a pointer", what, port, m.Name(), got)
+				}
 			}
-		default:
-			c.P.Deferred(pos(it.Value.Pos), "a list or a named settings value", "§5.5.1")
 		}
 	}
-}
-
-func (c *Checker) flag(v *decl.Value, t types.Type, where string, plan *Plan) {
-	getter, goType := flagGetter(t)
-	pos := c.P.SysSrc.Pos(v.Flag.Pos)
-	if getter == "" {
-		c.D.Errorf(pos, "K0602", "flag %q fills %s of type %s; a flag gives a string, int, int64, float64, bool, or time.Duration", v.Flag.Name, where, types.TypeString(t, qualifier))
-		return
-	}
-	if v.Flag.Max != nil {
-		c.P.Deferred(c.P.SysSrc.Pos(v.Flag.Max.Pos), "max on a flag", "§5.5.1")
-	}
-	env := strings.NewReplacer("-", "_", ".", "_").Replace(strings.ToUpper(v.Flag.Name))
-	for _, f := range plan.Flags {
-		fenv := strings.NewReplacer("-", "_", ".", "_").Replace(strings.ToUpper(f.Name))
-		if f.Name == v.Flag.Name {
-			if f.Getter != getter || defText(f.Default) != defText(v.Flag.Default) {
-				c.D.Errorf(pos, "K0602", "flag %q is used with two types or two defaults", v.Flag.Name)
-			}
-			return
-		}
-		if fenv == env {
-			c.D.Errorf(pos, "K0602", "flags %q and %q both read the environment variable %s", f.Name, v.Flag.Name, env)
-			return
-		}
-	}
-	plan.Flags = append(plan.Flags, &Flag{Name: v.Flag.Name, Getter: getter, GoType: goType, Default: v.Flag.Default})
-}
-
-func defText(v *decl.Value) string {
-	if v == nil {
-		return ""
-	}
-	return v.Text
-}
-
-func flagGetter(t types.Type) (string, string) {
-	if n, ok := types.Unalias(t).(*types.Named); ok && n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == "time" && n.Obj().Name() == "Duration" {
-		return "Duration", "time.Duration"
-	}
-	b, ok := t.(*types.Basic)
-	if !ok {
-		return "", ""
-	}
-	switch b.Kind() {
-	case types.String:
-		return "String", "string"
-	case types.Int:
-		return "Int", "int"
-	case types.Int64:
-		return "Int64", "int64"
-	case types.Float64:
-		return "Float64", "float64"
-	case types.Bool:
-		return "Bool", "bool"
-	}
-	return "", ""
+	return msg
 }

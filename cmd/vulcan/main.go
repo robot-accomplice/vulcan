@@ -24,13 +24,14 @@ Usage:
 	vulcan run [dir] [-- flags]           build, then run the program with flags
 	vulcan test [--json] [-v] [-run re] [Leaf|library ...]
 	                                      check with tests, then run the tests of each leaf and library
+	vulcan mod tidy                       add each module that the code imports to go.mod and go.sum
 
 The project root is the directory that holds system.vulcan; dir defaults to the current one.
 Exit codes: 0 success, 1 diagnostics or failures, 2 a usage error or a command that this release
 does not have.
 `
 
-var deferred = map[string]bool{"fmt": true, "explain": true, "doc": true, "diagram": true, "archdiff": true, "fake": true, "trace": true, "mod": true, "guide": true, "context": true, "query": true, "audit": true}
+var deferred = map[string]bool{"fmt": true, "explain": true, "doc": true, "diagram": true, "archdiff": true, "fake": true, "trace": true, "guide": true, "context": true, "query": true, "audit": true}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -49,6 +50,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runCmd(rest, stdout, stderr)
 	case "test":
 		return testCmd(rest, stdout, stderr)
+	case "mod":
+		return modCmd(rest, stdout, stderr)
 	}
 	if deferred[cmd] {
 		fmt.Fprintf(stderr, "vulcan %s is not in this release of Vulcan (the PoC subset of release 1)\n", cmd)
@@ -224,6 +227,24 @@ func testCmd(args []string, stdout, stderr io.Writer) int {
 	c.Env = check.Env()
 	c.Stdout, c.Stderr = stdout, stderr
 	if err := c.Run(); err != nil {
+		return 1
+	}
+	return 0
+}
+
+func modCmd(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 || args[0] != "tidy" {
+		fmt.Fprintf(stderr, "vulcan mod: this release has only vulcan mod tidy\n")
+		return 2
+	}
+	root, err := driver.FindRoot(".")
+	if err != nil {
+		fmt.Fprintf(stderr, "vulcan: %v\n", err)
+		return 1
+	}
+	out, err := driver.ModTidy(root)
+	if err != nil {
+		fmt.Fprintf(stderr, "vulcan mod tidy: %v\n%s", err, out)
 		return 1
 	}
 	return 0

@@ -16,6 +16,7 @@ package conformance
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/tools/txtar"
 
@@ -53,13 +55,15 @@ type want struct {
 }
 
 type runWant struct {
-	exit   int
-	stdout string
-	args   []string
+	exit     int
+	stdout   string
+	contains []string // lines that the output must contain
+	args     []string
 }
 
 type cmdWant struct {
 	exit int
+	say  string // text that the output must contain
 	args []string
 }
 
@@ -92,6 +96,12 @@ func parseWant(t *testing.T, b []byte, files map[string][]byte) want {
 					r.exit, _ = strconv.Atoi(v)
 				case "stdout":
 					r.stdout = string(files[v])
+				case "contains":
+					for _, l := range strings.Split(string(files[v]), "\n") {
+						if l = strings.TrimSpace(l); l != "" {
+							r.contains = append(r.contains, l)
+						}
+					}
 				case "arg":
 					r.args = append(r.args, v)
 				}
@@ -103,7 +113,18 @@ func parseWant(t *testing.T, b []byte, files map[string][]byte) want {
 				t.Fatalf("bad cmd line %q", line)
 			}
 			n, _ := strconv.Atoi(v)
-			w.cmds = append(w.cmds, cmdWant{exit: n, args: f[3:]})
+			c := cmdWant{exit: n}
+			rest := f[2:]
+			if len(rest) > 0 && strings.HasPrefix(rest[0], "say=") {
+				// say=not-in-this-release: the output contains "not in this release".
+				c.say = strings.ReplaceAll(strings.TrimPrefix(rest[0], "say="), "-", " ")
+				rest = rest[1:]
+			}
+			if len(rest) == 0 || rest[0] != "vulcan" {
+				t.Fatalf("bad cmd line %q", line)
+			}
+			c.args = rest[1:]
+			w.cmds = append(w.cmds, c)
 		default:
 			t.Fatalf("bad want line %q", line)
 		}
@@ -133,9 +154,12 @@ func runCase(t *testing.T, path string) {
 	}
 	w := parseWant(t, files["want.txt"], files)
 	for _, c := range w.cmds {
-		got := vulcanExit(t, dir, c.args)
+		got, out := vulcanExit(t, dir, c.args)
 		if got != c.exit {
-			t.Errorf("vulcan %s: exit %d, want %d", strings.Join(c.args, " "), got, c.exit)
+			t.Errorf("vulcan %s: exit %d, want %d; output:\n%s", strings.Join(c.args, " "), got, c.exit, out)
+		}
+		if c.say != "" && !strings.Contains(out, c.say) {
+			t.Errorf("vulcan %s: output does not say %q:\n%s", strings.Join(c.args, " "), c.say, out)
 		}
 	}
 	if !w.accept && w.run == nil && len(w.errors) == 0 && len(w.warns) == 0 {
@@ -174,7 +198,9 @@ func runCase(t *testing.T, path string) {
 		}
 	}
 	if w.run != nil && r.OK {
-		cmd := exec.Command(driver.Binary(r.P), w.run.args...)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, driver.Binary(r.P), w.run.args...)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		cmd.Stderr = &out
@@ -188,28 +214,37 @@ func runCase(t *testing.T, path string) {
 		if code != w.run.exit {
 			t.Errorf("exit %d, want %d; output:\n%s", code, w.run.exit, out.String())
 		}
-		if w.run.stdout != "" && strings.TrimSpace(out.String()) != strings.TrimSpace(w.run.stdout) {
-			t.Errorf("output:\n%s\nwant:\n%s", out.String(), w.run.stdout)
+		if ctx.Err() != nil {
+			t.Errorf("the program did not exit within 30s")
+		}
+		got := strings.ReplaceAll(out.String(), "\r\n", "\n")
+		if w.run.stdout != "" && strings.TrimSpace(got) != strings.TrimSpace(w.run.stdout) {
+			t.Errorf("output:\n%s\nwant:\n%s", got, w.run.stdout)
+		}
+		for _, c := range w.run.contains {
+			if !strings.Contains(got, c) {
+				t.Errorf("output does not contain %q:\n%s", c, got)
+			}
 		}
 	}
 }
 
 var vulcanBin string
 
-func vulcanExit(t *testing.T, dir string, args []string) int {
+func vulcanExit(t *testing.T, dir string, args []string) (int, string) {
 	if vulcanBin == "" {
 		t.Fatal("no vulcan binary")
 	}
 	cmd := exec.Command(vulcanBin, args...)
 	cmd.Dir = dir
-	err := cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); ok {
-		return ee.ExitCode()
+		return ee.ExitCode(), string(out)
 	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	return 0
+	return 0, string(out)
 }
 
 func TestMain(m *testing.M) {

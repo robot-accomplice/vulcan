@@ -5,6 +5,7 @@ package check
 import (
 	"go/ast"
 	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,12 +27,14 @@ type Checker struct {
 	Full  map[string]*packages.Package // by import path, with test files when loaded
 	D     *diag.List
 
-	badPorts map[string]bool // ports with a K0112 type, whose method set is not checked
+	badPorts map[string]bool
+	scope    *types.Package // the scope of system.vulcan values // ports with a K0112 type, whose method set is not checked
 }
 
-// Env is the environment for the go command in the build directory.
+// Env is the environment for the go command in the build directory. The module graph is read
+// only: a dependency that go.mod lacks is an error (K0209), which `vulcan mod tidy` fixes.
 func Env() []string {
-	return append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod")
+	return append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=readonly")
 }
 
 // Load type-checks the build directory, which gen.WriteLeaves wrote.
@@ -62,16 +65,56 @@ func Load(p *project.Project, tests bool) (*Checker, error) {
 			}
 		}
 	}
-	for _, pkg := range pkgs {
+	// A module that go.mod lacks gives a list error on the missing package, and a type error
+	// "could not import" in each importer; report the first as K0209 and drop the second.
+	missing := map[string]bool{}
+	packages.Visit(pkgs, nil, func(pkg *packages.Package) {
 		for _, e := range pkg.Errors {
-			// "# pkg" errors of the go command repeat the type errors of the package.
-			if e.Pos == "" && strings.HasPrefix(e.Msg, "# ") {
-				continue
+			if e.Kind == packages.ListError && isMissingModule(e.Msg) {
+				missing[pkg.PkgPath] = true
+				c.goError(e)
 			}
-			c.goError(e)
+		}
+	})
+	for _, pkg := range pkgs {
+		parseErr := map[string]bool{} // files with a parse error: report only the first
+		for _, e := range pkg.Errors {
+			if e.Kind == packages.ParseError {
+				file := c.relPos(e.Pos).File
+				if !parseErr[file] {
+					parseErr[file] = true
+					c.goError(e)
+				}
+			}
+		}
+		for _, e := range pkg.Errors {
+			switch {
+			case e.Kind == packages.ParseError:
+			case len(parseErr) > 0 && e.Kind == packages.TypeError:
+				// Type errors after a syntax error repeat it.
+			case e.Pos == "" && strings.HasPrefix(e.Msg, "# "):
+				// "# pkg" errors of the go command repeat the type errors of the package.
+			case e.Kind == packages.ListError && isMissingModule(e.Msg):
+			case importsMissing(e.Msg, missing):
+			default:
+				c.goError(e)
+			}
 		}
 	}
 	return c, nil
+}
+
+func isMissingModule(msg string) bool {
+	return strings.Contains(msg, "no required module provides package") || strings.Contains(msg, "cannot find module providing package") || strings.Contains(msg, "missing go.sum entry")
+}
+
+func importsMissing(msg string, missing map[string]bool) bool {
+	for path := range missing {
+		if strings.Contains(msg, "could not import "+path) {
+			return true
+		}
+	}
+	return false
 }
 
 var posRE = regexp.MustCompile(`^(.*):(\d+):(\d+)$`)
@@ -85,6 +128,16 @@ func (c *Checker) goError(e packages.Error) {
 		code = "K0001"
 	}
 	msg := e.Msg
+	if isMissingModule(msg) {
+		code = "K0209"
+		for _, cut := range []string{"; to add it", ": import lookup disabled"} {
+			if i := strings.Index(msg, cut); i > 0 {
+				msg = msg[:i]
+			}
+		}
+		msg = strings.Replace(msg, "cannot find module providing package", "no module in go.mod provides package", 1)
+		msg += "; run vulcan mod tidy to add it to go.mod and go.sum"
+	}
 	if pos.File == "" && strings.Contains(msg, ":") {
 		// Errors of the go command carry their own position.
 		if i := strings.Index(msg, ": "); i > 0 {
@@ -117,7 +170,31 @@ func (c *Checker) relPos(s string) diag.Pos {
 	} else {
 		return diag.Pos{}
 	}
-	return diag.Pos{File: c.rel(file), Line: line, Col: col}
+	if !filepath.IsAbs(file) && !strings.HasPrefix(filepath.ToSlash(file), "/") {
+		file = filepath.Join(gen.BuildDir(c.P), file) // relative to the build directory
+	}
+	rel := c.rel(file)
+	// A position in the build directory's copy of a code file: map it back to the .vulcan file,
+	// whose first line is the //line directive's line.
+	build := filepath.ToSlash(filepath.Join(".vulcan", "build")) + "/"
+	if strings.HasPrefix(rel, build) && strings.HasSuffix(rel, ".go") && !strings.HasPrefix(filepath.Base(rel), "vulcan_") {
+		if src := strings.TrimSuffix(strings.TrimPrefix(rel, build), ".go") + ".vulcan"; c.isSource(src) {
+			rel = src
+			line--
+		}
+	}
+	return diag.Pos{File: rel, Line: line, Col: col}
+}
+
+func (c *Checker) isSource(rel string) bool {
+	for _, pkg := range append(append([]*project.Package{}, c.P.Leaves...), c.P.Libs...) {
+		for _, f := range pkg.Files {
+			if f.Rel == rel {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *Checker) rel(file string) string {

@@ -104,10 +104,17 @@ decision 6.
 **Phase P1 (2026-10-26):** the compiler skeleton works. It parses the declaration files, blanks
 code files to Go with lines and columns kept, type-checks with `go/types`, applies the
 architecture, wiring, library, and startup rules, generates `main`, and runs `check`, `build`,
-`run`, and `test`. 50 conformance cases pass (`conformance/`). Contracts are rejected with K0009
-until phase P2. Known limits: the wire-cycle report names the first wire of the cycle only;
-W04 (stop signal) has no case yet, because the test host is Windows; a type error in a
-`system.vulcan` value is reported in the generated `main`, not at its `system.vulcan` position.
+`run`, `test`, and `mod tidy`. Contracts are rejected with K0009 until phase P2. The independent
+[P1 audit](../experiments/poc/audit-p1.md) found 0 Blocker, 4 High, 9 Medium, and 10 Low findings;
+its resolution section lists what was fixed. 84 conformance cases pass (`conformance/`).
+Spec changes from the audit: K0606 (a `system.vulcan` value is a constant of its field's type),
+every exported settings field needs a value (K0603), and K0110 covers more boundary errors.
+
+PoC choices to know: a container exits 0 when all its startup functions return `nil`, also with
+an entry leaf, as conformance case W01 expects (§6 says it runs until a stop signal; release 1 has
+nothing else that keeps it alive). Open after P1: W04 (stop signal) needs a host with signals;
+the differential runner of conformance.md; flags for named types; `-trimpath` and relative
+`//line` paths.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

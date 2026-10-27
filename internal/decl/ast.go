@@ -103,6 +103,7 @@ type Value struct {
 	Kind     ValueKind
 	Pos, End Pos
 	Text     string   // the source text, for ExprValue
+	Lit      string   // the checked constant as Go source, for ExprValue (set by the checker)
 	Expr     ast.Expr // for ExprValue
 	Flag     *Flag
 	List     []*Value

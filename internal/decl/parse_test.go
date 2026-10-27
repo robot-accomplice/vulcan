@@ -75,3 +75,19 @@ component Orders {
 		t.Fatalf("sig2 %q", got)
 	}
 }
+
+func TestTruncated(t *testing.T) {
+	ParseComponent([]byte("component Billing {\n    publishes P topic["))
+	ParseSystem([]byte("system A0{A0.A:A0.A00{A0:00000\x97"))
+	ParseSystem([]byte("system S { container A { X.P: Y.N{ a: flag("))
+}
+
+func FuzzParse(f *testing.F) {
+	f.Add([]byte("system S {\n container Api {\n  Web{ Addr: flag(\"a\", default: \":8080\") }, B\n  Web.P: B.New{ X: 1 }\n }\n}\n"))
+	f.Add([]byte("import \"x/lib/m\"\ncomponent C {\n needs port P {\n  func F(a m.T) (m.R, error)\n   requires a > 0\n }\n gateway for X\n}\n"))
+	f.Fuzz(func(t *testing.T, src []byte) {
+		ParseSystem(src)
+		ParseComponent(src)
+		ParseLibrary(src)
+	})
+}
