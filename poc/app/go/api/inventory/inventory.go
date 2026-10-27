@@ -36,8 +36,8 @@ func (c *Catalog) AddProduct(p shop.Product) (shop.Item, error) {
 		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "sku must be 1 to 32 letters, digits, or -")
 	case p.Name == "" || utf8.RuneCountInString(p.Name) > 100:
 		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "name must be 1 to 100 characters")
-	case p.Price <= 0:
-		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "price_cents must be more than 0")
+	case p.Price <= 0 || p.Price > shop.MaxPrice:
+		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "price_cents must be more than 0 and at most %d", shop.MaxPrice)
 	}
 	if err := c.store.AddProduct(p); err != nil {
 		return shop.Item{}, err
@@ -57,8 +57,8 @@ func (c *Catalog) Products() ([]shop.Item, error) {
 
 // Receive adds received units to the stock of a product.
 func (c *Catalog) Receive(sku shop.SKU, qty int) (shop.Item, error) {
-	if qty <= 0 {
-		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0")
+	if qty <= 0 || qty > shop.MaxQty {
+		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0 and at most %d", shop.MaxQty)
 	}
 	return c.store.Receive(sku, qty)
 }

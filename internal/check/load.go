@@ -185,7 +185,7 @@ func (c *Checker) relPos(s string) diag.Pos {
 	if strings.HasPrefix(rel, build) && strings.HasSuffix(rel, ".go") && !strings.HasPrefix(filepath.Base(rel), "vulcan_") {
 		if src := strings.TrimSuffix(strings.TrimPrefix(rel, build), ".go") + ".vulcan"; c.isSource(src) {
 			rel = src
-			line--
+			line -= gen.HeaderLines
 		}
 	}
 	return diag.Pos{File: rel, Line: line, Col: col}

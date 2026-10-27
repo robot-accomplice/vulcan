@@ -3,6 +3,12 @@ package shop
 // Money is an amount in cents.
 type Money int64
 
+// Limits of the data (docs/poc/stockroom.md): with them, no sum of an order overflows.
+const (
+	MaxPrice Money = 100_000_000 // cents, for one unit
+	MaxQty         = 10_000      // units, for one line or one receipt
+)
+
 // SKU names a product.
 type SKU string
 

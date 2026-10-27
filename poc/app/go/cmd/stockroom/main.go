@@ -17,50 +17,64 @@ import (
 	"stockroom/api/web"
 )
 
-// setting reads --name=value from the command line, else the variable NAME (with - as _), else
-// the default. A setting with no default is required.
-type settings struct {
-	args     map[string]string
-	problems []string
+// flags are the settings of the process. Each reads --name=value from the command line, else
+// the variable NAME (with - as _), else its default; a flag with no default is required.
+var flags = []struct {
+	name, def string
+	required  bool
+}{
+	{"addr", ":8080", false},
+	{"db", "stockroom.db", false},
+	{"payments-url", "", true},
+	{"payments-key", "", true},
 }
 
-func (s *settings) get(name, def string, required bool) string {
-	if v, ok := s.args[name]; ok {
-		return v
+// readFlags returns the value of each flag, or the list of problems.
+func readFlags(args []string) (map[string]string, []string) {
+	given := map[string]string{}
+	known := map[string]bool{}
+	for _, f := range flags {
+		known[f.name] = true
 	}
-	env := strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
-	if v, ok := os.LookupEnv(env); ok {
-		return v
+	var problems []string
+	for _, a := range args {
+		name, val, ok := strings.Cut(strings.TrimPrefix(a, "--"), "=")
+		if !strings.HasPrefix(a, "--") || !ok || !known[name] {
+			problems = append(problems, fmt.Sprintf("unknown or malformed flag %q", a))
+			continue
+		}
+		given[name] = val
 	}
-	if required {
-		s.problems = append(s.problems, fmt.Sprintf("flag --%s (or %s) is required", name, env))
+	out := map[string]string{}
+	for _, f := range flags {
+		env := strings.ToUpper(strings.ReplaceAll(f.name, "-", "_"))
+		if v, ok := given[f.name]; ok {
+			out[f.name] = v
+		} else if v, ok := os.LookupEnv(env); ok {
+			out[f.name] = v
+		} else if f.required {
+			problems = append(problems, fmt.Sprintf("flag --%s (or %s) is required", f.name, env))
+		} else {
+			out[f.name] = f.def
+		}
 	}
-	return def
+	return out, problems
 }
 
 func main() {
 	os.Exit(run())
 }
 
+// run wires the service and serves it. The customer calls web; web uses inventory and orders;
+// orders uses inventory, billing, and store; billing uses payments (the card processor) and
+// store; store keeps everything in the SQLite file.
 func run() int {
-	s := &settings{args: map[string]string{}}
-	known := map[string]bool{"addr": true, "db": true, "payments-url": true, "payments-key": true}
-	for _, a := range os.Args[1:] {
-		name, val, ok := strings.Cut(strings.TrimPrefix(a, "--"), "=")
-		if !strings.HasPrefix(a, "--") || !ok || !known[name] {
-			s.problems = append(s.problems, fmt.Sprintf("unknown or malformed flag %q", a))
-			continue
-		}
-		s.args[name] = val
-	}
-	addr := s.get("addr", ":8080", false)
-	dbPath := s.get("db", "stockroom.db", false)
-	payURL := s.get("payments-url", "", true)
-	payKey := s.get("payments-key", "", true)
-	if len(s.problems) > 0 {
-		fmt.Fprintf(os.Stderr, "stockroom: reading flags failed:\n%s\n", strings.Join(s.problems, "\n"))
+	f, problems := readFlags(os.Args[1:])
+	if len(problems) > 0 {
+		fmt.Fprintf(os.Stderr, "stockroom: reading flags failed:\n%s\n", strings.Join(problems, "\n"))
 		return 1
 	}
+	addr, dbPath, payURL, payKey := f["addr"], f["db"], f["payments-url"], f["payments-key"]
 	db, err := store.Open(store.Settings{Path: dbPath})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "stockroom: open the database: %v\n", err)

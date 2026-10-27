@@ -11,6 +11,8 @@ system Stockroom {
         Web.Orders:      Orders.NewService
         Orders.Stock:    Inventory.NewCatalog
         Orders.Billing:  Billing.NewLedger
+        // The three Store wires have the same settings, so they share one database (K0607 warns
+        // when they differ).
         Orders.Store:    Store.Open{ Path: flag("db", default: "stockroom.db") }
         Inventory.Store: Store.Open{ Path: flag("db", default: "stockroom.db") }
         Billing.Store:   Store.Open{ Path: flag("db", default: "stockroom.db") }

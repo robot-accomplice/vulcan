@@ -57,8 +57,8 @@ func (s *Service) Create(customer shop.CustomerID, wants []shop.Want) (shop.Orde
 	seen := map[shop.SKU]bool{}
 	var lines []shop.Line
 	for _, w := range wants {
-		if w.Qty <= 0 {
-			return shop.Order{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0")
+		if w.Qty <= 0 || w.Qty > shop.MaxQty {
+			return shop.Order{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0 and at most %d", shop.MaxQty)
 		}
 		if seen[w.SKU] {
 			return shop.Order{}, shop.Errorf(shop.CodeInvalid, "sku %s is on two lines", w.SKU)

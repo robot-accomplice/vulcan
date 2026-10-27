@@ -146,6 +146,13 @@ its resolution section lists the fixes. After them:
   (N02 is not met), nor the interface steps of §5.4c (audit P2, L7).
 - A type error inside a contract is reported at the start of its clause.
 
+**Phase P3 (2026-10-27):** Stockroom-lite exists in both arms: `poc/app/vulcan` and `poc/app/go`,
+from the functional description [stockroom.md](poc/stockroom.md), with the test card processor
+`poc/fakepay`. Both pass the shared black-box suite `poc/acceptance`. The independent
+[parity review](../experiments/poc/parity-p3.md) found 2 High, 4 Medium, and 5 Low differences;
+all but one Low are fixed. From the review: `vulcan check` now runs `go vet` (K0706), and K0607
+warns of a second instance of one constructor. Next: the harness (P4).
+
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
 3. **Optional review 10.** Reviews 8 and 9 changed much text. The trend is 55, then 29 findings,

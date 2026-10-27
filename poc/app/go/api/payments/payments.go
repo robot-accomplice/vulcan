@@ -1,3 +1,4 @@
+// Package payments is the client of the card processor.
 package payments
 
 import (

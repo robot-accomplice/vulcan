@@ -183,6 +183,20 @@ func (c *Checker) instance(sup *project.Package, w *decl.Wire, plan *Plan, seen 
 	if inst := seen[key]; inst != nil {
 		return inst
 	}
+	// One constructor with two settings makes two instances: say so, because a provider that
+	// holds a resource (a database) is then opened twice (parity review P3, item 2).
+	ctor := sup.Name + "." + name
+	for k, other := range seen {
+		if strings.HasPrefix(k, ctor+"{") || k == ctor {
+			if other.Settings != nil {
+				line := c.P.SysSrc.Pos(other.Settings.Pos).Line
+				c.D.Warnf(sysPos(w.Supply.NamePos), "K0607", "%s is wired with other settings than at line %d, so main makes a second instance; wires with the same constructor and the same settings share one instance", ctor, line)
+			} else {
+				c.D.Warnf(sysPos(w.Supply.NamePos), "K0607", "%s is wired with other settings than before, so main makes a second instance; wires with the same constructor and the same settings share one instance", ctor)
+			}
+			break
+		}
+	}
 	inst := &Instance{ID: len(plan.Instances), Leaf: sup, Name: name, Settings: w.Settings}
 	switch o := obj.(type) {
 	case *types.TypeName:

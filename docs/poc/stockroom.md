@@ -37,7 +37,8 @@ language and no framework.
 
 - **Money** is an integer number of cents. There are no fractional cents.
 - **Product:** `sku` (1 to 32 characters: letters, digits, `-`), `name` (1 to 100 characters),
-  `price_cents` (more than 0).
+  `price_cents` (more than 0, at most 100,000,000).
+- **Quantities:** a receipt of stock and a line of an order have a `qty` of 1 to 10,000.
 - **Stock** of a product: `on_hand` (units in the stockroom), `reserved` (units held by orders that
   are not shipped or cancelled), `available` = `on_hand` − `reserved`. Each is 0 or more, and
   `reserved` is never more than `on_hand`.

@@ -51,9 +51,9 @@ func Handler() http.Handler {
 	mux.HandleFunc("POST /orders", createOrder)
 	mux.HandleFunc("GET /orders", listOrders)
 	mux.HandleFunc("GET /orders/{id}", getOrder)
-	mux.HandleFunc("POST /orders/{id}/pay", orderAction(func(id shop.OrderID) (shop.Order, error) { return Orders.Pay(id) }))
-	mux.HandleFunc("POST /orders/{id}/ship", orderAction(func(id shop.OrderID) (shop.Order, error) { return Orders.Ship(id) }))
-	mux.HandleFunc("POST /orders/{id}/cancel", orderAction(func(id shop.OrderID) (shop.Order, error) { return Orders.Cancel(id) }))
+	mux.HandleFunc("POST /orders/{id}/pay", orderAction(Orders.Pay))
+	mux.HandleFunc("POST /orders/{id}/ship", orderAction(Orders.Ship))
+	mux.HandleFunc("POST /orders/{id}/cancel", orderAction(Orders.Cancel))
 	mux.HandleFunc("POST /orders/{id}/refunds", refund)
 	mux.HandleFunc("GET /orders/{id}/payments", payments)
 	return mux

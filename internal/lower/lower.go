@@ -915,8 +915,9 @@ func (lw *file) invariantMethods(it *invType) {
 		}
 		fmt.Fprintf(&b, "if !(%s%s) { vulcan_rt.Fail(%s) }; ", lw.clauseDir(c), GoText(x), args)
 	}
-	b.WriteString("}\n")
-	fmt.Fprintf(&b, "func Vulcan_check%s(vulcan_x %s, vulcan_at string) %s { (&vulcan_x).Vulcan_invariant(\"the value built at \" + vulcan_at); return vulcan_x }\n", it.name, it.name, it.name)
+	// One line, the invariant's: a go vet finding in this generated code is then on a clause line.
+	b.WriteString("}; ")
+	fmt.Fprintf(&b, "func Vulcan_check%s(vulcan_x %s, vulcan_at string) %s { (&vulcan_x).Vulcan_invariant(\"the value built at \" + vulcan_at); return vulcan_x }; ", it.name, it.name, it.name)
 	fmt.Fprintf(&b, "func Vulcan_checkPtr%s(vulcan_p *%s, vulcan_at string) *%s { vulcan_p.Vulcan_invariant(\"the value built at \" + vulcan_at); return vulcan_p }", it.name, it.name, it.name)
 	lw.extra = append(lw.extra, b.String())
 }

@@ -2308,12 +2308,14 @@ the long form.
 | K0604 | E | A constructor has parameters other than one settings struct, or results other than `T` or `(T, error)`; or a wire that names a type has settings | §5.3 |
 | K0605 | E | A literal, or a flag default, in a settings field tagged `vulcan:"secret"` | §5.3 |
 | K0606 | E | A settings value, a flag default, or a `config` value is not a constant of its field's type; a value can use only constants, the package `time`, and the libraries that `system.vulcan` imports | §5.3, App. B.2 |
+| K0607 | W | One constructor is wired with two different settings, so `main` makes two instances | §5.3 |
 | **K07** | | **Warnings on Go code** | |
 | K0701 | W | Unhandled error | §6 |
 | K0702 | W | Error masking | §6 |
 | K0703 | W | Possible `nil` dereference | §6 |
 | K0704 | W | Data race (from `vulcan test`; the test also fails, as in Go) | §6 |
 | K0705 | W | `vulcan test` ran without the race detector, because the host cannot run it | §6 |
+| K0706 | E | `go vet` reports a finding in the code (the PoC gives both arms of its evaluation the same Go analysis) | §6 |
 
 ## Appendix F: Lowering to Go
 

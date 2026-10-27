@@ -93,6 +93,9 @@ func Check(root string, tests bool) (*Result, error) {
 			return nil, err
 		}
 		goBuild(p, r.Diags)
+		if !r.Diags.HasErrors() {
+			goVet(p, r.Diags)
+		}
 	}
 	contractPositions(p, r.Diags)
 	r.Diags.Sort()
@@ -106,6 +109,22 @@ var generatedName = regexp.MustCompile(`\bvulcan_(t|r)[0-9]+\b|\bvulcan_p_(\w+)\
 // lowered text of a clause has other columns than its source, and writes the generated names of
 // the message as source names (audit P2, M3).
 func contractPositions(p *project.Project, d *diag.List) {
+	starts := clauseStarts(p)
+	// A go vet finding on the line of a clause is in the generated check code (for example a
+	// check function that copies a struct with a lock), not in code that anyone wrote.
+	kept := d.Items[:0]
+	for _, x := range d.Items {
+		if x.Code == "K0706" && len(starts[x.Pos.File][x.Pos.Line]) > 0 {
+			continue
+		}
+		kept = append(kept, x)
+	}
+	d.Items = kept
+	mapToClauses(d, starts)
+}
+
+// clauseStarts gives the columns where a contract clause starts, by file and line.
+func clauseStarts(p *project.Project) map[string]map[int][]int {
 	starts := map[string]map[int][]int{} // file -> line -> clause columns
 	add := func(pos diag.Pos) {
 		if starts[pos.File] == nil {
@@ -136,6 +155,10 @@ func contractPositions(p *project.Project, d *diag.List) {
 			}
 		}
 	}
+	return starts
+}
+
+func mapToClauses(d *diag.List, starts map[string]map[int][]int) {
 	for i := range d.Items {
 		x := &d.Items[i]
 		best := 0
@@ -208,6 +231,38 @@ func goBuild(p *project.Project, d *diag.List) {
 	}
 	if !found {
 		d.Errorf(diag.Pos{}, "K0008", "go build failed:\n%s", strings.TrimSpace(string(out)))
+	}
+}
+
+// goVet runs go vet on the generated code, as a Go team runs it, and reports each finding at
+// its .vulcan position as an error (K0706): the PoC gives both arms the same Go analysis
+// (parity review P3, item 1).
+func goVet(p *project.Project, d *diag.List) {
+	cmd := exec.Command("go", "vet", "./...")
+	cmd.Dir = gen.BuildDir(p)
+	cmd.Env = check.Env()
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return
+	}
+	sc := bufio.NewScanner(bytes.NewReader(out))
+	found := false
+	for sc.Scan() {
+		m := goErrLine.FindStringSubmatch(strings.TrimSpace(sc.Text()))
+		if m == nil {
+			continue
+		}
+		file := filepath.ToSlash(m[1])
+		if !filepath.IsAbs(m[1]) && !strings.HasPrefix(file, "/") {
+			file = filepath.ToSlash(filepath.Join(gen.BuildDir(p), m[1]))
+		}
+		ln, _ := strconv.Atoi(m[2])
+		col, _ := strconv.Atoi(m[3])
+		d.Errorf(diag.Pos{File: relTo(p.Root, file), Line: ln, Col: col}, "K0706", "go vet: %s", m[4])
+		found = true
+	}
+	if !found {
+		d.Errorf(diag.Pos{}, "K0706", "go vet failed:\n%s", strings.TrimSpace(string(out)))
 	}
 }
 

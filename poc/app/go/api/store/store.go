@@ -1,3 +1,4 @@
+// Package store keeps the catalog, the stock, the orders, and the ledger in SQLite.
 package store
 
 import (

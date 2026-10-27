@@ -711,6 +711,18 @@ case("L5", "A literal that ends at the closing brace of a body with a contract (
      [("api/billing/billing.vulcan", "// Payer takes payments.", "// Account holds money.\ntype Account struct{ Balance int }\n\tinvariant Balance >= 0\n\nfunc open(x int) *Account\n\trequires x >= 0\n{ return &Account{Balance: x}}\n\nvar _ = open\n\n// Payer takes payments.")],
      "accept")
 
+# ---- Cases added after the P3 parity review (experiments/poc/parity-p3.md)
+case("V01", "vulcan check runs go vet: a value receiver that copies a mutex is K0706 (parity P3, item 1).",
+     [("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"sync"\n\n\t"shop/lib/money"\n)'),
+      ("api/billing/billing.vulcan", "// Payer takes payments.\ntype Payer struct{}", "// Payer takes payments.\ntype Payer struct{ mu sync.Mutex }\n\n// Name names the payer.\nfunc (p Payer) Name() string { return \"payer\" }")],
+     "error api/billing/billing.vulcan:@@Payer) Name@ K0706")
+case("V02", "One constructor wired with two settings: K0607 warns of the second instance (parity P3, item 2).",
+     [("system.vulcan", "        Web.Orders:      Orders.NewService\n        Orders.Checkout: Billing.NewPayer",
+       "        Web.Orders:      Orders.NewService\n        Orders.Checkout: Billing.NewPayer{ Fee: 1 }\n        Web.Extra:       Billing.NewPayer{ Fee: 2 }"),
+      ("api/billing/billing.vulcan", "func NewPayer() *Payer { return &Payer{} }", "// Settings configure a Payer.\ntype Settings struct {\n\tFee int\n}\n\nfunc NewPayer(s Settings) *Payer { return &Payer{} }"),
+      ("api/web/component.vulcan", "    needs port Orders {", "    needs port Extra {\n        func Pay(amt money.Money) (money.Receipt, error)\n    }\n\n    needs port Orders {")],
+     "accept\nwarn system.vulcan:@2@NewPayer@ K0607")
+
 os.makedirs(OUT, exist_ok=True)
 for f in os.listdir(OUT):
     if f.endswith(".txtar"):

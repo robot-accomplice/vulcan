@@ -34,8 +34,14 @@ the result is not one-sided.
 
 | Arm | What the agent gets | Check command |
 |---|---|---|
-| **V** | The application in Vulcan, the PoC compiler, and the release-1 primer (`vulcan guide`) | `vulcan check && vulcan test` |
+| **V** | The application in Vulcan, the PoC compiler, and the release-1 primer (`vulcan guide`) | `vulcan check && vulcan test --race=false` |
 | **G** | The same application in plain Go, with the same team rules written in a `RULES.md`, in Go terms (packages, interfaces) | `go vet ./... && go test ./...` |
+
+Both check commands run `go vet` and the tests without the race detector, because the run host
+(Windows, no cgo) cannot run it; on a host that can, both add it (parity review P3, item 3). Each
+workspace has a README, word for word the same except the language and the commands, and a
+`fakepay` command on the PATH to run the service end to end. An arm V run starts with no
+`.vulcan/` directory.
 
 Everything else is the same in both arms: the model and its version, the harness, the budgets, the
 machine, and the task briefs, word for word except for the language name.

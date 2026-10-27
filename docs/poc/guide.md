@@ -79,6 +79,9 @@ system Shop {
 
 - Every wire reads `needer: supplier`. Every needed port is wired exactly once. The wires have no
   cycle. One gateway leaf for each external system.
+- Wires that name the same constructor with the same settings share one instance; other
+  settings make a second instance (K0607 warns). So one database is one `Store.Open{...}`, written
+  the same on every wire.
 - A wire names an exported constructor or type of the supplier leaf. A constructor takes nothing
   or one exported settings struct, and returns `T` or `(T, error)`; `T` is an exported concrete
   type or a pointer to one. Pointer receivers need a pointer: return `*Payer`.
@@ -157,9 +160,11 @@ bind panics with "port X is not bound".
 
 ## 5. Commands
 
-- `vulcan check` checks the architecture, the contracts, and the Go types. `--json` prints the
+- `vulcan check` checks the architecture, the contracts, and the Go types, and runs `go vet`. `--json` prints the
   diagnostics as JSON. Each diagnostic has a code (`K0101`) and a `.vulcan` position.
-- `vulcan build`, `vulcan run [-- --flag=value]`, `vulcan test [Leaf]`.
+- `vulcan build`, `vulcan run [-- --flag=value]`, `vulcan test [Leaf]`. The `go` commands do not
+  work in the project (its code is in `.vulcan` files); `.vulcan/build` is generated, so never
+  edit it.
 - `vulcan mod tidy` adds the modules that the code imports to `go.mod` and `go.sum`. Use it, not
   `go mod tidy`, which cannot see `.vulcan` files.
 - `vulcan guide` prints this primer.

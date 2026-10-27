@@ -167,12 +167,13 @@ func TestProducts(t *testing.T) {
 		{"sku": "has space", "name": "x", "price_cents": 1},
 		{"sku": "C-3", "name": "", "price_cents": 1},
 		{"sku": "C-3", "name": "x", "price_cents": 0},
+		{"sku": "C-3", "name": "x", "price_cents": 100000001},
 	} {
 		a.want("POST", "/products", bad, 400, "invalid")
 	}
 	_, list := a.do("GET", "/products", nil)
 	l, _ := list.([]any)
-	if len(l) != 2 || l[0].(map[string]any)["sku"] != "A-1" || l[1].(map[string]any)["sku"] != "B-2" {
+	if len(l) != 2 || l[0].(map[string]any)["sku"] != "A-1" || l[1].(map[string]any)["sku"] != "B-2" { // before M-1
 		t.Fatalf("products by sku: %v", list)
 	}
 	a.want("GET", "/products/NOPE", nil, 404, "not_found")
@@ -181,6 +182,8 @@ func TestProducts(t *testing.T) {
 		t.Fatalf("after receive: %v", p)
 	}
 	a.want("POST", "/products/A-1/receive", map[string]any{"qty": 0}, 400, "invalid")
+	a.want("POST", "/products/A-1/receive", map[string]any{"qty": 10001}, 400, "invalid")
+	a.want("POST", "/products", map[string]any{"sku": "M-1", "name": "Max", "price_cents": 100000000}, 201, "")
 	a.want("POST", "/products/NOPE/receive", map[string]any{"qty": 1}, 404, "not_found")
 }
 
@@ -207,6 +210,7 @@ func TestOrderReservesStock(t *testing.T) {
 		{"customer": "", "lines": []any{map[string]any{"sku": "A-1", "qty": 1}}},
 		{"customer": "bob", "lines": []any{}},
 		{"customer": "bob", "lines": []any{map[string]any{"sku": "A-1", "qty": 0}}},
+		{"customer": "bob", "lines": []any{map[string]any{"sku": "A-1", "qty": 10001}}},
 		{"customer": "bob", "lines": []any{map[string]any{"sku": "A-1", "qty": 1}, map[string]any{"sku": "A-1", "qty": 1}}},
 	} {
 		a.want("POST", "/orders", bad, 400, "invalid")
