@@ -4,6 +4,8 @@ system Stockroom {
     external Database        "The SQLite file"
     external PaymentProvider "The card processor"
 
+    config { strict: true }
+
     container Api {
         Web{ Addr: flag("addr", default: ":8080") }, Inventory, Orders, Billing, Store, Payments
 

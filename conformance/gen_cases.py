@@ -723,6 +723,46 @@ case("V02", "One constructor wired with two settings: K0607 warns of the second 
       ("api/web/component.vulcan", "    needs port Orders {", "    needs port Extra {\n        func Pay(amt money.Money) (money.Receipt, error)\n    }\n\n    needs port Orders {")],
      "accept\nwarn system.vulcan:@2@NewPayer@ K0607")
 
+# ---- Strict mode (spec §5.4d, decision 2): N05 to N12 of conformance.md
+def strict(extra=""):
+    return ("system.vulcan", '    person Customer "Buys goods"', '    person Customer "Buys goods"\n\n    config { strict: true' + extra + ' }')
+FUNC_PORT = [("api/orders/component.vulcan", "func Pay(amt money.Money) (money.Receipt, error)", "func Pay(amt money.Money, done func(money.Receipt)) (money.Receipt, error)"),
+             ("api/orders/orders.vulcan", "return Checkout.Pay(amt)", "return Checkout.Pay(amt, nil)"),
+             ("api/billing/billing.vulcan", "Pay(amt money.Money) (money.Receipt, error) {", "Pay(amt money.Money, done func(money.Receipt)) (money.Receipt, error) {")]
+case("N05", "Strict: a port method takes a function: K0123.", [strict()] + FUNC_PORT, "error api/orders/component.vulcan:@@Pay@ K0123")
+RC_PORT = [("api/orders/component.vulcan", 'import "shop/lib/money"', 'import (\n    "io"\n    "shop/lib/money"\n)'),
+           ("api/orders/component.vulcan", "func Pay(amt money.Money) (money.Receipt, error)", "func Pay(amt money.Money) (money.Receipt, error)\n        func Statement() (io.ReadCloser, error)"),
+           ("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"io"\n\t"strings"\n\n\t"shop/lib/money"\n)'),
+           ("api/billing/billing.vulcan", "// Pay takes a payment.", "// Statement returns the statement.\nfunc (p *Payer) Statement() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader(\"\")), nil }\n\n// Pay takes a payment.")]
+case("N06", "Strict: a port method returns io.ReadCloser: K0123.", [strict()] + RC_PORT, "error api/orders/component.vulcan:@@Statement@ K0123")
+case("N06b", "Strict: the same with strict_interfaces: [\"io.ReadCloser\"]: accepted.", [strict(', strict_interfaces: ["io.ReadCloser"]')] + RC_PORT, "accept")
+case("N07", "Strict: a leaf imports unsafe: K0124.",
+     [strict(), ("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"unsafe"\n\n\t"shop/lib/money"\n)\n\nvar _ = unsafe.Sizeof(0)')],
+     'error api/billing/billing.vulcan:@@"unsafe"@ K0124')
+DIAL = [("api/web/web.vulcan", 'import (\n\t"context"\n\t"fmt"\n)', 'import (\n\t"context"\n\t"fmt"\n\t"net/http"\n)'),
+        ("api/web/web.vulcan", "func startup(", "func ping() { _, _ = http.Get(\"http://127.0.0.1:1\") }\n\nvar _ = ping\n\nfunc startup(")]
+case("N08", "Strict: an entry leaf calls http.Get: K0125.", [strict()] + DIAL, "error api/web/web.vulcan:@@Get@ K0125")
+case("N09", "Strict: a library var holds a channel: K0210.",
+     [strict(), ("lib/money/money.vulcan", "// Money is an amount in cents.", "// Events carries events.\nvar Events = make(chan int)\n\n// Money is an amount in cents.")],
+     "error lib/money/money.vulcan:@@Events =@ K0210")
+case("N09b", "Strict: a library var of an error type, and of a type in strict_shared, is accepted.",
+     [strict(', strict_shared: ["*regexp.Regexp"]'), ("lib/money/money.vulcan", "package money\n", 'package money\n\nimport (\n\t"errors"\n\t"regexp"\n)\n\n// ErrBad is an error.\nvar ErrBad = errors.New("bad")\n\n// Code matches a code.\nvar Code = regexp.MustCompile(`^[A-Z]+$`)\n')],
+     "accept")
+SETENV = [("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"os"\n\n\t"shop/lib/money"\n)\n\nfunc mode() { _ = os.Setenv("MODE", "x") }\n\nvar _ = mode')]
+case("N10", "Strict: a leaf calls os.Setenv: K0211.", [strict()] + SETENV, "error api/billing/billing.vulcan:@@Setenv@ K0211")
+case("N11", "Strict: N05, N08, and N10 in leaves listed in strict_exempt: accepted.",
+     [strict(', strict_exempt: ["Orders", "Web", "Billing"]')] + FUNC_PORT + DIAL + [
+      ("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"os"\n\n\t"shop/lib/money"\n)\n\nfunc mode() { _ = os.Setenv("MODE", "x") }\n\nvar _ = mode')],
+     "accept")
+case("N12", "Ordinary mode: N05, N08, and N10 are accepted.", FUNC_PORT + DIAL + SETENV, "accept")
+case("N13", "Strict: the base system, a serving entry leaf, and a dialing gateway are accepted.",
+     [strict(), ("system.vulcan", '    person Customer "Buys goods"', '    person Customer "Buys goods"\n    external Bank "Cards"'),
+      ("api/billing/component.vulcan", "component Billing {", "component Billing {\n    gateway for Bank"),
+      ("api/billing/billing.vulcan", 'import "shop/lib/money"', 'import (\n\t"net/http"\n\n\t"shop/lib/money"\n)\n\nfunc ping() { _, _ = http.Get("http://127.0.0.1:1") }\n\nvar _ = ping'),
+      ("api/web/web.vulcan", 'import (\n\t"context"\n\t"fmt"\n)', 'import (\n\t"context"\n\t"fmt"\n\t"net"\n)'),
+      ("api/web/web.vulcan", "func startup(", "func listen() { l, err := net.Listen(\"tcp\", \"127.0.0.1:0\"); if err == nil { l.Close() } }\n\nvar _ = listen\n\nfunc startup(")],
+     "accept")
+
 os.makedirs(OUT, exist_ok=True)
 for f in os.listdir(OUT):
     if f.endswith(".txtar"):

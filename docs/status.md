@@ -160,6 +160,15 @@ frozen analysis of plan section 9. The analysis reads four synthetic scenarios r
 pipeline ran end to end with a scripted agent on demo material in both arms. Next: phase P5, the
 hidden material from separate sessions, its validation, and two pilot tasks with the real agent.
 
+**Phase P5 (2026-10-27):** separate sessions wrote the hidden material: 16 rules, 14 tasks, the
+tests, detectors, seeded cases, and reference solutions. It validates and is sealed outside the
+repository ([material-p5.md](../experiments/poc/material-p5.md)). The owner then had strict mode
+(§5.4d) implemented and turned on in arm V; after it, 2 of 16 rules are enforced by V (R03, R05),
+and the compiler rejects 9 of the 36 seeded cases of arm V (5 before). Not done: the two pilot
+runs. The tool permission check of the session refused to start headless agents with
+`bypassPermissions`; the owner must decide how the runs start (by hand, or a narrower permission
+mode).
+
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
 3. **Optional review 10.** Reviews 8 and 9 changed much text. The trend is 55, then 29 findings,

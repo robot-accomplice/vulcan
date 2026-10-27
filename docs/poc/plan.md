@@ -206,7 +206,12 @@ for Stockroom-lite and its tasks. It follows decision 4: staged, reusing `go/par
 | Startup | Generated wiring, startup, and shutdown in `main` | K0601 to K0605 |
 | Commands | `check`, `build`, `test`, `run`, `guide`, with `--json` diagnostics; source positions mapped back to `.vulcan` files by `//line` directives | |
 
-Deferred in the PoC, and rejected with K0009: strict mode, the rules of §7.3 beyond the return
+Added after the hidden material was written, by the owner's decision: strict mode as §5.4d
+defines it (K0123, K0124, K0125, K0210, K0211), on in arm V. It was a planned feature, not a check
+designed from the rules; [material-p5.md](../../experiments/poc/material-p5.md) records the
+change and the labels before and after it.
+
+Deferred in the PoC, and rejected with K0009: the rules of §7.3 beyond the return
 check, K0525, `audit`, `context`, `query`, and everything that release 1 defers. The deviations of
 the built compiler from §7 are listed in `docs/status.md` (phase P2). The agents of arm V read
 [guide.md](guide.md), the primer cut to what the PoC accepts.

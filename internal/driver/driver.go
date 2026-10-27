@@ -87,6 +87,7 @@ func Check(root string, tests bool) (*Result, error) {
 	}
 	c.Rules()
 	c.Contracts()
+	c.Strict()
 	plan := c.Wiring()
 	if !p.Diags.HasErrors() {
 		if err := link.Write(p, plan); err != nil {

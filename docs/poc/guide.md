@@ -25,6 +25,13 @@ lib/money/library.vulcan      a library: shared types and reusable code
 - Import any Go package. Only a **gateway** leaf (`gateway for Stripe`) or an **entry** leaf
   (`entry for Customer`) can use a network function: dial, listen, send an HTTP request,
   `sql.Open`, `exec.Command`. Never write `//go:linkname`.
+- **Strict mode** (`config { strict: true }`, on in this project) adds: a port method takes and
+  returns no function, channel, or interface type except `error` and `context.Context` (K0123);
+  no `unsafe`, `syscall`, cgo, or `reflect` calls (K0124); an entry leaf only serves (listens),
+  and only a gateway dials (K0125); a library `var` holds no pointer, slice, map, channel,
+  function, or interface (K0210); no code changes process-wide state such as `os.Setenv`,
+  `http.HandleFunc`, `log.SetOutput`, or `flag.Parse` (K0211). `strict_exempt: ["Leaf"]` keeps
+  a leaf in ordinary mode.
 - `main` is generated. It reads flags, calls the constructors and binds the ports, runs every
   `func setup(ctx context.Context) error`, then runs every `func startup(ctx context.Context) error`
   at once. Plain Go functions: tests can call them. A leaf cannot declare `init`, and the
@@ -170,5 +177,5 @@ bind panics with "port X is not bound".
 - `vulcan guide` prints this primer.
 
 Not in this release (K0009): topics, remote ports, transports, a second container, `pure`
-functions, `limit`, `handle`, strict mode, and `vulcan audit`, `context`, `query`, `explain`,
+functions, `limit`, `handle`, and `vulcan audit`, `context`, `query`, `explain`,
 `fake`, `fmt`, `diagram`, `archdiff`, `doc`, `trace`.
