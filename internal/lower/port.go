@@ -10,6 +10,7 @@ import (
 
 	"github.com/robot-accomplice/vulcan/internal/blank"
 	"github.com/robot-accomplice/vulcan/internal/decl"
+	"github.com/robot-accomplice/vulcan/internal/diag"
 	"github.com/robot-accomplice/vulcan/internal/project"
 )
 
@@ -35,8 +36,13 @@ func PortWrapper(p *project.Project, leaf *project.Package, port *decl.Port, lf 
 	wrap := WrapType(port.Name)
 	var b strings.Builder
 	fmt.Fprintf(&b, "type %s struct{ Impl %s }\n\n", wrap, iface)
-	fmt.Fprintf(&b, "func (w %s) Vulcan_wrap(impl any) any { return %s{Impl: impl.(%s)} }\n\n", wrap, wrap, iface)
+	fmt.Fprintf(&b, "func (vulcan_w %s) Vulcan_wrap(impl any) any { return %s{Impl: impl.(%s)} }\n\n", wrap, wrap, iface)
 	for _, m := range port.Methods {
+		reservedPort := func(name string) {
+			if len(m.Contracts) > 0 && (name == "err" || name == "result") {
+				p.Diags.Errorf(src.Pos(m.Contracts[0].WordPos), "K0511", "port method %s has a contract, so it cannot name a parameter or a result %s; rename it", m.Name, name)
+			}
+		}
 		sig := string(src.Src[m.SigOff:m.SigEnd])
 		ft, fset, err := parseSig(sig)
 		if err != nil {
@@ -57,6 +63,7 @@ func PortWrapper(p *project.Project, leaf *project.Package, port *decl.Port, lf 
 			}
 			for _, n := range fieldNames {
 				name := n.Name
+				reservedPort(name)
 				if name == "_" {
 					name = fmt.Sprintf("vulcan_a%d", k)
 				}
@@ -73,13 +80,19 @@ func PortWrapper(p *project.Project, leaf *project.Package, port *decl.Port, lf 
 		var results []result
 		if ft.Results != nil {
 			for _, f := range ft.Results.List {
-				n := len(f.Names)
-				if n == 0 {
-					n = 1
-				}
-				for range n {
+				if len(f.Names) == 0 {
 					results = append(results, result{typ: at(f.Type)})
 				}
+				for _, n := range f.Names {
+					reservedPort(n.Name)
+					results = append(results, result{name: n.Name, typ: at(f.Type)})
+				}
+			}
+		}
+		named := map[string]int{}
+		for i, r := range results {
+			if r.name != "" && r.name != "_" {
+				named[r.name] = i
 			}
 		}
 		var res, vars []string
@@ -98,7 +111,9 @@ func PortWrapper(p *project.Project, leaf *project.Package, port *decl.Port, lf 
 			}
 		}
 		caller := leaf.Name + "." + port.Name + "." + m.Name
-		var pre, post strings.Builder
+		// requires first, then old() at entry, then the call, then ensures.
+		var req, olds, post strings.Builder
+		oldNext := 0
 		for _, c := range m.Contracts {
 			text := string(src.Src[c.Off:c.End])
 			pos := src.Pos(c.Off)
@@ -118,10 +133,13 @@ func PortWrapper(p *project.Project, leaf *project.Package, port *decl.Port, lf 
 					shows = append(shows, fmt.Sprintf("vulcan_rt.Show(%q, %s)", label, expr))
 				}
 			}
-			var olds []string
 			x := Rewrite(e, func(n ast.Expr) ast.Expr {
 				switch v := n.(type) {
 				case *ast.Ident:
+					if i, ok := named[v.Name]; ok && ensures {
+						show(v.Name, vars[i])
+						return ast.NewIdent(vars[i])
+					}
 					switch {
 					case names[v.Name]:
 						show(v.Name, v.Name)
@@ -140,8 +158,13 @@ func PortWrapper(p *project.Project, leaf *project.Package, port *decl.Port, lf 
 					}
 				case *ast.CallExpr:
 					if id, ok := v.Fun.(*ast.Ident); ok && id.Name == "old" && len(v.Args) == 1 && ensures {
-						name := fmt.Sprintf("vulcan_old%d", len(olds))
-						olds = append(olds, fmt.Sprintf("%s := %s; ", name, GoText(v.Args[0])))
+						name := fmt.Sprintf("vulcan_old_%s_%s_%d", port.Name, m.Name, oldNext)
+						oldNext++
+						fmt.Fprintf(&olds, "%s := /*line %s:%d:%d*/%s; ", name, lf, pos.Line, pos.Col, GoText(v.Args[0]))
+						if leaf.Olds == nil {
+							leaf.Olds = map[string]diag.Pos{}
+						}
+						leaf.Olds[name] = pos
 						show("old("+GoText(v.Args[0])+")", name)
 						return ast.NewIdent(name)
 					}
@@ -154,20 +177,17 @@ func PortWrapper(p *project.Project, leaf *project.Package, port *decl.Port, lf 
 			}
 			check := fmt.Sprintf("if !(/*line %s:%d:%d*/%s) { vulcan_rt.Fail(%s) }; ", lf, pos.Line, pos.Col, GoText(x), args)
 			if ensures {
-				for _, o := range olds {
-					pre.WriteString(o)
-				}
 				post.WriteString(check)
 			} else {
-				pre.WriteString(check)
+				req.WriteString(check)
 			}
 		}
-		call := "w.Impl." + m.Name + "(" + strings.Join(args, ", ") + ")"
+		call := "vulcan_w.Impl." + m.Name + "(" + strings.Join(args, ", ") + ")"
 		if len(vars) > 0 {
 			call = strings.Join(vars, ", ") + " = " + call
 		}
 		mp := src.Pos(m.Pos)
-		fmt.Fprintf(&b, "func (w %s) /*line %s:%d:%d*/%s(%s) (%s) {\n\t%s%s; %sreturn\n}\n\n", wrap, lf, mp.Line, mp.Col, m.Name, strings.Join(params, ", "), strings.Join(res, ", "), pre.String(), call, post.String())
+		fmt.Fprintf(&b, "func (vulcan_w %s) /*line %s:%d:%d*/%s(%s) (%s) {\n\t%s%s%s; %sreturn\n}\n\n", wrap, lf, mp.Line, mp.Col, m.Name, strings.Join(params, ", "), strings.Join(res, ", "), req.String(), olds.String(), call, post.String())
 	}
 	return b.String()
 }

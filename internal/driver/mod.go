@@ -24,7 +24,7 @@ func ModTidy(root string) (string, error) {
 	if p.System == nil {
 		return "", fmt.Errorf("system.vulcan does not parse; run vulcan check")
 	}
-	if err := gen.WriteLeaves(p, true); err != nil {
+	if err := gen.WriteLeaves(p, true, nil); err != nil {
 		return "", err
 	}
 	dir := gen.BuildDir(p)

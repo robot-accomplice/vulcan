@@ -1,0 +1,114 @@
+A write through a promoted field: K0507 (audit P2, M1).
+-- want.txt --
+error api/billing/billing.vulcan:30:2 K0507
+-- api/billing/billing.vulcan --
+package billing
+
+import "shop/lib/money"
+
+// Counter counts down.
+type Counter struct{ N int }
+
+// Dec counts down.
+func (c *Counter) Dec() { c.N-- }
+
+// Account holds money.
+type Account struct {
+	Balance int
+	C       Counter
+}
+	invariant Balance >= 0 && C.N >= 0
+
+// Holder embeds an account.
+type Holder struct{ Account }
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	var h Holder
+	h.Balance = -7
+	return money.Receipt{Amount: amt}, nil
+}
+-- api/billing/component.vulcan --
+component Billing {
+}
+-- api/orders/component.vulcan --
+import "shop/lib/money"
+
+component Orders {
+    needs port Checkout {
+        func Pay(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/orders/orders.vulcan --
+package orders
+
+import "shop/lib/money"
+
+// Service places orders.
+type Service struct{}
+
+// NewService returns a Service.
+func NewService() *Service { return &Service{} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return Checkout.Pay(amt)
+}
+-- api/web/component.vulcan --
+import "shop/lib/money"
+
+component Web {
+    entry for Customer
+
+    needs port Orders {
+        func Place(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/web/web.vulcan --
+package web
+
+import (
+	"context"
+	"fmt"
+)
+
+func startup(ctx context.Context) error {
+	r, err := Orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- lib/money/library.vulcan --
+// money holds amounts.
+library money {
+}
+-- lib/money/money.vulcan --
+package money
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+-- system.vulcan --
+// Shop is the online store.
+system Shop {
+    person Customer "Buys goods"
+
+    container Api {
+        Web, Orders, Billing
+
+        Web.Orders:      Orders.NewService
+        Orders.Checkout: Billing.NewPayer
+    }
+}

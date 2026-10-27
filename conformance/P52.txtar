@@ -1,6 +1,6 @@
 A port contract that names an identifier of its own leaf: K0120.
 -- want.txt --
-error api/orders/component.vulcan:6:28 K0120
+error api/orders/component.vulcan:6:22 K0120
 -- api/billing/billing.vulcan --
 package billing
 

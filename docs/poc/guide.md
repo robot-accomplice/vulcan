@@ -95,34 +95,40 @@ system Shop {
 ## 3. Contracts
 
 ```go
-func Withdraw(a *Account, amt int) (int, error)
-    requires a != nil && amt > 0
+type Account struct{ Balance int }
+    invariant Balance >= 0
+
+func (a *Account) Withdraw(amt int) (int, error)
+    requires amt > 0
     ensures  err == nil => result == old(a.Balance) - amt
     ensures  err != nil => a.Balance == old(a.Balance)
 {
     ...                 // plain Go
 }
-
-type Account struct{ Balance int }
-    invariant Balance >= 0
 ```
 
-- `requires` is checked at entry. `ensures` and the invariant are checked when the body returns,
-  after its deferred calls. `=>` means "implies".
+- `requires` is checked at entry. `ensures` and the invariant are checked at each `return`,
+  before the deferred calls run (so a deferred `Unlock` comes after the check). `=>` means
+  "implies".
 - `err` names the error result and `result` the first other one (`result.0`, `result.1` for
   several). Use `result` only after `err == nil =>`. A function with a contract cannot name a
   parameter or a result `err` or `result`. Named results can be used by name in `ensures`.
 - `old(x)` is the value of `x` at entry. Its type holds no reference: `old(len(xs))`, not
   `old(xs)`.
-- A contract is a side-effect-free Go expression: comparisons, arithmetic, `&&`, `||`, `!`, `=>`,
-  fields, `len`. No type assertions. Guard its own index and dereference on its left:
-  `len(xs) > 0 && xs[0] > 0`, `a != nil => a.Balance >= 0`.
+- A contract is a Go expression with no effects: comparisons, arithmetic, `&&`, `||`, `!`, `=>`,
+  fields, indexes, `len`, `cap`, and conversions. It calls no other function (K0503) and has no
+  type assertion. Guard its own index and dereference on its left: `len(xs) > 0 && xs[0] > 0`,
+  `a != nil => a.Balance >= 0`. Put a composite literal in parentheses, as in an `if`:
+  `ensures err == nil => result == (money.Receipt{Amount: amt})`.
+- A port contract names only its parameters, `err`, `result`, `old`, the standard library, and
+  libraries; never a name of its own leaf (K0120).
 - A failed contract panics with a report of the clause and its values. It undoes nothing: check
   before you commit (`defer tx.Rollback()`, checks, then `return tx.Commit()`).
   `config { on_contract_failure: exit }` makes a failure exit the process with code 3.
-- An invariant is checked after each method call on a pointer receiver, and on each struct
-  literal of the type, except a call through the method's own receiver (`a.Withdraw(x)` inside a
-  method of `a`), so a method can pass through a broken state. It must hold for the zero value.
+- An invariant is checked when each method call on a pointer receiver returns, and on each value
+  of the type that the code builds (a literal, also inside `[]T{{...}}`, and a conversion), except
+  a call through the method's own receiver (`a.Withdraw(x)` inside a method of `a`), so a method
+  can pass through a broken state. It must hold for the zero value.
 - Only the struct's own methods write its fields or take a field's address (`&e.Amount`);
   elsewhere, call a method or build a new literal.
 

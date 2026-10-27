@@ -103,5 +103,5 @@ system Shop {
     }
 }
 -- want.out --
-contract failure: Window invariant: Lo <= Hi
+contract failure: the value built at api/billing/billing.vulcan:19:7 invariant: Lo <= Hi
 Lo = 42

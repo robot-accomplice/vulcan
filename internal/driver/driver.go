@@ -17,6 +17,7 @@ import (
 	"github.com/robot-accomplice/vulcan/internal/diag"
 	"github.com/robot-accomplice/vulcan/internal/gen"
 	"github.com/robot-accomplice/vulcan/internal/link"
+	"github.com/robot-accomplice/vulcan/internal/lower"
 	"github.com/robot-accomplice/vulcan/internal/project"
 )
 
@@ -55,10 +56,32 @@ func Check(root string, tests bool) (*Result, error) {
 		r.Diags.Sort()
 		return r, nil
 	}
-	if err := gen.WriteLeaves(p, tests); err != nil {
+	// First pass: the code without its contracts, for the types that the lowering needs.
+	var c0 *check.Checker
+	if lower.Needed(p) {
+		if err := gen.WriteLeaves(p, tests, nil); err != nil {
+			return nil, err
+		}
+		if c0, err = check.Load(p, tests, false); err != nil {
+			return nil, err
+		}
+	}
+	in := &lower.Input{P: p, LineFile: func(rel string) string { return gen.LineFile(p, rel) }, Inv: lower.Invariants(p)}
+	lowered := map[*project.CodeFile][]byte{}
+	for _, pkg := range append(append([]*project.Package{}, p.Libs...), p.Leaves...) {
+		var typed *lower.Typed
+		if c0 != nil {
+			typed = c0.Typed(pkg)
+		}
+		for cf, text := range lower.Package(in, pkg, typed) {
+			lowered[cf] = text
+		}
+	}
+	// Second pass: the lowered code, which every rule reads.
+	if err := gen.WriteLeaves(p, tests, lowered); err != nil {
 		return nil, err
 	}
-	c, err := check.Load(p, tests)
+	c, err := check.Load(p, tests, true)
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +94,70 @@ func Check(root string, tests bool) (*Result, error) {
 		}
 		goBuild(p, r.Diags)
 	}
+	contractPositions(p, r.Diags)
 	r.Diags.Sort()
 	r.OK = !r.Diags.HasErrors()
 	return r, nil
+}
+
+var generatedName = regexp.MustCompile(`\bvulcan_(t|r)[0-9]+\b|\bvulcan_p_(\w+)\b|\bvulcan_old\w*\b`)
+
+// contractPositions maps a diagnostic inside a contract to the start of its clause, because the
+// lowered text of a clause has other columns than its source, and writes the generated names of
+// the message as source names (audit P2, M3).
+func contractPositions(p *project.Project, d *diag.List) {
+	starts := map[string]map[int][]int{} // file -> line -> clause columns
+	add := func(pos diag.Pos) {
+		if starts[pos.File] == nil {
+			starts[pos.File] = map[int][]int{}
+		}
+		starts[pos.File][pos.Line] = append(starts[pos.File][pos.Line], pos.Col)
+	}
+	for _, pkg := range append(append([]*project.Package{}, p.Leaves...), p.Libs...) {
+		for _, f := range pkg.Files {
+			for _, fn := range f.Blank.Funcs {
+				for _, c := range fn.Clauses {
+					add(f.Pos(c.Off))
+				}
+			}
+			for _, t := range f.Blank.Types {
+				for _, c := range t.Clauses {
+					add(f.Pos(c.Off))
+				}
+			}
+		}
+		if pkg.Comp != nil {
+			for _, port := range pkg.Comp.Ports {
+				for _, m := range port.Methods {
+					for _, c := range m.Contracts {
+						add(pkg.CompSrc.Pos(c.Off))
+					}
+				}
+			}
+		}
+	}
+	for i := range d.Items {
+		x := &d.Items[i]
+		best := 0
+		for _, col := range starts[x.Pos.File][x.Pos.Line] {
+			if col <= x.Pos.Col && col > best {
+				best = col
+			}
+		}
+		if best == 0 {
+			continue
+		}
+		x.Pos.Col = best
+		x.Message = generatedName.ReplaceAllStringFunc(x.Message, func(m string) string {
+			switch {
+			case strings.HasPrefix(m, "vulcan_p_"):
+				return strings.TrimPrefix(m, "vulcan_p_")
+			case strings.HasPrefix(m, "vulcan_old"):
+				return "old(...)"
+			}
+			return "the result"
+		})
+	}
 }
 
 // stops reports whether a syntax or package-clause error makes the Go stages useless.

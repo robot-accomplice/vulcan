@@ -5,7 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"path"
+	"go/types"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,9 +24,17 @@ type Input struct {
 	P *project.Project
 	// LineFile gives the file name of //line directives for a source file.
 	LineFile func(rel string) string
-	// Inv lists the struct types with an invariant, by import path, for literal checks in
-	// other packages.
+	// Inv lists the struct types with an invariant, by import path.
 	Inv map[string]map[string]bool
+}
+
+// Typed is the type-checked code of a package before lowering: each code file's syntax, with
+// positions in the file set; Base is the length of the //line header of each generated file.
+type Typed struct {
+	Fset  *token.FileSet
+	Info  *types.Info
+	Files map[*project.CodeFile]*ast.File
+	Base  map[*project.CodeFile]int
 }
 
 // Invariants collects the struct types with an invariant in every package.
@@ -54,15 +62,18 @@ type invType struct {
 	methods map[string]bool // pointer-receiver methods with a named receiver: they get a twin
 }
 
+// edit replaces src[off:end] with text. At one offset, edits apply in order of prio, then of
+// creation: an outer opening (-1) before an inner one (0), an inner closing (0) before an outer
+// one (1). twin, when set, is the text in a method's unchecked twin.
 type edit struct {
 	off, end int
 	text     string
+	twin     *string
+	prio     int
 }
 
 type twin struct {
-	fd        *ast.FuncDecl
-	closeEdit int    // index of the edit that closes the body
-	closeText string // the same text without the invariant check
+	fd *ast.FuncDecl
 }
 
 type file struct {
@@ -70,7 +81,9 @@ type file struct {
 	pkg     *project.Package
 	cf      *project.CodeFile
 	af      *ast.File
-	tf      *token.File
+	fset    *token.FileSet
+	info    *types.Info // nil when the package did not type-check
+	base    int
 	src     []byte
 	lines   *lex.Lines
 	lf      string
@@ -82,29 +95,37 @@ type file struct {
 	oldNext *int
 }
 
-// Package lowers the contracts of one package. It returns the Go text of each code file, and
-// reports contract diagnostics.
-func Package(in *Input, pkg *project.Package) map[*project.CodeFile][]byte {
+// Package lowers the contracts of one package. typed may be nil, or miss a file: such a file is
+// parsed again and lowered without type information. It returns the Go text of each code file.
+func Package(in *Input, pkg *project.Package, typed *Typed) map[*project.CodeFile][]byte {
 	out := map[*project.CodeFile][]byte{}
 	type parsed struct {
-		cf *project.CodeFile
-		af *ast.File
-		tf *token.File
+		cf   *project.CodeFile
+		af   *ast.File
+		fset *token.FileSet
+		info *types.Info
+		base int
 	}
 	var files []parsed
 	invs := map[string]*invType{}
 	for _, cf := range pkg.Files {
-		fset := token.NewFileSet()
-		af, err := parser.ParseFile(fset, cf.Rel, cf.Blank.Go, parser.SkipObjectResolution)
-		if err != nil || af == nil {
-			out[cf] = cf.Blank.Go // the go command reports the syntax error
-			continue
+		pf := parsed{cf: cf}
+		if typed != nil && typed.Files[cf] != nil {
+			pf.af, pf.fset, pf.info, pf.base = typed.Files[cf], typed.Fset, typed.Info, typed.Base[cf]
+		} else {
+			fset := token.NewFileSet()
+			af, err := parser.ParseFile(fset, cf.Rel, cf.Blank.Go, parser.SkipObjectResolution)
+			if err != nil || af == nil {
+				out[cf] = cf.Blank.Go // the go command reports the syntax error
+				continue
+			}
+			pf.af, pf.fset = af, fset
 		}
-		reservedNames(in.P, cf, af, fset)
-		files = append(files, parsed{cf, af, fset.File(af.Pos())})
+		reservedNames(in.P, cf, pf.af, pf.fset, pf.base)
+		files = append(files, pf)
 		for _, t := range cf.Blank.Types {
 			it := &invType{name: t.Name, file: cf, clauses: t.Clauses, fields: map[string]bool{}, methods: map[string]bool{}}
-			for _, d := range af.Decls {
+			for _, d := range pf.af.Decls {
 				gd, ok := d.(*ast.GenDecl)
 				if !ok || gd.Tok != token.TYPE {
 					continue
@@ -137,7 +158,6 @@ func Package(in *Input, pkg *project.Package) map[*project.CodeFile][]byte {
 			invs[t.Name] = it
 		}
 	}
-	// Methods of invariant types, from every file of the package.
 	for _, f := range files {
 		for _, d := range f.af.Decls {
 			fd, ok := d.(*ast.FuncDecl)
@@ -152,8 +172,8 @@ func Package(in *Input, pkg *project.Package) map[*project.CodeFile][]byte {
 	}
 	oldNext := 0
 	for _, f := range files {
-		lw := &file{in: in, pkg: pkg, cf: f.cf, af: f.af, tf: f.tf, src: f.cf.Blank.Go, lines: lex.NewLines(f.cf.Blank.Go),
-			lf: in.LineFile(f.cf.Rel), invs: invs, oldNext: &oldNext}
+		lw := &file{in: in, pkg: pkg, cf: f.cf, af: f.af, fset: f.fset, info: f.info, base: f.base, src: f.cf.Blank.Go,
+			lines: lex.NewLines(f.cf.Blank.Go), lf: in.LineFile(f.cf.Rel), invs: invs, oldNext: &oldNext}
 		out[f.cf] = lw.lower()
 	}
 	return out
@@ -196,11 +216,10 @@ func recvType(e ast.Expr) (string, bool) {
 
 // reservedNames applies Appendix B.1: a declared name cannot start with vulcan_ (K0005). It runs
 // on the code as written, so generated names do not count.
-func reservedNames(p *project.Project, cf *project.CodeFile, af *ast.File, fset *token.FileSet) {
+func reservedNames(p *project.Project, cf *project.CodeFile, af *ast.File, fset *token.FileSet, base int) {
 	check := func(id *ast.Ident) {
 		if id != nil && (strings.HasPrefix(id.Name, "vulcan_") || strings.HasPrefix(id.Name, "Vulcan_")) {
-			pos := fset.Position(id.Pos())
-			p.Diags.Errorf(diag.Pos{File: cf.Rel, Line: pos.Line, Col: pos.Column}, "K0005", "the name %s starts with %s, which is reserved for generated code", id.Name, id.Name[:7])
+			p.Diags.Errorf(cf.Pos(fset.PositionFor(id.Pos(), false).Offset-base), "K0005", "the name %s starts with %s, which is reserved for generated code", id.Name, id.Name[:7])
 		}
 	}
 	fields := func(fl *ast.FieldList) {
@@ -255,7 +274,7 @@ func reservedNames(p *project.Project, cf *project.CodeFile, af *ast.File, fset 
 	})
 }
 
-func (lw *file) off(p token.Pos) int { return lw.tf.Offset(p) }
+func (lw *file) off(p token.Pos) int { return lw.fset.PositionFor(p, false).Offset - lw.base }
 
 // dir is a directive that gives the next character the position of offset off of this file.
 func (lw *file) dir(off int) string {
@@ -269,8 +288,8 @@ func (lw *file) clauseDir(c blank.Clause) string {
 	return fmt.Sprintf("/*line %s:%d:%d*/", lw.lf, p.Line, p.Col)
 }
 
-func (lw *file) add(off, end int, text string) int {
-	lw.edits = append(lw.edits, edit{off: off, end: end, text: text})
+func (lw *file) add(off, end int, text string, prio int) int {
+	lw.edits = append(lw.edits, edit{off: off, end: end, text: text, prio: prio})
 	return len(lw.edits) - 1
 }
 
@@ -312,20 +331,23 @@ func (lw *file) lower() []byte {
 			lw.invariantMethods(it)
 		}
 	}
+	if len(lw.edits) == 0 && len(lw.extra) == 0 && len(lw.twins) == 0 {
+		return lw.src // nothing to lower: the file stays as it is
+	}
 	if lw.usesRT {
-		lw.add(lw.off(lw.af.Name.End()), lw.off(lw.af.Name.End()), "; import vulcan_rt "+strconv.Quote(RT))
+		e := lw.off(lw.af.Name.End())
+		lw.add(e, e, "; import vulcan_rt "+strconv.Quote(RT), -1)
 	}
 	var b strings.Builder
-	b.WriteString(apply(lw.src, lw.edits, 0, len(lw.src)))
+	b.WriteString(apply(lw.src, lw.edits, 0, len(lw.src), false))
 	for _, tw := range lw.twins {
 		edits := append([]edit{}, lw.edits...)
-		edits[tw.closeEdit].text = tw.closeText
 		name := tw.fd.Name
 		edits = append(edits, edit{off: lw.off(name.Pos()), end: lw.off(name.End()),
 			text: lw.dir(lw.off(name.Pos())) + "vulcan_" + name.Name + lw.dir(lw.off(name.End()))})
 		start := lw.off(tw.fd.Pos())
 		l, c := lw.lines.Pos(start)
-		fmt.Fprintf(&b, "\n\n//line %s:%d:1\n%s%s", lw.lf, l, strings.Repeat(" ", c-1), apply(lw.src, edits, start, lw.off(tw.fd.End())))
+		fmt.Fprintf(&b, "\n\n//line %s:%d:1\n%s%s", lw.lf, l, strings.Repeat(" ", c-1), apply(lw.src, edits, start, lw.off(tw.fd.End()), true))
 	}
 	for _, x := range lw.extra {
 		b.WriteString("\n\n")
@@ -335,15 +357,21 @@ func (lw *file) lower() []byte {
 	return []byte(b.String())
 }
 
-// apply applies the edits inside [from, to) to src[from:to]. Edits at one offset keep their order.
-func apply(src []byte, edits []edit, from, to int) string {
+// apply applies the edits inside [from, to) to src[from:to]; for a twin, it uses each edit's
+// twin text where one is set.
+func apply(src []byte, edits []edit, from, to int, forTwin bool) string {
 	var in []edit
 	for _, e := range edits {
 		if e.off >= from && e.end <= to {
 			in = append(in, e)
 		}
 	}
-	sort.SliceStable(in, func(i, j int) bool { return in[i].off < in[j].off })
+	sort.SliceStable(in, func(i, j int) bool {
+		if in[i].off != in[j].off {
+			return in[i].off < in[j].off
+		}
+		return in[i].prio < in[j].prio
+	})
 	var b strings.Builder
 	at := from
 	for _, e := range in {
@@ -351,7 +379,11 @@ func apply(src []byte, edits []edit, from, to int) string {
 			continue // overlapping: keep the first
 		}
 		b.Write(src[at:e.off])
-		b.WriteString(e.text)
+		if forTwin && e.twin != nil {
+			b.WriteString(*e.twin)
+		} else {
+			b.WriteString(e.text)
+		}
 		at = e.end
 	}
 	b.Write(src[at:to])
@@ -363,7 +395,16 @@ type result struct {
 	typ  string
 }
 
-// function lowers one function or method (Appendix F, with the check after the body).
+// contract is one parsed clause, with old() replaced by entry variables.
+type contract struct {
+	c     blank.Clause
+	e     ast.Expr
+	ensur bool
+}
+
+// function lowers one function or method (Appendix F): requires and old() at entry, ensures and
+// the invariant at each return, before the deferred calls run, and at a reachable end of a body
+// that has no results.
 func (lw *file) function(fd *ast.FuncDecl, clauses []blank.Clause, it *invType) {
 	p := lw.in.P
 	recvName, recvTypeName := "", ""
@@ -390,7 +431,9 @@ func (lw *file) function(fd *ast.FuncDecl, clauses []blank.Clause, it *invType) 
 	}
 	for _, f := range fd.Type.Params.List {
 		for _, n := range f.Names {
-			params[n.Name] = true
+			if n.Name != "_" {
+				params[n.Name] = true
+			}
 			reserved(n)
 		}
 	}
@@ -417,15 +460,17 @@ func (lw *file) function(fd *ast.FuncDecl, clauses []blank.Clause, it *invType) 
 			nonErr = append(nonErr, i)
 		}
 	}
-	rv := func(i int) string { return "vulcan_r" + strconv.Itoa(i) }
 	named := map[string]int{}
 	for i, r := range results {
 		if r.name != "" && r.name != "_" {
 			named[r.name] = i
 		}
 	}
-	var open, closeChecks strings.Builder
-	var olds []string
+	// Parse each clause, and replace old(x) with a variable set at entry. Parameters that an
+	// ensures reads are saved at entry, so that a local name in the body cannot hide them.
+	var open strings.Builder
+	var contracts []contract
+	saved := map[string]bool{}
 	for _, c := range clauses {
 		e, err := ParseContract(c.Text)
 		if err != nil {
@@ -434,6 +479,32 @@ func (lw *file) function(fd *ast.FuncDecl, clauses []blank.Clause, it *invType) 
 		}
 		ensures := c.Word == "ensures"
 		lw.checkNames(e, c, ensures, errIdx, len(nonErr))
+		if ensures {
+			e = Rewrite(e, func(n ast.Expr) ast.Expr {
+				if v, ok := n.(*ast.CallExpr); ok {
+					if id, ok := v.Fun.(*ast.Ident); ok && id.Name == "old" && len(v.Args) == 1 {
+						name := fmt.Sprintf("vulcan_old%d", *lw.oldNext)
+						*lw.oldNext++
+						fmt.Fprintf(&open, "%s := %s%s; _ = %s; ", name, lw.clauseDir(c), GoText(v.Args[0]), name)
+						if lw.pkg.Olds == nil {
+							lw.pkg.Olds = map[string]diag.Pos{}
+						}
+						lw.pkg.Olds[name] = lw.cf.Pos(c.Off)
+						return &ast.CallExpr{Fun: ast.NewIdent("vulcan_oldvalue"), Args: []ast.Expr{ast.NewIdent(name), v.Args[0]}}
+					}
+				}
+				return nil
+			})
+			Idents(e, func(id *ast.Ident) {
+				if params[id.Name] {
+					saved[id.Name] = true
+				}
+			})
+		}
+		contracts = append(contracts, contract{c: c, e: e, ensur: ensures})
+	}
+	// check writes one clause's check, with resVar naming each result at this point.
+	check := func(ct contract, resVar func(int) string) string {
 		var shows []string
 		seen := map[string]bool{}
 		show := func(label, expr string) {
@@ -442,104 +513,168 @@ func (lw *file) function(fd *ast.FuncDecl, clauses []blank.Clause, it *invType) 
 				shows = append(shows, fmt.Sprintf("vulcan_rt.Show(%q, %s)", label, expr))
 			}
 		}
-		x := Rewrite(e, func(n ast.Expr) ast.Expr {
+		x := Rewrite(ct.e, func(n ast.Expr) ast.Expr {
 			switch v := n.(type) {
+			case *ast.CallExpr:
+				if id, ok := v.Fun.(*ast.Ident); ok && id.Name == "vulcan_oldvalue" {
+					name := v.Args[0].(*ast.Ident).Name
+					show("old("+GoText(v.Args[1])+")", name)
+					return ast.NewIdent(name)
+				}
 			case *ast.Ident:
 				switch {
 				case params[v.Name]:
+					if ct.ensur {
+						show(v.Name, "vulcan_p_"+v.Name)
+						return ast.NewIdent("vulcan_p_" + v.Name)
+					}
 					show(v.Name, v.Name)
-				case v.Name == "err" && errIdx >= 0 && ensures:
-					show("err", rv(errIdx))
-					return ast.NewIdent(rv(errIdx))
-				case v.Name == "result" && len(nonErr) > 0 && ensures:
-					show("result", rv(nonErr[0]))
-					return ast.NewIdent(rv(nonErr[0]))
-				case strings.HasPrefix(v.Name, "vulcan_result_") && ensures:
+				case !ct.ensur:
+				case v.Name == "err" && errIdx >= 0:
+					show("err", resVar(errIdx))
+					return ast.NewIdent(resVar(errIdx))
+				case v.Name == "result" && len(nonErr) > 0:
+					show("result", resVar(nonErr[0]))
+					return ast.NewIdent(resVar(nonErr[0]))
+				case strings.HasPrefix(v.Name, "vulcan_result_"):
 					k, _ := strconv.Atoi(strings.TrimPrefix(v.Name, "vulcan_result_"))
 					if k < len(nonErr) {
-						show("result."+strconv.Itoa(k), rv(nonErr[k]))
-						return ast.NewIdent(rv(nonErr[k]))
+						show("result."+strconv.Itoa(k), resVar(nonErr[k]))
+						return ast.NewIdent(resVar(nonErr[k]))
 					}
 				default:
-					if i, ok := named[v.Name]; ok && ensures {
-						show(v.Name, rv(i))
-						return ast.NewIdent(rv(i))
+					if i, ok := named[v.Name]; ok {
+						show(v.Name, resVar(i))
+						return ast.NewIdent(resVar(i))
 					}
-				}
-			case *ast.CallExpr:
-				if id, ok := v.Fun.(*ast.Ident); ok && id.Name == "old" && len(v.Args) == 1 && ensures {
-					name := fmt.Sprintf("vulcan_old%d", *lw.oldNext)
-					*lw.oldNext++
-					olds = append(olds, fmt.Sprintf("%s%s := %s; ", lw.clauseDir(c), name, GoText(v.Args[0])))
-					if lw.pkg.Olds == nil {
-						lw.pkg.Olds = map[string]diag.Pos{}
-					}
-					lw.pkg.Olds[name] = lw.cf.Pos(c.Off)
-					show("old("+GoText(v.Args[0])+")", name)
-					return ast.NewIdent(name)
 				}
 			}
 			return nil
 		})
-		goText := GoText(x)
-		args := fmt.Sprintf("%q, %q, %q, %q", c.Word, c.Text, lw.cf.Pos(c.Off).String(), caller)
+		args := fmt.Sprintf("%q, %q, %q, %q", ct.c.Word, ct.c.Text, lw.cf.Pos(ct.c.Off).String(), caller)
 		if len(shows) > 0 {
 			args += ", " + strings.Join(shows, ", ")
 		}
-		check := fmt.Sprintf("if !(%s%s) { vulcan_rt.Fail(%s) }; ", lw.clauseDir(c), goText, args)
 		lw.usesRT = true
-		if ensures {
-			closeChecks.WriteString(check)
-		} else {
-			open.WriteString(check)
+		return fmt.Sprintf("if !(%s%s) { vulcan_rt.Fail(%s) }; ", lw.clauseDir(ct.c), GoText(x), args)
+	}
+	// Entry: requires, saved parameters, old().
+	var entry strings.Builder
+	for _, ct := range contracts {
+		if !ct.ensur {
+			entry.WriteString(check(ct, nil))
 		}
 	}
-	for _, o := range olds {
-		open.WriteString(o)
+	var savedNames []string
+	for n := range saved {
+		savedNames = append(savedNames, n)
 	}
-	var vars []string
-	for i := range results {
-		vars = append(vars, rv(i))
+	sort.Strings(savedNames)
+	for _, n := range savedNames {
+		fmt.Fprintf(&entry, "vulcan_p_%s := %s; _ = vulcan_p_%s; ", n, n, n)
 	}
-	lbrace, rbrace := lw.off(fd.Body.Lbrace), lw.off(fd.Body.Rbrace)
-	resText := ""
-	if fd.Type.Results != nil {
-		resText = string(lw.src[lw.off(fd.Type.Results.Pos()):lw.off(fd.Type.Results.End())])
+	entry.WriteString(open.String())
+	lbrace := lw.off(fd.Body.Lbrace)
+	if entry.Len() > 0 {
+		lw.add(lbrace+1, lbrace+1, " "+entry.String()+lw.dir(lbrace+1), -1)
 	}
-	if len(vars) > 0 {
-		fmt.Fprintf(&open, "%s := func() %s {", strings.Join(vars, ", "), resText)
-	} else {
-		open.WriteString("func() {")
-	}
-	open.WriteString(lw.dir(lbrace + 1))
-	lw.add(lbrace+1, lbrace+1, " "+open.String())
-	ret := "return; "
-	if len(vars) > 0 {
-		ret = "return " + strings.Join(vars, ", ") + "; "
-	}
-	tail := lw.dir(rbrace)
-	withoutInv := "}(); " + closeChecks.String() + ret + tail
-	withInv := withoutInv
+	inv := ""
 	if it != nil {
-		withInv = "}(); " + closeChecks.String() + recvName + ".Vulcan_invariant(); " + ret + tail
+		inv = fmt.Sprintf("%s.Vulcan_invariant(%q); ", recvName, caller)
 		lw.receiverCalls(fd, recvName, it)
+		lw.twins = append(lw.twins, twin{fd: fd})
 	}
-	idx := lw.add(rbrace, rbrace, withInv)
-	if it != nil {
-		lw.twins = append(lw.twins, twin{fd: fd, closeEdit: idx, closeText: withoutInv})
+	ensures := func(resVar func(int) string) string {
+		var b strings.Builder
+		for _, ct := range contracts {
+			if ct.ensur {
+				b.WriteString(check(ct, resVar))
+			}
+		}
+		return b.String()
+	}
+	addPair := func(off, end int, with, without string, prio int) {
+		i := lw.add(off, end, with, prio)
+		if with != without {
+			w := without
+			lw.edits[i].twin = &w
+		}
+	}
+	// Each return, outside the function literals of the body.
+	var hasEnsures bool
+	for _, ct := range contracts {
+		hasEnsures = hasEnsures || ct.ensur
+	}
+	if !hasEnsures && it == nil {
+		return
+	}
+	ast.Inspect(fd.Body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.ReturnStmt:
+			kw := lw.off(x.Return)
+			end := lw.off(x.End())
+			if len(x.Results) == 0 {
+				// A bare return: the results are the named results, by name.
+				byName := func(i int) string { return results[i].name }
+				checks := ensures(byName)
+				addPair(kw, kw+len("return"), "{ "+checks+inv+"return }"+lw.dir(kw+len("return")), "{ "+checks+"return }"+lw.dir(kw+len("return")), -1)
+				return false
+			}
+			var tvars, decls []string
+			for i, r := range results {
+				t := fmt.Sprintf("vulcan_t%d", i)
+				tvars = append(tvars, t)
+				decls = append(decls, fmt.Sprintf("var %s %s; ", t, r.typ))
+			}
+			byTemp := func(i int) string { return tvars[i] }
+			checks := ensures(byTemp)
+			openText := "{ " + strings.Join(decls, "") + strings.Join(tvars, ", ") + " = " + lw.dir(kw+len("return"))
+			lw.add(kw, kw+len("return"), openText, -1)
+			ret := "return " + strings.Join(tvars, ", ") + " }"
+			addPair(end, end, "; "+checks+inv+ret+lw.dir(end), "; "+checks+ret+lw.dir(end), 1)
+			return true
+		}
+		return true
+	})
+	if len(results) == 0 {
+		// The end of the body can be reached.
+		rbrace := lw.off(fd.Body.Rbrace)
+		checks := ensures(func(int) string { return "" })
+		if checks != "" || inv != "" {
+			addPair(rbrace, rbrace, "; "+checks+inv+lw.dir(rbrace), "; "+checks+lw.dir(rbrace), 1)
+		}
 	}
 }
 
-// receiverCalls makes a call through the method's own receiver call the twin without the
-// invariant check (§7.2, "outer calls only"), unless the method assigns the receiver.
+// receiverCalls makes a call through the method's own receiver variable call the twin without
+// the invariant check (§7.2, "outer calls only"), unless the method assigns the receiver. The
+// receiver is found by its object, so a local variable of the same name does not count.
 func (lw *file) receiverCalls(fd *ast.FuncDecl, recv string, it *invType) {
+	if lw.info == nil {
+		return // without types, every call is checked
+	}
+	recvObj := lw.info.Defs[fd.Recv.List[0].Names[0]]
+	if recvObj == nil {
+		return
+	}
 	assigned := false
 	ast.Inspect(fd.Body, func(n ast.Node) bool {
-		if a, ok := n.(*ast.AssignStmt); ok {
-			for _, l := range a.Lhs {
-				if id, ok := l.(*ast.Ident); ok && id.Name == recv {
-					assigned = true
-				}
+		var lhs []ast.Expr
+		switch a := n.(type) {
+		case *ast.AssignStmt:
+			lhs = a.Lhs
+		case *ast.RangeStmt:
+			lhs = []ast.Expr{a.Key, a.Value}
+		case *ast.UnaryExpr:
+			if a.Op == token.AND {
+				lhs = []ast.Expr{a.X}
+			}
+		}
+		for _, l := range lhs {
+			if id, ok := l.(*ast.Ident); ok && lw.info.Uses[id] == recvObj {
+				assigned = true
 			}
 		}
 		return true
@@ -559,9 +694,9 @@ func (lw *file) receiverCalls(fd *ast.FuncDecl, recv string, it *invType) {
 		if !ok {
 			return true
 		}
-		if id, ok := sel.X.(*ast.Ident); ok && id.Name == recv && it.methods[sel.Sel.Name] {
+		if id, ok := sel.X.(*ast.Ident); ok && lw.info.Uses[id] == recvObj && it.methods[sel.Sel.Name] {
 			s, e := lw.off(sel.Sel.Pos()), lw.off(sel.Sel.End())
-			lw.add(s, e, lw.dir(s)+"vulcan_"+sel.Sel.Name+lw.dir(e))
+			lw.add(s, e, lw.dir(s)+"vulcan_"+sel.Sel.Name+lw.dir(e), 0)
 		}
 		return true
 	})
@@ -591,45 +726,53 @@ func (lw *file) checkNames(e ast.Expr, c blank.Clause, ensures bool, errIdx, non
 				walk(x.Y, errNil || hasErrNil(x.X))
 				return
 			}
-			walk(x.X, errNil)
-			walk(x.Y, errNil)
-		case *ast.ParenExpr:
-			walk(x.X, errNil)
-		case *ast.UnaryExpr:
-			walk(x.X, errNil)
-		case *ast.CallExpr:
-			for _, a := range x.Args {
-				walk(a, errNil)
-			}
 		case *ast.SelectorExpr:
 			walk(x.X, errNil)
-		case *ast.IndexExpr:
-			walk(x.X, errNil)
-			walk(x.Index, errNil)
+			return
+		case *ast.KeyValueExpr:
+			walk(x.Value, errNil)
+			return
 		case *ast.Ident:
-			isResult := x.Name == "result" || strings.HasPrefix(x.Name, "vulcan_result_")
-			switch {
-			case (isResult || x.Name == "err") && !ensures:
-				p.Diags.Errorf(pos, "K0510", "%s names a result, which requires cannot see; requires is checked at entry", displayName(x.Name))
-			case isResult && nonErr == 0:
-				p.Diags.Errorf(pos, "K0510", "%s names a result, but the function has no result other than error", displayName(x.Name))
-			case x.Name == "result" && nonErr > 1:
-				p.Diags.Errorf(pos, "K0510", "the function has %d results other than error; write result.0 to result.%d, not result", nonErr, nonErr-1)
-			case strings.HasPrefix(x.Name, "vulcan_result_"):
-				k, _ := strconv.Atoi(strings.TrimPrefix(x.Name, "vulcan_result_"))
-				if k >= nonErr {
-					p.Diags.Errorf(pos, "K0510", "%s is out of range: the function has %d results other than error", displayName(x.Name), nonErr)
-				} else if errIdx >= 0 && !errNil {
-					p.Diags.Errorf(pos, "K0502", "%s is used without an err == nil guard; write err == nil => ...", displayName(x.Name))
-				}
-			case isResult && errIdx >= 0 && !errNil:
-				p.Diags.Errorf(pos, "K0502", "result is used without an err == nil guard; write err == nil => ...")
-			case x.Name == "err" && errIdx < 0:
-				p.Diags.Errorf(pos, "K0510", "err names the last result when its type is error; this function has no error result")
-			}
+			lw.checkIdent(x, pos, ensures, errIdx, nonErr, errNil)
+			return
 		}
+		// Every other expression: walk its direct sub-expressions.
+		ast.Inspect(e, func(n ast.Node) bool {
+			if n == nil || n == ast.Node(e) {
+				return true
+			}
+			if x, ok := n.(ast.Expr); ok {
+				walk(x, errNil)
+				return false
+			}
+			return true
+		})
 	}
 	walk(e, false)
+}
+
+func (lw *file) checkIdent(x *ast.Ident, pos diag.Pos, ensures bool, errIdx, nonErr int, errNil bool) {
+	p := lw.in.P
+	isResult := x.Name == "result" || strings.HasPrefix(x.Name, "vulcan_result_")
+	switch {
+	case (isResult || x.Name == "err") && !ensures:
+		p.Diags.Errorf(pos, "K0510", "%s names a result, which requires cannot see; requires is checked at entry", displayName(x.Name))
+	case isResult && nonErr == 0:
+		p.Diags.Errorf(pos, "K0510", "%s names a result, but the function has no result other than error", displayName(x.Name))
+	case x.Name == "result" && nonErr > 1:
+		p.Diags.Errorf(pos, "K0510", "the function has %d results other than error; write result.0 to result.%d, not result", nonErr, nonErr-1)
+	case strings.HasPrefix(x.Name, "vulcan_result_"):
+		k, _ := strconv.Atoi(strings.TrimPrefix(x.Name, "vulcan_result_"))
+		if k >= nonErr {
+			p.Diags.Errorf(pos, "K0510", "%s is out of range: the function has %d results other than error", displayName(x.Name), nonErr)
+		} else if errIdx >= 0 && !errNil {
+			p.Diags.Errorf(pos, "K0502", "%s is used without an err == nil guard; write err == nil => ...", displayName(x.Name))
+		}
+	case isResult && errIdx >= 0 && !errNil:
+		p.Diags.Errorf(pos, "K0502", "result is used without an err == nil guard; write err == nil => ...")
+	case x.Name == "err" && errIdx < 0 && ensures:
+		p.Diags.Errorf(pos, "K0510", "err names the last result when its type is error; this function has no error result")
+	}
 }
 
 func displayName(n string) string {
@@ -657,57 +800,83 @@ func hasErrNil(e ast.Expr) bool {
 	return false
 }
 
-// literals checks each struct literal of a type with an invariant where it is built (§7.2).
-func (lw *file) literals() {
-	names := map[string]string{} // package name in this file -> import path
+// invariantOf returns the qualifier and the name of the invariant type t, or ok false.
+func (lw *file) invariantOf(t types.Type) (qual, name string, ok bool) {
+	n, isNamed := types.Unalias(t).(*types.Named)
+	if !isNamed || n.Obj().Pkg() == nil || n.TypeArgs() != nil {
+		return "", "", false
+	}
+	path := n.Obj().Pkg().Path()
+	if !lw.in.Inv[path][n.Obj().Name()] {
+		return "", "", false
+	}
+	if path == lw.pkg.ImportPath {
+		return "", n.Obj().Name(), true
+	}
 	for _, imp := range lw.af.Imports {
-		ip, _ := strconv.Unquote(imp.Path.Value)
-		name := path.Base(ip)
-		if pkg := lw.in.P.ByPath[ip]; pkg != nil {
-			name = pkg.GoName
-		}
-		if imp.Name != nil {
-			name = imp.Name.Name
-		}
-		names[name] = ip
-	}
-	checker := func(t ast.Expr) (string, bool) {
-		switch x := t.(type) {
-		case *ast.Ident:
-			if it := lw.invs[x.Name]; it != nil && !it.generic {
-				return "Vulcan_check" + x.Name, true
+		if ip, _ := strconv.Unquote(imp.Path.Value); ip == path {
+			q := n.Obj().Pkg().Name()
+			if imp.Name != nil {
+				q = imp.Name.Name
 			}
-		case *ast.SelectorExpr:
-			if pk, ok := x.X.(*ast.Ident); ok {
-				if ip, ok := names[pk.Name]; ok && lw.in.Inv[ip][x.Sel.Name] && ip != lw.pkg.ImportPath {
-					return pk.Name + ".Vulcan_check" + x.Sel.Name, true
-				}
+			if q == "_" || q == "." {
+				return "", "", false
 			}
+			return q + ".", n.Obj().Name(), true
 		}
-		return "", false
 	}
-	done := map[*ast.CompositeLit]bool{}
-	wrap := func(n ast.Node, fn string) {
+	return "", "", false // the file does not import the package: nothing to name it with
+}
+
+// literals checks each value of a type with an invariant where the code builds it: a struct
+// literal, also with its type elided, and a conversion (§7.2). It needs the types.
+func (lw *file) literals() {
+	if lw.info == nil {
+		return
+	}
+	done := map[ast.Node]bool{}
+	wrap := func(n ast.Node, before, after string) {
 		s, e := lw.off(n.Pos()), lw.off(n.End())
-		lw.add(s, s, fn+"("+lw.dir(s))
-		lw.add(e, e, ")"+lw.dir(e))
+		lw.add(s, s, before+lw.dir(s), 0)
+		lw.add(e, e, after+lw.dir(e), 0)
 	}
+	at := func(n ast.Node) string { return strconv.Quote(lw.cf.Pos(lw.off(n.Pos())).String()) }
 	ast.Inspect(lw.af, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.UnaryExpr:
-			if lit, ok := x.X.(*ast.CompositeLit); ok && x.Op == token.AND {
-				if fn, ok := checker(lit.Type); ok {
+			if lit, ok := x.X.(*ast.CompositeLit); ok && x.Op == token.AND && lit.Type != nil {
+				if q, name, ok := lw.invariantOf(lw.info.TypeOf(lit)); ok {
 					done[lit] = true
-					i := strings.LastIndex(fn, "Vulcan_check")
-					wrap(x, fn[:i]+"Vulcan_checkPtr"+fn[i+len("Vulcan_check"):])
+					wrap(x, q+"Vulcan_checkPtr"+name+"(", ", "+at(x)+")")
 				}
 			}
 		case *ast.CompositeLit:
 			if done[x] {
 				return true
 			}
-			if fn, ok := checker(x.Type); ok {
-				wrap(x, fn)
+			t := lw.info.TypeOf(x)
+			if t == nil {
+				return true
+			}
+			if p, isPtr := t.(*types.Pointer); isPtr && x.Type == nil {
+				// An elided &T{...} in a slice or map literal of *T.
+				if q, name, ok := lw.invariantOf(p.Elem()); ok {
+					wrap(x, q+"Vulcan_checkPtr"+name+"(&"+q+name, ", "+at(x)+")")
+				}
+				return true
+			}
+			if q, name, ok := lw.invariantOf(t); ok {
+				if x.Type == nil {
+					wrap(x, q+"Vulcan_check"+name+"("+q+name, ", "+at(x)+")")
+				} else {
+					wrap(x, q+"Vulcan_check"+name+"(", ", "+at(x)+")")
+				}
+			}
+		case *ast.CallExpr:
+			if tv, ok := lw.info.Types[x.Fun]; ok && tv.IsType() && len(x.Args) == 1 {
+				if q, name, ok := lw.invariantOf(tv.Type); ok {
+					wrap(x, q+"Vulcan_check"+name+"(", ", "+at(x)+")")
+				}
 			}
 		}
 		return true
@@ -715,12 +884,13 @@ func (lw *file) literals() {
 }
 
 // invariantMethods writes Vulcan_invariant, Vulcan_checkT, and Vulcan_checkPtrT (Appendix F).
+// The argument of each names the call or the position that the check follows.
 func (lw *file) invariantMethods(it *invType) {
 	lw.usesRT = true
 	var b strings.Builder
 	first := it.clauses[0]
 	fp := lw.cf.Pos(first.WordOff)
-	fmt.Fprintf(&b, "//line %s:%d:1\nfunc (vulcan_v *%s) Vulcan_invariant() { if vulcan_v == nil { return }; ", lw.lf, fp.Line, it.name)
+	fmt.Fprintf(&b, "//line %s:%d:1\nfunc (vulcan_v *%s) Vulcan_invariant(vulcan_at string) { if vulcan_v == nil { return }; ", lw.lf, fp.Line, it.name)
 	for _, c := range it.clauses {
 		e, err := ParseContract(c.Text)
 		if err != nil {
@@ -739,14 +909,27 @@ func (lw *file) invariantMethods(it *invType) {
 			}
 			return nil
 		})
-		args := fmt.Sprintf("%q, %q, %q, %q", "invariant", c.Text, lw.cf.Pos(c.Off).String(), it.name)
+		args := fmt.Sprintf("%q, %q, %q, vulcan_at", "invariant", c.Text, lw.cf.Pos(c.Off).String())
 		if len(shows) > 0 {
 			args += ", " + strings.Join(shows, ", ")
 		}
 		fmt.Fprintf(&b, "if !(%s%s) { vulcan_rt.Fail(%s) }; ", lw.clauseDir(c), GoText(x), args)
 	}
 	b.WriteString("}\n")
-	fmt.Fprintf(&b, "func Vulcan_check%s(vulcan_x %s) %s { (&vulcan_x).Vulcan_invariant(); return vulcan_x }\n", it.name, it.name, it.name)
-	fmt.Fprintf(&b, "func Vulcan_checkPtr%s(vulcan_p *%s) *%s { vulcan_p.Vulcan_invariant(); return vulcan_p }", it.name, it.name, it.name)
+	fmt.Fprintf(&b, "func Vulcan_check%s(vulcan_x %s, vulcan_at string) %s { (&vulcan_x).Vulcan_invariant(\"the value built at \" + vulcan_at); return vulcan_x }\n", it.name, it.name, it.name)
+	fmt.Fprintf(&b, "func Vulcan_checkPtr%s(vulcan_p *%s, vulcan_at string) *%s { vulcan_p.Vulcan_invariant(\"the value built at \" + vulcan_at); return vulcan_p }", it.name, it.name, it.name)
 	lw.extra = append(lw.extra, b.String())
+}
+
+// Needed reports whether a project has a contract or an invariant, so that the lowering needs
+// the types of a first pass.
+func Needed(p *project.Project) bool {
+	for _, pkg := range append(append([]*project.Package{}, p.Leaves...), p.Libs...) {
+		for _, f := range pkg.Files {
+			if len(f.Blank.Funcs) > 0 || len(f.Blank.Types) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

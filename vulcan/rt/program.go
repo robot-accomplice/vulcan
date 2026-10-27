@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -135,9 +136,15 @@ func Main(p Program) int {
 	// --on-contract-failure=panic|exit overrides the config key (§7.4).
 	mode := p.OnContractFailure
 	var args []string
-	for _, a := range os.Args[1:] {
+	for i := 1; i < len(os.Args); i++ {
+		a := os.Args[i]
 		if v, ok := strings.CutPrefix(a, "--on-contract-failure="); ok {
 			mode = v
+			continue
+		}
+		if a == "--on-contract-failure" && i+1 < len(os.Args) {
+			mode = os.Args[i+1]
+			i++
 			continue
 		}
 		args = append(args, a)
@@ -222,7 +229,8 @@ func runAll(ctx context.Context, steps []Step) error {
 func runStep(ctx context.Context, s Step) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%s: panic: %v", s.Leaf, r)
+			// The stack names the .vulcan lines of the calls that led to the panic.
+			err = fmt.Errorf("%s: panic: %v\n%s", s.Leaf, r, debug.Stack())
 		}
 	}()
 	if err := s.Fn(ctx); err != nil {

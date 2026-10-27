@@ -16,6 +16,7 @@ import (
 
 	"github.com/robot-accomplice/vulcan/internal/diag"
 	"github.com/robot-accomplice/vulcan/internal/gen"
+	"github.com/robot-accomplice/vulcan/internal/lower"
 	"github.com/robot-accomplice/vulcan/internal/project"
 )
 
@@ -37,9 +38,13 @@ func Env() []string {
 	return append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=readonly")
 }
 
-// Load type-checks the build directory, which gen.WriteLeaves wrote.
-func Load(p *project.Project, tests bool) (*Checker, error) {
+// Load type-checks the build directory, which gen.WriteLeaves wrote. With report false, it
+// reports nothing: the first pass only gives the lowering its types.
+func Load(p *project.Project, tests, report bool) (*Checker, error) {
 	c := &Checker{P: p, Fset: token.NewFileSet(), Plain: map[string]*packages.Package{}, Full: map[string]*packages.Package{}, D: p.Diags}
+	if !report {
+		c.D = &diag.List{}
+	}
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes |
 			packages.NeedTypesInfo | packages.NeedImports | packages.NeedModule,
@@ -220,3 +225,28 @@ func (c *Checker) Generated(f *ast.File) bool {
 
 // Package returns the project package for an import path, or nil.
 func (c *Checker) Package(path string) *project.Package { return c.P.ByPath[path] }
+
+// Typed gives the lowering the syntax and types of a package's code files.
+func (c *Checker) Typed(pkg *project.Package) *lower.Typed {
+	gp := c.Full[pkg.ImportPath]
+	if gp == nil || gp.TypesInfo == nil {
+		return nil
+	}
+	byRel := map[string]*project.CodeFile{}
+	for _, f := range pkg.Files {
+		byRel[gen.GoFileName(f.Rel)] = f
+	}
+	build := filepath.ToSlash(gen.BuildDir(c.P)) + "/"
+	t := &lower.Typed{Fset: c.Fset, Info: gp.TypesInfo, Files: map[*project.CodeFile]*ast.File{}, Base: map[*project.CodeFile]int{}}
+	for _, f := range gp.Syntax {
+		name := filepath.ToSlash(c.Fset.PositionFor(f.Package, false).Filename)
+		if !strings.HasPrefix(strings.ToLower(name), strings.ToLower(build)) {
+			continue
+		}
+		if cf := byRel[name[len(build):]]; cf != nil {
+			t.Files[cf] = f
+			t.Base[cf] = len(gen.Header(c.P, cf.Rel))
+		}
+	}
+	return t
+}

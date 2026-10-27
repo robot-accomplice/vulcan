@@ -113,5 +113,5 @@ system Shop {
     }
 }
 -- want.out --
-contract failure: Account invariant: Balance >= 0
+contract failure: Account.Deposit invariant: Balance >= 0
 Balance = -4

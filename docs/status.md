@@ -125,18 +125,26 @@ for calls through the method's own receiver (§7.2); port contracts checked thro
 K0120. K0205 and K0203 check the network and acquiring functions of Appendix D that the project's
 code uses. `vulcan guide` prints [the PoC primer](poc/guide.md). 108 conformance cases pass.
 
-PoC deviations from §7 and §5.4c, to know when reading results:
+PoC deviations from §7 and §5.4c, to know when reading results. The independent
+[P2 audit](../experiments/poc/audit-p2.md) found 1 Blocker, 5 High, 3 Medium, and 8 Low findings;
+its resolution section lists the fixes. After them:
 
-- `ensures` and the invariant are checked once, after the body and its deferred calls return
-  (the body runs in a generated closure). This is the second check point of §7.3 for every
-  function; the first check point, before the deferred calls, is not separate.
+- `ensures` and the invariant are checked at each `return` and at a reachable end of the body,
+  before the deferred calls run (Appendix F). The second check point of §7.3, after a risky
+  deferred call or a recovered panic, is not built (D01 is not met). Parameters that an `ensures`
+  reads are their values at entry.
+- The lowering runs on the types of a first pass over the code without contracts: receivers,
+  literals (also elided ones), conversions, and aliases are found by type.
+- A contract calls only `len`, `cap`, and conversions (K0503), because `pure` is deferred.
 - Contract arithmetic is Go arithmetic, not exact (C08 is not met). The proof rule is not
-  implemented: K0504 (an unproved index or dereference) is not reported, and a contract that
-  panics panics as Go does. K0109 (provider and port contracts) is not checked.
+  implemented: K0504 is not reported, and a contract that panics panics as Go does. K0109 is not
+  checked.
 - A panic that leaves a method with its invariant false is not turned into a contract failure
-  (§7.3 rule 5). Calls that receive a struct (`json.Unmarshal(b, a)`) are not followed by a check.
+  (§7.3 rule 5). Calls that receive a struct (`json.Unmarshal(b, a)`) are not followed by a
+  check, so the PoC application must not decode a type with an invariant from JSON.
 - K0205 and K0203 look at the project's own code; they do not follow calls into other modules
-  (N02 is not met).
+  (N02 is not met), nor the interface steps of §5.4c (audit P2, L7).
+- A type error inside a contract is reported at the start of its clause.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
