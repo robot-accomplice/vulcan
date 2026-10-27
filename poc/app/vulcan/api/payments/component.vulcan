@@ -1,0 +1,4 @@
+// Payments is the client of the card processor.
+component Payments {
+    gateway for PaymentProvider
+}

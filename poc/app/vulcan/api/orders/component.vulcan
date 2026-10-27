@@ -1,0 +1,30 @@
+import "stockroom/lib/shop"
+
+// Orders runs the life cycle of an order: create, pay, ship, cancel, refund.
+component Orders {
+    // Stock reserves, releases, and ships stock.
+    needs port Stock {
+        func Product(sku shop.SKU) (shop.Item, error)
+        func Reserve(lines []shop.Line) error
+            requires len(lines) > 0
+        func Release(lines []shop.Line) error
+        func Ship(lines []shop.Line) error
+    }
+
+    // Billing takes and returns the money of an order.
+    needs port Billing {
+        func Charge(o shop.Order) (shop.Payment, error)
+            requires o.Charged == 0 && o.Total > 0
+        func Refund(o shop.Order, amount shop.Money) (shop.Payment, error)
+            requires amount > 0
+        func Payments(id shop.OrderID) ([]shop.Payment, error)
+    }
+
+    // Store persists orders.
+    needs port Store {
+        func CreateOrder(o shop.Order) (shop.OrderID, error)
+        func Order(id shop.OrderID) (shop.Order, error)
+        func OrdersOf(c shop.CustomerID) ([]shop.Order, error)
+        func SaveOrder(o shop.Order) error
+    }
+}

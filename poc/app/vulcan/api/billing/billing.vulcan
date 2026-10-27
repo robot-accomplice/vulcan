@@ -1,0 +1,99 @@
+package billing
+
+import (
+	"fmt"
+
+	"stockroom/lib/shop"
+)
+
+// account is the money of one order: what was charged and what was refunded.
+type account struct {
+	Charged  shop.Money
+	Refunded shop.Money
+}
+	invariant Refunded >= 0 && Refunded <= Charged
+
+// charge records a charge.
+func (a *account) charge(amount shop.Money)
+	requires amount > 0
+	ensures a.Charged == old(a.Charged) + amount
+{
+	a.Charged += amount
+}
+
+// refund records a refund.
+func (a *account) refund(amount shop.Money)
+	requires amount > 0
+	ensures a.Refunded == old(a.Refunded) + amount
+{
+	a.Refunded += amount
+}
+
+// Ledger charges and refunds orders.
+type Ledger struct{}
+
+// NewLedger returns the ledger.
+func NewLedger() *Ledger { return &Ledger{} }
+
+// accountOf sums the ledger of an order.
+func accountOf(id shop.OrderID) (*account, error) {
+	entries, err := Store.Payments(id)
+	if err != nil {
+		return nil, err
+	}
+	a := &account{}
+	for _, p := range entries {
+		switch p.Kind {
+		case shop.KindCharge:
+			a.charge(p.Amount)
+		case shop.KindRefund:
+			a.refund(p.Amount)
+		}
+	}
+	return a, nil
+}
+
+// Charge charges the total of an order that is not charged yet, and records it.
+func (l *Ledger) Charge(o shop.Order) (shop.Payment, error)
+	requires o.Charged == 0 && o.Total > 0
+	ensures err == nil => result.Kind == shop.KindCharge && result.Amount == o.Total
+{
+	id, err := Card.Charge(o.Customer, o.Total)
+	if err != nil {
+		return shop.Payment{}, err
+	}
+	p := shop.Payment{Kind: shop.KindCharge, Amount: o.Total, ProviderID: id}
+	if err := Store.AddPayment(o.ID, p); err != nil {
+		return shop.Payment{}, fmt.Errorf("record the charge %s: %w", id, err)
+	}
+	return p, nil
+}
+
+// Refund refunds part of what an order was charged, and records it.
+func (l *Ledger) Refund(o shop.Order, amount shop.Money) (shop.Payment, error)
+	requires amount > 0
+	ensures err == nil => result.Kind == shop.KindRefund && result.Amount == amount
+{
+	a, err := accountOf(o.ID)
+	if err != nil {
+		return shop.Payment{}, err
+	}
+	if amount > a.Charged-a.Refunded {
+		return shop.Payment{}, shop.Errorf(shop.CodeConflict, "refund %d is more than the %d that can be refunded", amount, a.Charged-a.Refunded)
+	}
+	id, err := Card.Refund(o.PaymentID, amount)
+	if err != nil {
+		return shop.Payment{}, err
+	}
+	a.refund(amount)
+	p := shop.Payment{Kind: shop.KindRefund, Amount: amount, ProviderID: id}
+	if err := Store.AddPayment(o.ID, p); err != nil {
+		return shop.Payment{}, fmt.Errorf("record the refund %s: %w", id, err)
+	}
+	return p, nil
+}
+
+// Payments returns the ledger of an order.
+func (l *Ledger) Payments(id shop.OrderID) ([]shop.Payment, error) {
+	return Store.Payments(id)
+}

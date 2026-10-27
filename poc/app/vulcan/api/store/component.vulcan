@@ -1,0 +1,4 @@
+// Store keeps the catalog, the stock, the orders, and the ledger in SQLite.
+component Store {
+    gateway for Database
+}

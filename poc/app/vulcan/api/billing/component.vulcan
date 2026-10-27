@@ -1,0 +1,18 @@
+import "stockroom/lib/shop"
+
+// Billing charges and refunds orders, and keeps the ledger of each order.
+component Billing {
+    // Card is the card processor.
+    needs port Card {
+        func Charge(customer shop.CustomerID, amount shop.Money) (string, error)
+            requires amount > 0
+        func Refund(chargeID string, amount shop.Money) (string, error)
+            requires chargeID != "" && amount > 0
+    }
+
+    // Store persists the ledger.
+    needs port Store {
+        func AddPayment(id shop.OrderID, p shop.Payment) error
+        func Payments(id shop.OrderID) ([]shop.Payment, error)
+    }
+}

@@ -1,0 +1,16 @@
+import "stockroom/lib/shop"
+
+// Inventory keeps the catalog and the stock levels.
+component Inventory {
+    // Store persists products and stock.
+    needs port Store {
+        func AddProduct(p shop.Product) error
+        func Product(sku shop.SKU) (shop.Item, error)
+        func Products() ([]shop.Item, error)
+        func Receive(sku shop.SKU, qty int) (shop.Item, error)
+            requires qty > 0
+        func Reserve(lines []shop.Line) error
+        func Release(lines []shop.Line) error
+        func Ship(lines []shop.Line) error
+    }
+}

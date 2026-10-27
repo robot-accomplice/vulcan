@@ -1,0 +1,328 @@
+// Package web is the HTTP API.
+package web
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
+	"stockroom/lib/shop"
+)
+
+// Catalog is the catalog and the stock.
+type Catalog interface {
+	AddProduct(p shop.Product) (shop.Item, error)
+	Product(sku shop.SKU) (shop.Item, error)
+	Products() ([]shop.Item, error)
+	Receive(sku shop.SKU, qty int) (shop.Item, error)
+}
+
+// Orders runs the life cycle of orders.
+type Orders interface {
+	Create(customer shop.CustomerID, wants []shop.Want) (shop.Order, error)
+	Get(id shop.OrderID) (shop.Order, error)
+	List(customer shop.CustomerID) ([]shop.Order, error)
+	Pay(id shop.OrderID) (shop.Order, error)
+	Ship(id shop.OrderID) (shop.Order, error)
+	Cancel(id shop.OrderID) (shop.Order, error)
+	Refund(id shop.OrderID, amount shop.Money) (shop.Order, error)
+	Payments(id shop.OrderID) ([]shop.Payment, error)
+}
+
+// Settings say where the API listens.
+type Settings struct {
+	Addr string
+}
+
+// API serves the HTTP API.
+type API struct {
+	catalog Catalog
+	orders  Orders
+}
+
+// New returns the API.
+func New(catalog Catalog, orders Orders) *API { return &API{catalog: catalog, orders: orders} }
+
+// Serve serves the API until ctx is cancelled, then lets the requests in progress finish.
+func (a *API) Serve(ctx context.Context, s Settings) error {
+	srv := &http.Server{Addr: s.Addr, Handler: a.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	ln, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		return err
+	}
+	log.Printf("stockroom listens on %s", ln.Addr())
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ln) }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+	}
+	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return srv.Shutdown(shutdown)
+}
+
+// Handler returns the routes of the API.
+func (a *API) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		reply(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+	mux.HandleFunc("POST /products", a.addProduct)
+	mux.HandleFunc("GET /products", a.listProducts)
+	mux.HandleFunc("GET /products/{sku}", a.getProduct)
+	mux.HandleFunc("POST /products/{sku}/receive", a.receive)
+	mux.HandleFunc("POST /orders", a.createOrder)
+	mux.HandleFunc("GET /orders", a.listOrders)
+	mux.HandleFunc("GET /orders/{id}", a.getOrder)
+	mux.HandleFunc("POST /orders/{id}/pay", orderAction(a.orders.Pay))
+	mux.HandleFunc("POST /orders/{id}/ship", orderAction(a.orders.Ship))
+	mux.HandleFunc("POST /orders/{id}/cancel", orderAction(a.orders.Cancel))
+	mux.HandleFunc("POST /orders/{id}/refunds", a.refund)
+	mux.HandleFunc("GET /orders/{id}/payments", a.payments)
+	return mux
+}
+
+// The JSON forms of the API (docs/poc/stockroom.md).
+
+type productJSON struct {
+	SKU       string `json:"sku"`
+	Name      string `json:"name"`
+	Price     int64  `json:"price_cents"`
+	OnHand    int    `json:"on_hand"`
+	Reserved  int    `json:"reserved"`
+	Available int    `json:"available"`
+}
+
+type lineJSON struct {
+	SKU   string `json:"sku"`
+	Qty   int    `json:"qty"`
+	Price int64  `json:"price_cents"`
+}
+
+type orderJSON struct {
+	ID        string     `json:"id"`
+	Customer  string     `json:"customer"`
+	Status    string     `json:"status"`
+	Lines     []lineJSON `json:"lines"`
+	Total     int64      `json:"total_cents"`
+	Charged   int64      `json:"charged_cents"`
+	Refunded  int64      `json:"refunded_cents"`
+	PaymentID string     `json:"payment_id"`
+}
+
+type paymentJSON struct {
+	Kind       string `json:"kind"`
+	Amount     int64  `json:"amount_cents"`
+	ProviderID string `json:"provider_id"`
+}
+
+func itemJSON(it shop.Item) productJSON {
+	return productJSON{
+		SKU: string(it.Product.SKU), Name: it.Product.Name, Price: int64(it.Product.Price),
+		OnHand: it.Stock.OnHand, Reserved: it.Stock.Reserved, Available: it.Stock.Available(),
+	}
+}
+
+func toOrderJSON(o shop.Order) orderJSON {
+	out := orderJSON{
+		ID: string(o.ID), Customer: string(o.Customer), Status: string(o.Status), Lines: []lineJSON{},
+		Total: int64(o.Total), Charged: int64(o.Charged), Refunded: int64(o.Refunded), PaymentID: o.PaymentID,
+	}
+	for _, l := range o.Lines {
+		out.Lines = append(out.Lines, lineJSON{SKU: string(l.SKU), Qty: l.Qty, Price: int64(l.Price)})
+	}
+	return out
+}
+
+func reply(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// fail writes an error response: the code of a shop error gives its status.
+func fail(w http.ResponseWriter, err error) {
+	code := shop.CodeOf(err)
+	status := map[string]int{
+		shop.CodeInvalid:     http.StatusBadRequest,
+		shop.CodeNotFound:    http.StatusNotFound,
+		shop.CodeConflict:    http.StatusConflict,
+		shop.CodeOutOfStock:  http.StatusConflict,
+		shop.CodeDeclined:    http.StatusPaymentRequired,
+		shop.CodeUnavailable: http.StatusBadGateway,
+	}[code]
+	if status == 0 {
+		log.Printf("internal error: %v", err)
+		code, status = "internal", http.StatusInternalServerError
+	}
+	msg := err.Error()
+	var e *shop.Error
+	if errors.As(err, &e) {
+		msg = e.Message
+	}
+	reply(w, status, map[string]string{"error": code, "message": msg})
+}
+
+// decode reads a JSON body; an unknown field or a bad value is invalid.
+func decode(r *http.Request, v any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return shop.Errorf(shop.CodeInvalid, "bad request body: %v", err)
+	}
+	return nil
+}
+
+func (a *API) addProduct(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		SKU   string `json:"sku"`
+		Name  string `json:"name"`
+		Price int64  `json:"price_cents"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	it, err := a.catalog.AddProduct(shop.Product{SKU: shop.SKU(in.SKU), Name: in.Name, Price: shop.Money(in.Price)})
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusCreated, itemJSON(it))
+}
+
+func (a *API) listProducts(w http.ResponseWriter, r *http.Request) {
+	items, err := a.catalog.Products()
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := []productJSON{}
+	for _, it := range items {
+		out = append(out, itemJSON(it))
+	}
+	reply(w, http.StatusOK, out)
+}
+
+func (a *API) getProduct(w http.ResponseWriter, r *http.Request) {
+	it, err := a.catalog.Product(shop.SKU(r.PathValue("sku")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, itemJSON(it))
+}
+
+func (a *API) receive(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Qty int `json:"qty"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	it, err := a.catalog.Receive(shop.SKU(r.PathValue("sku")), in.Qty)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, itemJSON(it))
+}
+
+func (a *API) createOrder(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Customer string `json:"customer"`
+		Lines    []struct {
+			SKU string `json:"sku"`
+			Qty int    `json:"qty"`
+		} `json:"lines"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	var wants []shop.Want
+	for _, l := range in.Lines {
+		wants = append(wants, shop.Want{SKU: shop.SKU(l.SKU), Qty: l.Qty})
+	}
+	o, err := a.orders.Create(shop.CustomerID(in.Customer), wants)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusCreated, toOrderJSON(o))
+}
+
+func (a *API) listOrders(w http.ResponseWriter, r *http.Request) {
+	customer := strings.TrimSpace(r.URL.Query().Get("customer"))
+	if customer == "" {
+		fail(w, shop.Errorf(shop.CodeInvalid, "the query needs customer"))
+		return
+	}
+	list, err := a.orders.List(shop.CustomerID(customer))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := []orderJSON{}
+	for _, o := range list {
+		out = append(out, toOrderJSON(o))
+	}
+	reply(w, http.StatusOK, out)
+}
+
+func (a *API) getOrder(w http.ResponseWriter, r *http.Request) {
+	o, err := a.orders.Get(shop.OrderID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toOrderJSON(o))
+}
+
+func orderAction(act func(shop.OrderID) (shop.Order, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		o, err := act(shop.OrderID(r.PathValue("id")))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		reply(w, http.StatusOK, toOrderJSON(o))
+	}
+}
+
+func (a *API) refund(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Amount int64 `json:"amount_cents"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	o, err := a.orders.Refund(shop.OrderID(r.PathValue("id")), shop.Money(in.Amount))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toOrderJSON(o))
+}
+
+func (a *API) payments(w http.ResponseWriter, r *http.Request) {
+	list, err := a.orders.Payments(shop.OrderID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := []paymentJSON{}
+	for _, p := range list {
+		out = append(out, paymentJSON{Kind: p.Kind, Amount: int64(p.Amount), ProviderID: p.ProviderID})
+	}
+	reply(w, http.StatusOK, out)
+}

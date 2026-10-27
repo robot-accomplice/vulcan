@@ -1,0 +1,3 @@
+// shop holds the value types and the errors that every part of Stockroom shares.
+library shop {
+}
