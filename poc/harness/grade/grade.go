@@ -14,9 +14,6 @@
 package grade
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,6 +29,9 @@ type Grader struct {
 	Material string // the unsealed hidden material
 	ToolDir  string // the directory of the vulcan command
 	Meta     *record.Meta
+
+	prepared string   // the directory of the compiled tests and detectors (Prepare)
+	Only     []string // Validate checks only the items whose kind/id starts with one of these
 }
 
 // Grade fills the grading fields of r, for the run in outDir (its workspace is outDir/workspace).
@@ -56,14 +56,17 @@ func (g *Grader) Grade(outDir string, r *record.Run) error {
 		return err
 	}
 	r.Builds = g.build(r.Arm, ws, bin, logf)
-	mod, err := g.testModule(outDir, r.Task)
-	if err != nil {
-		return err
+	if g.prepared == "" {
+		if err := g.Prepare(filepath.Join(outDir, "grade")); err != nil {
+			return err
+		}
 	}
 	env := append(g.env(), "STOCKROOM_BIN="+bin)
 	if r.Builds {
-		r.Acceptance = runTests(mod, "./accept/", env, logf)
-		r.Holdout = runTests(mod, "./holdout/", env, logf)
+		if r.Task != "" {
+			r.Acceptance = runBinary(filepath.Join(g.prepared, "accept", r.Task+".test"+exe()), env, logf)
+		}
+		r.Holdout = runBinary(filepath.Join(g.prepared, "holdout.test"+exe()), env, logf)
 	} else {
 		r.Acceptance = record.Tests{Failed: 1}
 	}
@@ -73,10 +76,10 @@ func (g *Grader) Grade(outDir string, r *record.Run) error {
 			if !r.Builds {
 				continue // a build failure fails the task; it says nothing about the rule
 			}
-			t := runTests(mod, "./rules/"+rule.ID+"/", env, logf)
+			t := runBinary(filepath.Join(g.prepared, "rules", rule.ID+".test"+exe()), env, logf)
 			r.Violations[rule.ID] = t.Failed > 0
 		case "detector":
-			v, err := g.detector(mod, rule.ID, r.Arm, ws, logf)
+			v, err := g.detector(filepath.Join(g.prepared, "rules", rule.ID+exe()), rule.ID, r.Arm, ws, logf)
 			if err != nil {
 				fmt.Fprintf(logf, "detector %s: %v\n", rule.ID, err)
 				r.Note = strings.TrimSpace(r.Note + " detector " + rule.ID + " failed")
@@ -124,92 +127,16 @@ func (g *Grader) build(arm, ws, bin string, logf *os.File) bool {
 	}
 	cmd.Dir = ws
 	cmd.Env = append(g.env(), "GOPROXY=off")
+	_ = os.MkdirAll(filepath.Dir(bin), 0o755)
 	out, err := cmd.CombinedOutput()
 	fmt.Fprintf(logf, "== build (%s)\n%s\n", arm, out)
 	return err == nil
 }
 
-// testModule writes a Go module with the task's acceptance tests, the holdout tests, and the
-// rules, which imports the repository for poc/stockroomtest and poc/harness/detect.
-func (g *Grader) testModule(outDir, task string) (string, error) {
-	mod := filepath.Join(outDir, "grade")
-	if err := os.RemoveAll(mod); err != nil {
-		return "", err
-	}
-	repo, err := filepath.Abs(g.Repo)
-	if err != nil {
-		return "", err
-	}
-	gomod := fmt.Sprintf("module grading\n\ngo 1.26\n\nrequire github.com/robot-accomplice/vulcan v0.0.0\n\nreplace github.com/robot-accomplice/vulcan => %s\n", filepath.ToSlash(repo))
-	if err := writeFile(filepath.Join(mod, "go.mod"), []byte(gomod)); err != nil {
-		return "", err
-	}
-	sum, err := os.ReadFile(filepath.Join(repo, "go.sum"))
-	if err != nil {
-		return "", err
-	}
-	if err := writeFile(filepath.Join(mod, "go.sum"), sum); err != nil {
-		return "", err
-	}
-	for src, dst := range map[string]string{
-		filepath.Join(g.Material, "tasks", task, "accept"): "accept",
-		filepath.Join(g.Material, "holdout"):               "holdout",
-		filepath.Join(g.Material, "rules"):                 "rules",
-	} {
-		if err := copyDir(src, filepath.Join(mod, dst)); err != nil {
-			return "", err
-		}
-	}
-	return mod, nil
-}
-
-// runTests runs a test package with -json and counts the top-level tests.
-func runTests(mod, pkg string, env []string, logf *os.File) record.Tests {
-	if _, err := os.Stat(filepath.Join(mod, filepath.FromSlash(pkg))); err != nil {
-		return record.Tests{}
-	}
-	cmd := exec.Command("go", "test", "-json", "-count=1", pkg)
-	cmd.Dir = mod
-	cmd.Env = env
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	_ = cmd.Run()
-	fmt.Fprintf(logf, "== go test %s\n", pkg)
-	var t record.Tests
-	sc := bufio.NewScanner(bytes.NewReader(out.Bytes()))
-	sc.Buffer(make([]byte, 1<<20), 1<<24)
-	for sc.Scan() {
-		var ev struct {
-			Action, Test, Output string
-		}
-		if json.Unmarshal(sc.Bytes(), &ev) != nil {
-			fmt.Fprintln(logf, sc.Text())
-			continue
-		}
-		if ev.Output != "" {
-			logf.WriteString(ev.Output)
-		}
-		if ev.Test == "" || strings.Contains(ev.Test, "/") {
-			if ev.Test == "" && ev.Action == "fail" && t.Passed+t.Failed == 0 {
-				t.Failed++ // the package failed to build or to start
-			}
-			continue
-		}
-		switch ev.Action {
-		case "pass":
-			t.Passed++
-		case "fail":
-			t.Failed++
-		}
-	}
-	return t
-}
-
-// detector runs a rule's detector: exit 1 is a violation, 0 none, anything else an error.
-func (g *Grader) detector(mod, id, arm, ws string, logf *os.File) (bool, error) {
-	cmd := exec.Command("go", "run", "./rules/"+id, "-arm", arm, "-ws", ws)
-	cmd.Dir = mod
+// detector runs a rule's compiled detector: exit 1 is a violation, 0 none, anything else an
+// error.
+func (g *Grader) detector(bin, id, arm, ws string, logf *os.File) (bool, error) {
+	cmd := exec.Command(bin, "-arm", arm, "-ws", ws)
 	cmd.Env = g.env()
 	out, err := cmd.CombinedOutput()
 	fmt.Fprintf(logf, "== detector %s\n%s\n", id, out)
@@ -219,7 +146,7 @@ func (g *Grader) detector(mod, id, arm, ws string, logf *os.File) (bool, error) 
 	if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
 		return true, nil
 	}
-	return false, fmt.Errorf("%v", err)
+	return false, fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
 }
 
 func writeFile(path string, b []byte) error {

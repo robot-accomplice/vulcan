@@ -50,6 +50,12 @@ func main() {
 		err = cmdGrade(args)
 	case "analyze":
 		err = cmdAnalyze(args)
+	case "validate":
+		err = cmdValidate(args)
+	case "public":
+		err = cmdPublic(args)
+	case "gradeall":
+		err = cmdGradeAll(args)
 	case "synth":
 		err = cmdSynth(args)
 	case "tools":
@@ -200,6 +206,9 @@ func cmdGrade(args []string) error {
 		return err
 	}
 	g := &grade.Grader{Repo: c.repo, Material: *material, ToolDir: c.toolDir(), Meta: meta}
+	if err := g.Prepare(filepath.Join(*out, "prepared")); err != nil {
+		return err
+	}
 	if err := g.Grade(*out, r); err != nil {
 		return err
 	}
@@ -214,8 +223,9 @@ func cmdEvaluate(args []string) error {
 	var c common
 	c.flags(fs)
 	schedPath := fs.String("schedule", "", "the schedule file")
-	material := fs.String("material", "", "the unsealed hidden material")
+	material := fs.String("material", "", "the unsealed hidden material, or with -no-grade the public part")
 	outDir := fs.String("out", "", "the directory of the runs")
+	noGrade := fs.Bool("no-grade", false, "only run; grade later with gradeall, so that the hidden material stays sealed during the runs")
 	fs.Parse(args)
 	var slots []schedule.Slot
 	b, err := os.ReadFile(*schedPath)
@@ -223,10 +233,6 @@ func cmdEvaluate(args []string) error {
 		return err
 	}
 	if err := json.Unmarshal(b, &slots); err != nil {
-		return err
-	}
-	meta, err := record.LoadMeta(filepath.Join(*material, "meta.json"))
-	if err != nil {
 		return err
 	}
 	runsPath := filepath.Join(*outDir, "runs.jsonl")
@@ -237,7 +243,17 @@ func cmdEvaluate(args []string) error {
 		}
 	}
 	rules := filepath.Join(*material, "RULES.md")
-	g := &grade.Grader{Repo: c.repo, Material: *material, ToolDir: c.toolDir(), Meta: meta}
+	var g *grade.Grader
+	if !*noGrade {
+		meta, err := record.LoadMeta(filepath.Join(*material, "meta.json"))
+		if err != nil {
+			return err
+		}
+		g = &grade.Grader{Repo: c.repo, Material: *material, ToolDir: c.toolDir(), Meta: meta}
+		if err := g.Prepare(filepath.Join(*outDir, "prepared")); err != nil {
+			return err
+		}
+	}
 	for _, s := range slots {
 		key := fmt.Sprintf("%s/%s/%d", s.Task, s.Arm, s.Index)
 		if done[key] {
@@ -254,8 +270,10 @@ func cmdEvaluate(args []string) error {
 		if err != nil {
 			return fmt.Errorf("run %s: %w", key, err)
 		}
-		if err := g.Grade(dir, r); err != nil {
-			return fmt.Errorf("grade %s: %w", key, err)
+		if g != nil {
+			if err := g.Grade(dir, r); err != nil {
+				return fmt.Errorf("grade %s: %w", key, err)
+			}
 		}
 		if err := runner.Save(cfg, r); err != nil {
 			return err
@@ -330,4 +348,127 @@ func cmdSeal(cmd string, args []string) error {
 		return seal.Seal(*dir, *out, key)
 	}
 	return seal.Open(*in, *dir, key)
+}
+
+// cmdValidate checks the hidden material (grade.Validation), and with -write-labels writes the
+// enforced_by_v label of each rule into meta.json. Its output names rules and tasks by id only.
+func cmdValidate(args []string) error {
+	fs := flag.NewFlagSet("validate", flag.ExitOnError)
+	var c common
+	c.flags(fs)
+	material := fs.String("material", "", "the unsealed hidden material")
+	out := fs.String("out", "", "a scratch directory for the workspaces")
+	jobs := fs.Int("jobs", 3, "workspaces at once")
+	write := fs.Bool("write-labels", false, "write enforced_by_v into meta.json")
+	only := fs.String("only", "", "comma-separated prefixes of items to check: reference/T03, seeded/R05, base")
+	fs.Parse(args)
+	metaPath := filepath.Join(*material, "meta.json")
+	meta, err := record.LoadMeta(metaPath)
+	if err != nil {
+		return err
+	}
+	tools, err := filepath.Abs(c.toolDir())
+	if err != nil {
+		return err
+	}
+	g := &grade.Grader{Repo: c.repo, Material: *material, ToolDir: tools, Meta: meta}
+	tmpl := grade.Templates{record.ArmV: filepath.Join(c.repo, "poc", "app", "vulcan"), record.ArmG: filepath.Join(c.repo, "poc", "app", "go")}
+	if *only != "" {
+		g.Only = strings.Split(*only, ",")
+	}
+	v, err := g.Validate(tmpl, *out, *jobs)
+	if err != nil {
+		return err
+	}
+	if err := v.Save(filepath.Join(*out, "validation.json")); err != nil {
+		return err
+	}
+	fmt.Print(v.Summary())
+	if *write {
+		for i := range meta.Rules {
+			meta.Rules[i].EnforcedByV = v.EnforcedByV[meta.Rules[i].ID]
+		}
+		b, _ := json.MarshalIndent(meta, "", "  ")
+		if err := os.WriteFile(metaPath, b, 0o644); err != nil {
+			return err
+		}
+	}
+	if v.Problems > 0 {
+		return fmt.Errorf("%d problems", v.Problems)
+	}
+	return nil
+}
+
+// cmdPublic copies the part of the material that the runs need, and nothing else: each brief,
+// and RULES.md. The runs read only this copy, so the hidden material can stay sealed.
+func cmdPublic(args []string) error {
+	fs := flag.NewFlagSet("public", flag.ExitOnError)
+	material := fs.String("material", "", "the unsealed hidden material")
+	out := fs.String("out", "", "the directory of the public part")
+	fs.Parse(args)
+	copy := func(rel string) error {
+		b, err := os.ReadFile(filepath.Join(*material, rel))
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(*out, rel)), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(*out, rel), b, 0o644)
+	}
+	if err := copy("RULES.md"); err != nil {
+		return err
+	}
+	tasks, err := os.ReadDir(filepath.Join(*material, "tasks"))
+	if err != nil {
+		return err
+	}
+	for _, t := range tasks {
+		if err := copy(filepath.Join("tasks", t.Name(), "brief.md")); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// cmdGradeAll grades every run of an evaluation that ran with -no-grade, and rewrites
+// runs.jsonl with the graded records.
+func cmdGradeAll(args []string) error {
+	fs := flag.NewFlagSet("gradeall", flag.ExitOnError)
+	var c common
+	c.flags(fs)
+	material := fs.String("material", "", "the unsealed hidden material")
+	outDir := fs.String("out", "", "the directory of the runs")
+	fs.Parse(args)
+	meta, err := record.LoadMeta(filepath.Join(*material, "meta.json"))
+	if err != nil {
+		return err
+	}
+	g := &grade.Grader{Repo: c.repo, Material: *material, ToolDir: c.toolDir(), Meta: meta}
+	if err := g.Prepare(filepath.Join(*outDir, "prepared")); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(*outDir)
+	if err != nil {
+		return err
+	}
+	var graded []record.Run
+	for _, e := range entries {
+		dir := filepath.Join(*outDir, e.Name())
+		r, err := loadRun(dir)
+		if err != nil {
+			continue // not a run directory
+		}
+		if err := g.Grade(dir, r); err != nil {
+			return fmt.Errorf("grade %s: %w", e.Name(), err)
+		}
+		b, _ := json.MarshalIndent(r, "", "  ")
+		if err := os.WriteFile(filepath.Join(dir, "run.json"), b, 0o644); err != nil {
+			return err
+		}
+		graded = append(graded, *r)
+	}
+	path := filepath.Join(*outDir, "runs.jsonl")
+	os.Remove(path)
+	return record.Append(path, graded...)
 }
