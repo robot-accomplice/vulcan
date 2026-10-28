@@ -34,6 +34,7 @@ Below, **Accept** means the project builds with no diagnostic except the listed 
 | S03 | A struct field named `limit`, a local variable named `requires`, a parameter named `timeout` | Accept. |
 | S04 | `limit` on the line after its field | K0009 at the `limit` in release 1, which defers `limit`. When `limit` is supported: K0001 at the `limit`. |
 | S05 | A declared name `vulcan_x` | K0005 at the name. |
+| S05b | A code file named `vulcan_x.vulcan` that imports another leaf and `unsafe` | K0005 at line 1 of the file: the checker skips files with the prefix as generated, so the name is reserved. |
 | S06 | A body with a Go type error, inside a file with contracts above it | K0008 at the true `.vulcan` position. |
 | S07 | A panic in a body at a known line | The stack trace names the `.vulcan` file and line (`//line`). |
 | S08 | Each deferred source construct of syntax.md, one case each (topic, remote port, `via`, `limit`, `handle`, a second container; and `pure` unless milestone 2 adds it, see D08) | K0009 at the construct, naming it. |

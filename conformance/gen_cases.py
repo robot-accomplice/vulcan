@@ -305,6 +305,10 @@ case("S05", "A declared name vulcan_x.",
      [("api/billing/billing.vulcan", "// Payer takes payments.", "var vulcan_x = 1\n\n// Payer takes payments.")],
      "error api/billing/billing.vulcan:@@vulcan_x@ K0005")
 
+case("S05b", "A code file named vulcan_x.vulcan, which would break K0101 and K0124 if it were checked: K0005, because the checker skips generated vulcan_ files.",
+     [("api/orders/vulcan_x.vulcan", 'package orders\n\nimport (\n\t"unsafe"\n\n\t"shop/api/billing"\n)\n\nvar _ = unsafe.Sizeof(0)\n\nvar _ = billing.NewPayer\n')],
+     "error api/orders/vulcan_x.vulcan:1:1 K0005")
+
 case("S06", "A body with a Go type error, inside a file with contracts above it: K0008 at the true .vulcan position.",
      [("api/billing/billing.vulcan", "func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {\n\treturn money.Receipt{Amount: amt}, nil",
        "func (p *Payer) Pay(amt money.Money) (money.Receipt, error)\n\trequires amt > 0\n{\n\tvar s string = amt; _ = s\n\treturn money.Receipt{Amount: amt}, nil")],

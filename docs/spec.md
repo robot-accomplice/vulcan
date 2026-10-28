@@ -2214,7 +2214,7 @@ the long form.
 | K0002 | E | A code file outside a leaf or a library, or a leaf inside a leaf | §5.4 r2 |
 | K0003 | E | Directories and `system.vulcan` disagree | §5.2 |
 | K0004 | E | A `package` clause does not name its directory, or a `library` name is not its package name | §5.4a, App. B |
-| K0005 | E | A declared name starts with `vulcan_` or `Vulcan_` | App. B |
+| K0005 | E | A declared name, or the name of a code file, starts with `vulcan_` or `Vulcan_` | App. B |
 | K0006 | E | Unknown key in `config { }` | App. B |
 | K0007 | E | A `transport` name is not lower case | App. B |
 | K0009 | E | A construct that this release does not support; the message names the construct, the release, and the spec section | [release 1](release-1/syntax.md) |

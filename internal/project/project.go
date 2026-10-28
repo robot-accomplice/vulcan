@@ -165,6 +165,11 @@ func (p *Project) scan() error {
 		}
 		rel, _ := filepath.Rel(p.Root, filepath.Dir(full))
 		rel = filepath.ToSlash(rel)
+		if strings.HasPrefix(name, "vulcan_") || strings.HasPrefix(name, "Vulcan_") {
+			// The checker takes vulcan_*.go for generated code and skips it, so the prefix is
+			// reserved for file names too (Appendix B.1).
+			p.Diags.Errorf(diag.Pos{File: path.Join(rel, name), Line: 1, Col: 1}, "K0005", "the file name %s starts with %s, which is reserved for generated code", name, name[:7])
+		}
 		dirs[rel] = append(dirs[rel], name)
 		return nil
 	})
