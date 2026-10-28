@@ -94,6 +94,6 @@ listed for the next round. None of them was known when the runs started.
 ## Next
 
 The next round must answer the question this round could not: does Vulcan stop rule breaks that
-plain Go does not, at a cost worth paying? The plan for it is to be written: the litmus test of
-value against Go. Before it, the harness needs a budget in real turns, scratch files outside the
+plain Go does not, at a cost worth paying, and better than Go with linters? The draft plan is
+[plan-r2.md](../../docs/poc/plan-r2.md). Before it, the harness needs a budget in real turns, scratch files outside the
 graded code, and a temp directory that no other run can see.

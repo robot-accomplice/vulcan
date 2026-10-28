@@ -106,7 +106,8 @@ code, so the round could not show what Vulcan is for: stopping rule breaks that 
 through. All 9 failures were runs that the turn budget stopped, and a harness fault made that
 budget about 26 turns, not the planned 60. The round says the tasks were not hard enough to tempt
 this model, and that Vulcan cost runs under a tight budget. It does not yet say whether Vulcan
-adds value over Go. The next round must be built to answer that.
+adds value over Go. The next round must be built to answer that: its draft plan is
+[plan-r2.md](docs/poc/plan-r2.md).
 
 ## Repository layout
 
