@@ -77,15 +77,18 @@ t-bounds over tasks).
 | — | Controls (O5) and the reported measures (O7, O8) | Reported with intervals, not tested |
 
 **Validity gate.** Before any verdict: on tempting tasks, P breaks a targeted rule in at least
-30% of its runs; and each arm succeeds on at least 70% of its ordinary-task runs. If not, the
-round is **not informative**, as round 1 was, and no claim is made.
+30% of its runs; and P succeeds on at least 70% of its ordinary-task runs. If not, the round is
+**not informative**, as round 1 was, and no claim is made. The success condition reads P only:
+it asks whether the setup is too hard, and an arm that does worse than P is a result. (The first
+draft put it on every arm; the dry run of F10 showed that this hides a worse arm V as "not
+informative" in a quarter of the cases.)
 
 **Verdicts, applied in order** (written before any run):
 
 | # | Condition | Verdict |
 |---|---|---|
 | 1 | Validity gate fails, the cost gate (section 6) stops the round, or a toolchain fault blocks more than 10% of an arm's runs | **Not informative** |
-| 2 | QA passes, L is within the margins of P (N0, N1, N6), and V is not better than L (QV: equivalent, or worse) | **The model helps; the language does not.** Decision 6 row 4: pivot to the rules, as a Go tool |
+| 2 | QA passes, L is within the margins of P (N0, N1, N6), and V is not better than L (QV: equivalent, worse, or unclear) | **The model helps; the language does not.** Decision 6 row 4: pivot to the rules, as a Go tool |
 | 3 | QA passes, and V is better than L on clean success by more than 12 points with the bound above 0, or on review (QR) by a ratio bound below 0.87 | **The language adds something the linter does not.** Not expected after the desk test: the report must find the cause before any claim, and a new round with a fresh rule set tests it |
 | 4 | QA passes, but L fails N0, N1, or N6 against P | **The model helps, at a cost too high.** Find the cost in the check loop (O2) and the primer (O6) |
 | 5 | QA fails, and L's rate on S is not lower than P's | **The model does not help this agent.** Neither the language nor the linter is supported |
@@ -130,13 +133,13 @@ round is **not informative**, as round 1 was, and no claim is made.
 | F1 | The turn budget counted stream events | Done: one turn per message. Budget: 60 messages |
 | F2 | Stopped runs have no output tokens or cost | `--include-partial-messages`, output tokens from each message's last usage, cost from the provider's price table |
 | F3 | Scratch files were graded as code | A scratch directory outside the workspace (`--add-dir`); grading and diff stats read only product source |
-| F4 | Runs shared `/tmp` | Each run in WSL under `bwrap`: own `/tmp` and home, only workspace and scratch writable; the race detector on, as the plan wanted |
+| F4 | Runs shared `/tmp` | Each run in WSL in its own user, mount, and PID namespace (`unshare`, no root needed; `bwrap` is not installed): own `/tmp`, the user's home and `/mnt` (the Windows drives) hidden, tools read-only, modules from a read-only local proxy; the race detector on, as the plan wanted |
 | F5 | A pass on unchanged code looked like progress | Measures start at the first edit |
 | F6 | V runs went on after the task was done | Every preamble: "When the check passes and the brief is met, stop." |
 | F7 | A changed check configuration was not caught | The grader fails a run that changes the arm's check configuration (section 2) |
 | F8 | Spend per round unknown | The provider's balance before and after each batch |
 | F9 | No reviewer | The reviewer session of O3b, with a fixed prompt, checklist, and model |
-| F10 | Two arms only | The analysis grows to three arms and the verdicts of section 3; it reads synthetic data sets right first, including "L equals V", "V worse than L", and "no effect" |
+| F10 | Two arms only | The analysis grows to three arms and the verdicts of section 3 (`analysis2`); it reads synthetic data sets right first (`synth2`): over 200 seeds each, at the size of section 7, the expected verdict comes in at least 80% of cases, and "no effect" gives verdict 2 or 3 in at most 5% |
 
 ## 7. Size and cost
 
@@ -144,8 +147,17 @@ round is **not informative**, as round 1 was, and no claim is made.
 |---|---|
 | Pilot: 2 tasks × 3 arms × 1 run, to check F1 to F10 and to price a run | 6 |
 | Calibration: 36 tempting tasks × 3 runs, arm P | 108 |
-| Main: 32 tasks × 3 arms × 3 runs, plus 10% test-retest | about 317 |
-| Replication on a second model | about 317 |
+| Main: 24 tempting tasks × 3 arms × 3 runs, and 8 ordinary tasks × 3 arms × 5 runs, plus 10% test-retest | about 370 |
+| Replication on a second model | about 370 |
+
+The ordinary tasks get 5 runs, as decision 6's cost pilot has: with 3, the point estimate of N6
+alone fails a cost-free linter in about one case in eight (dry run of F10).
+
+Dry run of F10 at this size (200 seeds of each synthetic world, `analysis2` test): no effect gives
+verdict 2 or 3 in 0% of cases; "the model helps, the language does not" gives verdict 2 in 88%;
+"V worse than L" gives verdict 2 in 92%; "the language adds" gives verdict 3 in 86%; a costly
+linter gives verdict 4 in 95%; untempting tasks give verdict 1 in 100%. When V and L are equal,
+verdict 3 comes in 4.5% of cases: a false "the language adds", at the 5% level.
 
 Before the main runs, `experiments/sizing/sizing.py`, adapted to three arms and these tests, is run with the
 calibration's measured rates. The main runs start only if P(verdict 2 or 3 \| a large effect) is

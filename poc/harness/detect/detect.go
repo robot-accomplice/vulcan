@@ -83,7 +83,7 @@ func Load(arm, ws string) (*Source, error) {
 		return nil, err
 	}
 	for _, p := range pkgs {
-		if strings.HasSuffix(p.PkgPath, "vulcan_main") {
+		if strings.HasSuffix(p.PkgPath, "vulcan_main") || !Product(UnitOf(p.PkgPath)) {
 			continue
 		}
 		s.Pkgs = append(s.Pkgs, p)
@@ -94,6 +94,13 @@ func Load(arm, ws string) (*Source, error) {
 
 // UnitOf names the part of a package path: stockroom/api/orders is api/orders.
 func UnitOf(pkgPath string) string { return strings.TrimPrefix(pkgPath, Module+"/") }
+
+// Product reports whether a unit is part of the application: under api/, lib/, or cmd/. Code
+// that a run leaves elsewhere in the workspace (a test server in scratch/) is not graded
+// (round 2, F3; round 1, fault 3).
+func Product(unit string) bool {
+	return strings.HasPrefix(unit, "api/") || strings.HasPrefix(unit, "lib/") || strings.HasPrefix(unit, "cmd/")
+}
 
 // Generated reports whether a syntax file was written by the Vulcan compiler, not by anyone
 // working on the application.

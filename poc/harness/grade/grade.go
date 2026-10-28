@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/robot-accomplice/vulcan/poc/harness/detect"
+	"github.com/robot-accomplice/vulcan/poc/harness/measure"
 	"github.com/robot-accomplice/vulcan/poc/harness/record"
 )
 
@@ -49,7 +51,9 @@ func (g *Grader) Grade(outDir string, r *record.Run) error {
 		}
 	}
 	r.Targeted = task.Targets
+	r.ConfigAllowed = task.AllowConfig
 	r.Violations = map[string]bool{}
+	g.measures(outDir, r, logf)
 
 	bin, err := filepath.Abs(filepath.Join(outDir, "bin", "stockroom"+exe()))
 	if err != nil {
@@ -89,6 +93,35 @@ func (g *Grader) Grade(outDir string, r *record.Run) error {
 		}
 	}
 	return nil
+}
+
+// measures fills the code measures of round 2 (O7): final minus base, in the product source.
+// A workspace that does not load counts 0 dropped errors, with a note.
+func (g *Grader) measures(outDir string, r *record.Run, logf *os.File) {
+	ws, base := filepath.Join(outDir, "workspace"), filepath.Join(outDir, "base")
+	if _, err := os.Stat(base); err != nil {
+		return // a run without its base (round 1 archives keep it; tests may not)
+	}
+	if g.ToolDir != "" && !strings.Contains(os.Getenv("PATH"), g.ToolDir) {
+		// detect.Load runs `vulcan check` in this process for arm V.
+		os.Setenv("PATH", g.ToolDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
+	r.CloneLines = measure.CloneLines(ws) - measure.CloneLines(base)
+	masked := func(dir string) (int, error) {
+		s, err := detect.Load(r.Arm, dir)
+		if err != nil {
+			return 0, err
+		}
+		return measure.MaskedErrors(s), nil
+	}
+	after, errA := masked(ws)
+	before, errB := masked(base)
+	if errA != nil || errB != nil {
+		fmt.Fprintf(logf, "masked errors: %v %v\n", errA, errB)
+		r.Note = strings.TrimSpace(r.Note + " masked errors not measured")
+		return
+	}
+	r.MaskedErrors = after - before
 }
 
 func exe() string {

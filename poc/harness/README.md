@@ -11,8 +11,12 @@ The harness runs, grades, and analyzes the evaluation of [docs/poc/plan.md](../.
 | `schedule` | Every task, arm, and run index, in a random order fixed by a seed |
 | `grade` | Builds the final workspace, and runs the acceptance tests, the rule tests and detectors, and the holdout tests |
 | `detect` | The library of the structural detectors: the final source with types, by unit, in both arms |
-| `analysis` | The analysis script, frozen before the runs: per-task means, paired differences, bootstrap intervals, exact sign-flip p-values, and the verdict of section 9 |
-| `synth` | Synthetic runs with a known effect, for the dry run |
+| `analysis` | The analysis script of round 1, frozen before the runs: per-task means, paired differences, bootstrap intervals, exact sign-flip p-values, and the verdict of section 9 |
+| `analysis2` | The analysis script of round 2 ([plan-r2.md](../../docs/poc/plan-r2.md), section 3), frozen before its runs: arms P, L, and V; decision 6's violation tests and t-bounds; the validity gate and the verdicts |
+| `synth` | Synthetic runs with a known effect, for round 1's dry run |
+| `synth2` | Synthetic runs of round 2, one world per verdict, for its dry run |
+| `measure` | Round 2's code measures (O7): lines in duplicated blocks, and dropped or masked errors |
+| `provider` | The balance of the provider's account (DeepSeek, OpenRouter, Moonshot), for the spend of a batch |
 | `seal` | Seals the hidden material (AES-256-GCM) and lists its SHA-256 manifest |
 | `fakeagent` | Stands in for Claude Code in tests of the harness |
 | `testdata/material` | Demo material in the format of the hidden material (not the hidden material) |
@@ -22,10 +26,11 @@ The harness runs, grades, and analyzes the evaluation of [docs/poc/plan.md](../.
 Each run calls headless Claude Code in the run's workspace:
 
 ```
-claude -p --output-format stream-json --verbose --setting-sources local --strict-mcp-config
-       --mcp-config {"mcpServers":{}} --disallowedTools WebFetch,WebSearch
-       --permission-mode dontAsk --allowedTools <runner.AllowedTools>
-       [--model M] [--max-budget-usd X] <prompt>
+claude -p --output-format stream-json --verbose --include-partial-messages
+       --setting-sources local --strict-mcp-config --mcp-config {"mcpServers":{}}
+       --disallowedTools WebFetch,WebSearch --permission-mode dontAsk
+       --allowedTools <runner.AllowedTools> --add-dir <scratch>
+       [--resume SESSION] [--model M] [--max-budget-usd X] <prompt>
 ```
 
 With `-base-url URL` and `-token-file F` (or `VULCAN_AGENT_TOKEN`), Claude Code talks to another
@@ -48,6 +53,40 @@ machine, and `curl` or `go` can reach the web; the briefs need neither. Claude C
 loops only when the whole shell is allowed, and the owner chose loops over a command allowlist
 (experiments/poc/pilot-p5.md). Keep the hidden material sealed while the runs go on; it is opened
 only to grade, and it is not on any path that the workspace names.
+
+## Round 2
+
+Round 2 ([plan-r2.md](../../docs/poc/plan-r2.md)) has three arms: P (plain Go, `poc/app/go`), L
+(Go with Vulcan's model as a linter and primer, `poc/app/golint`, or `-template-l`), and V. Its
+fixes to round 1 (plan-r2, section 6):
+
+| # | What | Where |
+|---|---|---|
+| F1 | One turn per message | `agentlog` |
+| F2 | Output tokens of a stopped run from `--include-partial-messages`; cost at the provider's prices with `-prices FILE` (`{"model": {"input": …, "cached_input": …, "output": …}}`, USD per million tokens) | `agentlog`, `runner.Price` |
+| F3 | Scratch files in `<run>/scratch`, outside the workspace (`--add-dir`, named in the preamble); the diff counts only product source (no new top-level names, no binary files); detectors read only `api/`, `lib/`, `cmd/`; leftovers are listed as `stray_files` | `runner`, `detect.Product` |
+| F4 | `-sandbox DISTRO`: each agent round runs in WSL in its own user, mount, and PID namespace (`unshare --map-root-user`, no root needed): its own `/tmp`; the user's home, `/mnt`, `/var/tmp`, and `/dev/shm` hidden; the run's directory at `/tmp/run`; the Linux tools (`-linux-tools`, default `.harness/tools-linux`: `bin/` with claude, vulcan, fakepay, vulcan-lint, and `go/`, a Go toolchain) read-only; Go modules from a read-only file proxy of the host's module cache. The provider's key reaches the namespace through `WSLENV`, never through a file | `runner/sandbox.go` |
+| F5 | `first_edit_turn`, `first_pass_turn` (the first passing check after the first edit), `tokens_in_at_first_pass` | `agentlog` |
+| F6 | The preamble ends: "When the check passes and the request is met, stop." | `runner.Preamble` |
+| F7 | `config_changes`: a changed file that the template's `PROTECTED` file lists, a changed `config` block of `system.vulcan`, or new in-source suppressions (`//nolint`, `//lint:ignore`, `//vulcan-lint:ignore`). Such a run is no clean success unless its task has `allow_config` | `runner/config.go` |
+| F8 | The provider's balance before a batch, every 10 runs, and at the end, in `balance.jsonl` | `provider`, `evaluate` |
+| F9 | `-review`: after each agent round, a reviewer session (read-only tools, `runner.ReviewPrompt`, the brief, `RULES.md`, the diff) gives a verdict; a rejection goes back to the agent in the same session (`--resume`), up to `-resubmits` times within the run's budget; a second review of the final change measures the reviewer's agreement | `runner/review.go` |
+| F10 | `harness analyze2`, and its dry run: `go test ./poc/harness/analysis2` reads each world of `synth2` over 200 seeds | `analysis2`, `synth2` |
+
+Arm L's linter, written in step 2 of plan-r2, must print a code `VL` and four digits in each
+diagnostic, as Vulcan prints K-codes, so that the check loop (O2) reads both arms alike; and arm
+L's template must list its configuration (the manifest, the linter's settings) in `PROTECTED`.
+
+The sandbox needs two things that `harness tools -linux` does not fetch: Claude Code for Linux
+in `bin/claude`, and a Go toolchain in `go/`, of at least the version of `go.mod`.
+
+```bash
+harness tools -linux                           # vulcan, fakepay, fakeagent for the sandbox
+harness schedule -tasks T01,...,T24 -ord-tasks T25,...,T32 -arms P,L,V -runs 3 -ord-runs 5 -retest 0.1 -seed SEED > schedule.json
+harness evaluate -schedule schedule.json -material PUBLIC -no-grade -out RUNS -model M -base-url URL -token-file F     -sandbox Ubuntu-22.04 -review -prices prices.json
+harness gradeall -material MATERIAL -out RUNS
+harness analyze2 -runs RUNS/runs.jsonl -meta MATERIAL/meta.json > report.md
+```
 
 ## The hidden material
 
@@ -86,7 +125,11 @@ in its stream, so its output tokens and cost are not known (`usage_partial`).
 ## Checks
 
 - `go test ./poc/harness/...`: the stream parser, the diff, sealing, and the analysis on four
-  synthetic scenarios (promising, no signal, costly, a tool may do it), each read right.
+  synthetic scenarios (promising, no signal, costly, a tool may do it), each read right; for
+  round 2, the review loop with the scripted agent, the configuration checks, the code measures,
+  and the dry run of `analysis2`.
+- `VULCAN_TEST_WSL=Ubuntu-22.04 go test ./poc/harness/runner`: the sandbox on a real WSL
+  distribution: no Windows drive, no home, read-only tools, a private `/tmp`, and no key on disk.
 - The dry run: `harness synth -scenario promising -out DIR`, then `harness analyze`.
 - The pipeline: `harness evaluate` with `-agent fakeagent` on `testdata/material`. With
   `FAKEAGENT_BREAK=1` the fake agent opens a database in orders: the detector flags it in both

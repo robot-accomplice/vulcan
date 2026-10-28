@@ -82,3 +82,45 @@ func TestSplitMessage(t *testing.T) {
 		t.Fatalf("summary %+v", s)
 	}
 }
+
+// A stream with --include-partial-messages, stopped before its result: output tokens come from
+// each message's last message_delta; the first edit and the first pass after it are found; arm
+// L's linter is a check, and its VL-codes are rule codes.
+func TestPartialAndFirstEdit(t *testing.T) {
+	stream := `{"type":"system","subtype":"init","session_id":"sess-1"}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"m1"}}}
+{"type":"stream_event","event":{"type":"message_delta","usage":{"output_tokens":7}}}
+{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go vet ./... && vulcan-lint ./... && go test ./..."}}],"usage":{"input_tokens":10,"cache_read_input_tokens":90,"output_tokens":0}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"m2"}}}
+{"type":"stream_event","event":{"type":"message_delta","usage":{"output_tokens":20}}}
+{"type":"assistant","message":{"id":"m2","content":[{"type":"tool_use","id":"t2","name":"Write","input":{"file_path":"/tmp/run/scratch/x.sh"}}],"usage":{"input_tokens":5,"output_tokens":0}}}
+{"type":"assistant","message":{"id":"m2","content":[{"type":"tool_use","id":"t3","name":"Edit","input":{"file_path":"/tmp/run/workspace/api/orders/orders.go"}}],"usage":{"input_tokens":5,"output_tokens":0}}}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"m3"}}}
+{"type":"stream_event","event":{"type":"message_delta","usage":{"output_tokens":3}}}
+{"type":"assistant","message":{"id":"m3","content":[{"type":"tool_use","id":"t4","name":"Bash","input":{"command":"vulcan-lint ./..."}}],"usage":{"input_tokens":4,"output_tokens":0}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t4","is_error":true,"content":"api/orders/orders.go:3:2: VL0101 orders imports billing\nundefined: billing.Ledger"}]}}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"m4"}}}
+{"type":"assistant","message":{"id":"m4","content":[{"type":"tool_use","id":"t5","name":"Bash","input":{"command":"go test ./..."}}],"usage":{"input_tokens":6,"output_tokens":0}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t5","content":"ok"}]}}
+`
+	r := NewReader("L")
+	r.Scratch = "/tmp/run/scratch"
+	for _, l := range strings.Split(stream, "\n") {
+		r.Line([]byte(l))
+	}
+	s := r.S
+	if s.Session != "sess-1" || s.Turns != 4 || s.Done {
+		t.Fatalf("summary %+v", s)
+	}
+	if s.TokensOut != 30 || s.TokensIn != 115 || s.Cached != 90 {
+		t.Fatalf("tokens out %d in %d cached %d", s.TokensOut, s.TokensIn, s.Cached)
+	}
+	if len(s.Checks) != 3 || s.Checks[1].Codes["VL0101"] != 1 || s.Checks[1].Undefined != 1 || s.Checks[1].Turn != 3 {
+		t.Fatalf("checks %+v", s.Checks)
+	}
+	// The first check passed before any edit, so it is not the first pass.
+	if s.FirstEdit != 2 || s.FirstPass != 4 || s.TokensInAtFirstPass != 115 {
+		t.Fatalf("first edit %d, first pass %d, tokens %d", s.FirstEdit, s.FirstPass, s.TokensInAtFirstPass)
+	}
+}

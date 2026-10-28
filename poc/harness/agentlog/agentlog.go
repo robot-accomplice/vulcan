@@ -20,27 +20,51 @@ type Summary struct {
 	ToolCalls int
 	TokensIn  int64
 	TokensOut int64
+	Cached    int64 // input tokens read from the provider's cache, part of TokensIn
 	CostUSD   float64
 	Checks    []record.Check
 	Denied    int    // tool calls that the permission rules denied
 	Provider  string // the API error that ended the run, such as "api_error 429", or ""
 	Done      bool   // the stream has its final result
 	Error     string // the agent's error, if the run ended with one
+	Session   string // the session id, to resume the session (the review loop)
+	Result    string // the final answer's text
+
+	// Measures that start at the first edit (round 2, F5): the turn of the first Edit or Write
+	// outside the scratch directory, the turn of the first passing check after it, and the input
+	// tokens up to that check.
+	FirstEdit, FirstPass int
+	TokensInAtFirstPass  int64
 }
 
-// IsCheck reports whether a shell command runs the check command of an arm (plan section 2).
+// IsCheck reports whether a shell command runs the check command of an arm (plan section 2;
+// plan-r2 section 2).
 func IsCheck(arm, command string) bool {
-	if arm == record.ArmV {
+	switch arm {
+	case record.ArmV:
 		return strings.Contains(command, "vulcan check") || strings.Contains(command, "vulcan test")
+	case record.ArmL:
+		if strings.Contains(command, "vulcan-lint") {
+			return true
+		}
 	}
 	return strings.Contains(command, "go vet") || strings.Contains(command, "go test")
 }
 
-var codeRE = regexp.MustCompile(`\bK[0-9]{4}\b`)
+// codeRE finds rule codes: Vulcan's K-codes, and the VL-codes of arm L's linter.
+var codeRE = regexp.MustCompile(`\b(K|VL)[0-9]{4}\b`)
 
 type event struct {
-	Type    string `json:"type"`
-	Subtype string `json:"subtype"`
+	Type      string `json:"type"`
+	Subtype   string `json:"subtype"`
+	SessionID string `json:"session_id"`
+	Event     *struct {
+		Type    string `json:"type"`
+		Message *struct {
+			ID string `json:"id"`
+		} `json:"message"`
+		Usage *usage `json:"usage"`
+	} `json:"event"` // --include-partial-messages
 	Message struct {
 		ID      string          `json:"id"`
 		Content json.RawMessage `json:"content"`
@@ -75,16 +99,45 @@ type block struct {
 
 // Reader reads a stream one line at a time, so that the runner can stop a run at its budget.
 type Reader struct {
-	Arm               string
-	S                 Summary
-	pending           map[string]bool // tool_use ids of check commands
-	seen              map[string]bool // message ids already counted
-	usageIn, usageOut int64
+	Arm     string
+	Scratch string // the scratch directory: edits there are not edits of the change
+	S       Summary
+	pending map[string]int  // tool_use ids of check commands -> the turn that ran them
+	seen    map[string]bool // message ids already counted
+
+	usageIn, usageOut, cached int64
+	// From --include-partial-messages: each message's output tokens, from its last
+	// message_delta. A message's own events carry only the output tokens known at its start.
+	partial    bool
+	curMessage string
+	outBy      map[string]int64
+
+	// The totals of earlier rounds: a resumed session (the review loop) reports only its own
+	// usage and cost.
+	bankIn, bankOut, bankCached int64
+	bankCost                    float64
+}
+
+// NewRound starts the stream of a resumed session: the totals so far are kept, and the next
+// round's usage adds to them.
+func (r *Reader) NewRound() {
+	r.bankIn, r.bankOut, r.bankCached, r.bankCost = r.S.TokensIn, r.S.TokensOut, r.S.Cached, r.S.CostUSD
+	r.usageIn, r.usageOut, r.cached = 0, 0, 0
+	r.partial, r.curMessage, r.outBy = false, "", map[string]int64{}
+	r.S.Done = false
 }
 
 // NewReader returns a reader for a run of an arm.
 func NewReader(arm string) *Reader {
-	return &Reader{Arm: arm, pending: map[string]bool{}, seen: map[string]bool{}}
+	return &Reader{Arm: arm, pending: map[string]int{}, seen: map[string]bool{}, outBy: map[string]int64{}}
+}
+
+func (r *Reader) partialOut() int64 {
+	var n int64
+	for _, v := range r.outBy {
+		n += v
+	}
+	return n
 }
 
 // Line reads one line of the stream. A line that is not an event is ignored.
@@ -94,6 +147,24 @@ func (r *Reader) Line(line []byte) {
 		return
 	}
 	switch ev.Type {
+	case "system":
+		if ev.Subtype == "init" && ev.SessionID != "" {
+			r.S.Session = ev.SessionID
+		}
+	case "stream_event":
+		if e := ev.Event; e != nil {
+			switch e.Type {
+			case "message_start":
+				if e.Message != nil {
+					r.curMessage = e.Message.ID
+				}
+			case "message_delta":
+				if e.Usage != nil {
+					r.partial = true
+					r.outBy[r.curMessage] = e.Usage.Output
+				}
+			}
+		}
 	case "assistant":
 		// The events of one message repeat its usage; count the message once.
 		if id := ev.Message.ID; id == "" || !r.seen[id] {
@@ -104,6 +175,7 @@ func (r *Reader) Line(line []byte) {
 			if u := ev.Message.Usage; u != nil {
 				r.usageIn += u.Input + u.CacheCreate + u.CacheRead
 				r.usageOut += u.Output
+				r.cached += u.CacheRead
 			}
 		}
 		for _, b := range blocks(ev.Message.Content) {
@@ -111,24 +183,38 @@ func (r *Reader) Line(line []byte) {
 				continue
 			}
 			r.S.ToolCalls++
+			if r.S.FirstEdit == 0 && (b.Name == "Edit" || b.Name == "Write" || b.Name == "MultiEdit" || b.Name == "NotebookEdit") {
+				var in struct {
+					Path string `json:"file_path"`
+				}
+				_ = json.Unmarshal(b.Input, &in)
+				if r.Scratch == "" || !strings.HasPrefix(in.Path, r.Scratch) {
+					r.S.FirstEdit = r.S.Turns
+				}
+			}
 			if b.Name == "Bash" {
 				var in struct {
 					Command string `json:"command"`
 				}
 				_ = json.Unmarshal(b.Input, &in)
 				if IsCheck(r.Arm, in.Command) {
-					r.pending[b.ID] = true
+					r.pending[b.ID] = r.S.Turns
 				}
 			}
 		}
 	case "user":
 		for _, b := range blocks(ev.Message.Content) {
-			if b.Type != "tool_result" || !r.pending[b.ToolUseID] {
+			turn, ok := r.pending[b.ToolUseID]
+			if b.Type != "tool_result" || !ok {
 				continue
 			}
 			delete(r.pending, b.ToolUseID)
 			text := contentText(b.Content)
-			c := record.Check{OK: !b.IsError}
+			c := record.Check{OK: !b.IsError, Turn: turn, Undefined: strings.Count(text, "undefined:")}
+			if c.OK && r.S.FirstPass == 0 && r.S.FirstEdit > 0 && turn >= r.S.FirstEdit {
+				r.S.FirstPass = turn
+				r.S.TokensInAtFirstPass = r.bankIn + r.usageIn
+			}
 			for _, code := range codeRE.FindAllString(text, -1) {
 				if c.Codes == nil {
 					c.Codes = map[string]int{}
@@ -142,14 +228,16 @@ func (r *Reader) Line(line []byte) {
 		}
 	case "result":
 		r.S.Done = true // Turns stays the count of messages: num_turns counts otherwise and is not in a stopped run
-		r.S.CostUSD = ev.Cost
+		r.S.Result = ev.Result
+		r.S.CostUSD = r.bankCost + ev.Cost
 		r.S.Denied = len(ev.Denials)
 		if ev.Terminal == "api_error" || ev.APIError != 0 {
 			r.S.Provider = fmt.Sprintf("api_error %d", ev.APIError)
 		}
 		if u := ev.Usage; u != nil {
-			r.S.TokensIn = u.Input + u.CacheCreate + u.CacheRead
-			r.S.TokensOut = u.Output
+			r.S.TokensIn = r.bankIn + u.Input + u.CacheCreate + u.CacheRead
+			r.S.TokensOut = r.bankOut + u.Output
+			r.S.Cached = r.bankCached + u.CacheRead
 		}
 		if ev.IsError {
 			r.S.Error = ev.Subtype
@@ -159,8 +247,12 @@ func (r *Reader) Line(line []byte) {
 		}
 	}
 	if !r.S.Done {
-		// Until the final result, the sums of the messages are the best estimate.
-		r.S.TokensIn, r.S.TokensOut = r.usageIn, r.usageOut
+		// Until the final result, the sums of the messages are the best estimate; with partial
+		// messages, the output tokens are exact.
+		r.S.TokensIn, r.S.TokensOut, r.S.Cached = r.bankIn+r.usageIn, r.bankOut+r.usageOut, r.bankCached+r.cached
+		if r.partial {
+			r.S.TokensOut = r.bankOut + r.partialOut()
+		}
 	}
 }
 

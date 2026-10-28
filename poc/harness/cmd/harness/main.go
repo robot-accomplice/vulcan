@@ -1,7 +1,8 @@
 // Command harness runs the PoC evaluation (docs/poc/plan.md, sections 6 to 9).
 //
-//	harness schedule -tasks T01,T02 -runs 3 -seed 42 > schedule.json
+//	harness schedule -tasks T01,T02 -runs 3 -seed 42 [-arms P,L,V] > schedule.json
 //	harness evaluate -schedule schedule.json -material DIR -out DIR [-model M] [-budget-usd X]
+//	        [-sandbox DISTRO] [-review] [-prices prices.json]   (round 2, docs/poc/plan-r2.md)
 //	harness run -arm V -task T01 -index 1 -brief brief.md -rules RULES.md -out DIR
 //	harness grade -out DIR -material DIR
 //	harness analyze -runs runs.jsonl -meta meta.json > report.md
@@ -25,17 +26,20 @@ import (
 
 	"github.com/robot-accomplice/vulcan/poc/harness/agentlog"
 	"github.com/robot-accomplice/vulcan/poc/harness/analysis"
+	"github.com/robot-accomplice/vulcan/poc/harness/analysis2"
 	"github.com/robot-accomplice/vulcan/poc/harness/grade"
+	"github.com/robot-accomplice/vulcan/poc/harness/provider"
 	"github.com/robot-accomplice/vulcan/poc/harness/record"
 	"github.com/robot-accomplice/vulcan/poc/harness/runner"
 	"github.com/robot-accomplice/vulcan/poc/harness/schedule"
 	"github.com/robot-accomplice/vulcan/poc/harness/seal"
 	"github.com/robot-accomplice/vulcan/poc/harness/synth"
+	"github.com/robot-accomplice/vulcan/poc/harness/synth2"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: harness schedule|evaluate|run|grade|analyze|synth|tools|newkey|seal|open|manifest ...")
+		fmt.Fprintln(os.Stderr, "usage: harness schedule|evaluate|run|grade|gradeall|restream|analyze|analyze2|synth|synth2|tools|newkey|seal|open|manifest ...")
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
@@ -51,6 +55,10 @@ func main() {
 		err = cmdGrade(args)
 	case "analyze":
 		err = cmdAnalyze(args)
+	case "analyze2":
+		err = cmdAnalyze2(args)
+	case "synth2":
+		err = cmdSynth2(args)
 	case "validate":
 		err = cmdValidate(args)
 	case "public":
@@ -83,6 +91,14 @@ type common struct {
 	agent              string
 	maxTurns           int
 	maxTime            time.Duration
+
+	// Round 2 (docs/poc/plan-r2.md, section 6).
+	sandbox, linuxTools, modCache string // F4
+	review                        bool   // F9
+	reviewModel                   string
+	resubmits                     int
+	pricesFile                    string // F2
+	templateL                     string
 }
 
 func (c *common) flags(fs *flag.FlagSet) {
@@ -95,6 +111,48 @@ func (c *common) flags(fs *flag.FlagSet) {
 	fs.StringVar(&c.agent, "agent", "", "a command that replaces claude, for tests of the harness")
 	fs.IntVar(&c.maxTurns, "max-turns", 60, "the turn budget of a run")
 	fs.DurationVar(&c.maxTime, "max-time", 45*time.Minute, "the time budget of a run")
+	fs.StringVar(&c.sandbox, "sandbox", "", "run each agent in this WSL distribution, in its own namespace (round 2, F4)")
+	fs.StringVar(&c.linuxTools, "linux-tools", "", "the Linux tools of the sandbox: bin/ and go/ (default <repo>/.harness/tools-linux)")
+	fs.StringVar(&c.modCache, "modcache", "", "the Go module cache that the sandbox reads (default: go env GOMODCACHE)")
+	fs.BoolVar(&c.review, "review", false, "review each change, and give a rejection back to the agent (round 2, F9)")
+	fs.StringVar(&c.reviewModel, "review-model", "", "the reviewer's model (default: -model)")
+	fs.IntVar(&c.resubmits, "resubmits", 2, "resubmissions after a rejection")
+	fs.StringVar(&c.pricesFile, "prices", "", "a JSON file of the provider's prices by model, in USD per million tokens (round 2, F2)")
+	fs.StringVar(&c.templateL, "template-l", "", "arm L's workspace (default <repo>/poc/app/golint)")
+}
+
+// templates are the workspaces of the arms.
+func (c *common) template(arm string) string {
+	switch arm {
+	case record.ArmV:
+		return filepath.Join(c.repo, "poc", "app", "vulcan")
+	case record.ArmL:
+		if c.templateL != "" {
+			return c.templateL
+		}
+		return filepath.Join(c.repo, "poc", "app", "golint")
+	}
+	return filepath.Join(c.repo, "poc", "app", "go")
+}
+
+// prices reads the model's price from -prices, or nil.
+func (c *common) prices() (*runner.Price, error) {
+	if c.pricesFile == "" {
+		return nil, nil
+	}
+	b, err := os.ReadFile(c.pricesFile)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]*runner.Price
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("%s: %v", c.pricesFile, err)
+	}
+	p, ok := m[c.model]
+	if !ok {
+		return nil, fmt.Errorf("%s has no price for %q", c.pricesFile, c.model)
+	}
+	return p, nil
 }
 
 // token is the key of the other provider, from -token-file or VULCAN_AGENT_TOKEN.
@@ -117,17 +175,39 @@ func (c *common) toolDir() string {
 	return filepath.Join(c.repo, ".harness", "tools")
 }
 
-func (c *common) config(arm, task string, index, order int, brief, rules, out string) *runner.Config {
-	tmpl := filepath.Join(c.repo, "poc", "app", "go")
-	if arm == record.ArmV {
-		tmpl = filepath.Join(c.repo, "poc", "app", "vulcan")
-	}
-	cfg := &runner.Config{Template: tmpl, Arm: arm, Task: task, Index: index, Order: order, Brief: brief, RulesMD: rules,
+func (c *common) config(arm, task string, index, order int, brief, rules, out string) (*runner.Config, error) {
+	cfg := &runner.Config{Template: c.template(arm), Arm: arm, Task: task, Index: index, Order: order, Brief: brief, RulesMD: rules,
 		OutDir: out, ToolDir: c.toolDir(), Model: c.model, BaseURL: c.baseURL, Token: c.token(), MaxBudgetUSD: c.budget, MaxTurns: c.maxTurns, MaxTime: c.maxTime}
 	if c.agent != "" {
 		cfg.Agent = strings.Fields(c.agent)
 	}
-	return cfg
+	if c.sandbox != "" {
+		tools := c.linuxTools
+		if tools == "" {
+			tools = filepath.Join(c.repo, ".harness", "tools-linux")
+		}
+		mod := c.modCache
+		if mod == "" {
+			out, err := exec.Command("go", "env", "GOMODCACHE").Output()
+			if err != nil {
+				return nil, fmt.Errorf("go env GOMODCACHE: %v", err)
+			}
+			mod = strings.TrimSpace(string(out))
+		}
+		cfg.Sandbox = &runner.Sandbox{Distro: c.sandbox, Tools: tools, ModCache: mod}
+	}
+	if c.review {
+		cfg.Review = &runner.Review{Model: c.reviewModel, MaxResubmits: c.resubmits}
+		if c.agent != "" {
+			cfg.Review.Agent = strings.Fields(c.agent)
+		}
+	}
+	p, err := c.prices()
+	if err != nil {
+		return nil, err
+	}
+	cfg.Prices = p
+	return cfg, nil
 }
 
 func cmdSchedule(args []string) error {
@@ -135,20 +215,39 @@ func cmdSchedule(args []string) error {
 	tasks := fs.String("tasks", "", "comma-separated task ids")
 	runs := fs.Int("runs", 3, "runs per task and arm")
 	seed := fs.Uint64("seed", 0, "the committed seed")
+	arms := fs.String("arms", "V,G", "the arms: V,G in round 1; P,L,V in round 2")
+	ordTasks := fs.String("ord-tasks", "", "comma-separated ordinary task ids, with -ord-runs runs each (round 2)")
+	ordRuns := fs.Int("ord-runs", 5, "runs per ordinary task and arm")
+	retest := fs.Float64("retest", 0, "the share of slots to run a second time (round 2: 0.1)")
 	fs.Parse(args)
 	if *tasks == "" {
 		return fmt.Errorf("schedule needs -tasks")
 	}
-	b, _ := json.MarshalIndent(schedule.Make(strings.Split(*tasks, ","), *runs, *seed), "", "  ")
+	armList := strings.Split(*arms, ",")
+	slots := schedule.MakeArms(strings.Split(*tasks, ","), armList, *runs, *seed)
+	if *ordTasks != "" || *retest > 0 {
+		// Round 2: one shuffle over the tempting and the ordinary slots, then the retests.
+		if *ordTasks != "" {
+			slots = append(slots, schedule.MakeArms(strings.Split(*ordTasks, ","), armList, *ordRuns, *seed+1)...)
+			slots = schedule.Shuffle(slots, *seed)
+		}
+		if *retest > 0 {
+			slots = schedule.AddRetest(slots, *retest, *seed)
+		}
+	}
+	b, _ := json.MarshalIndent(slots, "", "  ")
 	fmt.Println(string(b))
 	return nil
 }
 
-// cmdTools builds the vulcan and fakepay commands into the tool directory.
+// cmdTools builds the vulcan and fakepay commands into the tool directory. With -linux it
+// builds them, and the scripted agent, for the sandbox into <linux-tools>/bin; the sandbox also
+// needs claude and a Go toolchain (go/) there, which this command does not fetch.
 func cmdTools(args []string) error {
 	fs := flag.NewFlagSet("tools", flag.ExitOnError)
 	var c common
 	c.flags(fs)
+	linux := fs.Bool("linux", false, "build for the sandbox (round 2, F4)")
 	fs.Parse(args)
 	dir, err := filepath.Abs(c.toolDir())
 	if err != nil {
@@ -158,9 +257,24 @@ func cmdTools(args []string) error {
 	if os.PathSeparator == '\\' {
 		exe = ".exe"
 	}
-	for name, pkg := range map[string]string{"vulcan": "./cmd/vulcan", "fakepay": "./poc/fakepay/cmd/fakepay"} {
+	pkgs := map[string]string{"vulcan": "./cmd/vulcan", "fakepay": "./poc/fakepay/cmd/fakepay"}
+	var env []string
+	if *linux {
+		tools := c.linuxTools
+		if tools == "" {
+			tools = filepath.Join(c.repo, ".harness", "tools-linux")
+		}
+		if dir, err = filepath.Abs(filepath.Join(tools, "bin")); err != nil {
+			return err
+		}
+		exe = ""
+		env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0")
+		pkgs["fakeagent"] = "./poc/harness/fakeagent"
+	}
+	for name, pkg := range pkgs {
 		cmd := exec.Command("go", "build", "-o", filepath.Join(dir, name+exe), pkg)
 		cmd.Dir = c.repo
+		cmd.Env = env
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("build %s: %v\n%s", name, err, out)
 		}
@@ -192,7 +306,10 @@ func cmdRun(args []string) error {
 	if err != nil {
 		return err
 	}
-	cfg := c.config(*arm, *task, *index, 0, brief, *rules, *out)
+	cfg, err := c.config(*arm, *task, *index, 0, brief, *rules, *out)
+	if err != nil {
+		return err
+	}
 	r, err := runner.Run(cfg)
 	if err != nil {
 		return err
@@ -273,6 +390,26 @@ func cmdEvaluate(args []string) error {
 			return err
 		}
 	}
+	// The provider's balance before the runs, after every 10 runs, and at the end (F8).
+	balances := filepath.Join(*outDir, "balance.jsonl")
+	logBalance := func(order int) error {
+		if c.baseURL == "" {
+			return nil
+		}
+		b, _ := json.Marshal(provider.Read(c.baseURL, c.token(), order))
+		f, err := os.OpenFile(balances, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = fmt.Fprintln(f, string(b))
+		return err
+	}
+	if err := logBalance(0); err != nil {
+		return err
+	}
+	ran, last := 0, 0
+	defer func() { _ = logBalance(last) }()
 	// A run that an API error of the provider ended is kept apart and run again, up to three
 	// passes over the schedule.
 	for pass := 1; pass <= 3; pass++ {
@@ -290,11 +427,19 @@ func cmdEvaluate(args []string) error {
 			if err := os.RemoveAll(dir); err != nil {
 				return err
 			}
-			cfg := c.config(s.Arm, s.Task, s.Index, s.Order, brief, rules, dir)
+			cfg, err := c.config(s.Arm, s.Task, s.Index, s.Order, brief, rules, dir)
+			if err != nil {
+				return err
+			}
 			fmt.Fprintf(os.Stderr, "run %d: %s\n", s.Order, key)
 			r, err := runner.Run(cfg)
 			if err != nil {
 				return fmt.Errorf("run %s: %w", key, err)
+			}
+			if ran, last = ran+1, s.Order; ran%10 == 0 {
+				if err := logBalance(last); err != nil {
+					return err
+				}
 			}
 			if r.ProviderFailed {
 				failed++
@@ -343,6 +488,53 @@ func cmdAnalyze(args []string) error {
 	}
 	analysis.Analyze(runs, meta).Markdown(os.Stdout, *title)
 	return nil
+}
+
+// cmdAnalyze2 is the frozen analysis of round 2 (docs/poc/plan-r2.md, section 3).
+func cmdAnalyze2(args []string) error {
+	fs := flag.NewFlagSet("analyze2", flag.ExitOnError)
+	runsPath := fs.String("runs", "", "runs.jsonl")
+	metaPath := fs.String("meta", "", "meta.json")
+	title := fs.String("title", "Round 2: Vulcan's objectives against plain Go", "the report's title")
+	fs.Parse(args)
+	runs, err := record.Load(*runsPath)
+	if err != nil {
+		return err
+	}
+	meta, err := record.LoadMeta(*metaPath)
+	if err != nil {
+		return err
+	}
+	analysis2.Analyze(runs, meta).Markdown(os.Stdout, *title)
+	return nil
+}
+
+// cmdSynth2 writes a synthetic data set of round 2 (F10).
+func cmdSynth2(args []string) error {
+	fs := flag.NewFlagSet("synth2", flag.ExitOnError)
+	name := fs.String("scenario", "model-helps", "not-tempting, model-helps, v-worse-than-l, language-adds, costly, or no-effect")
+	out := fs.String("out", "", "the directory for runs.jsonl and meta.json")
+	seed := fs.Uint64("seed", 1, "the seed")
+	runs := fs.Int("runs", 3, "runs per tempting task and arm")
+	ordRuns := fs.Int("ord-runs", 5, "runs per ordinary task and arm")
+	fs.Parse(args)
+	for _, s := range synth2.Scenarios {
+		if s.Name != *name {
+			continue
+		}
+		meta := synth2.Meta()
+		if err := os.MkdirAll(*out, 0o755); err != nil {
+			return err
+		}
+		b, _ := json.MarshalIndent(meta, "", "  ")
+		if err := os.WriteFile(filepath.Join(*out, "meta.json"), b, 0o644); err != nil {
+			return err
+		}
+		path := filepath.Join(*out, "runs.jsonl")
+		os.Remove(path)
+		return record.Append(path, synth2.Runs(s, meta, *runs, *ordRuns, *seed)...)
+	}
+	return fmt.Errorf("unknown scenario %q", *name)
 }
 
 func cmdSynth(args []string) error {
