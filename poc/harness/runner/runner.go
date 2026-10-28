@@ -165,6 +165,7 @@ func Run(c *Config) (*record.Run, error) {
 	}
 	s := reader.S
 	r.Turns, r.ToolCalls, r.TokensIn, r.TokensOut, r.CostUSD, r.Checks, r.Denied = s.Turns, s.ToolCalls, s.TokensIn, s.TokensOut, s.CostUSD, s.Checks, s.Denied
+	r.UsagePartial = !s.Done
 	switch {
 	case s.Provider != "":
 		r.AgentError, r.ProviderFailed = "provider: "+s.Provider, true

@@ -16,7 +16,7 @@ import (
 
 // Summary is what one stream tells.
 type Summary struct {
-	Turns     int
+	Turns     int // model messages: Claude Code writes one event per content block, so events with the same message id are one turn
 	ToolCalls int
 	TokensIn  int64
 	TokensOut int64
@@ -42,6 +42,7 @@ type event struct {
 	Type    string `json:"type"`
 	Subtype string `json:"subtype"`
 	Message struct {
+		ID      string          `json:"id"`
 		Content json.RawMessage `json:"content"`
 		Usage   *usage          `json:"usage"`
 	} `json:"message"`
@@ -77,11 +78,14 @@ type Reader struct {
 	Arm               string
 	S                 Summary
 	pending           map[string]bool // tool_use ids of check commands
+	seen              map[string]bool // message ids already counted
 	usageIn, usageOut int64
 }
 
 // NewReader returns a reader for a run of an arm.
-func NewReader(arm string) *Reader { return &Reader{Arm: arm, pending: map[string]bool{}} }
+func NewReader(arm string) *Reader {
+	return &Reader{Arm: arm, pending: map[string]bool{}, seen: map[string]bool{}}
+}
 
 // Line reads one line of the stream. A line that is not an event is ignored.
 func (r *Reader) Line(line []byte) {
@@ -91,10 +95,16 @@ func (r *Reader) Line(line []byte) {
 	}
 	switch ev.Type {
 	case "assistant":
-		r.S.Turns++
-		if u := ev.Message.Usage; u != nil {
-			r.usageIn += u.Input + u.CacheCreate + u.CacheRead
-			r.usageOut += u.Output
+		// The events of one message repeat its usage; count the message once.
+		if id := ev.Message.ID; id == "" || !r.seen[id] {
+			if id != "" {
+				r.seen[id] = true
+			}
+			r.S.Turns++
+			if u := ev.Message.Usage; u != nil {
+				r.usageIn += u.Input + u.CacheCreate + u.CacheRead
+				r.usageOut += u.Output
+			}
 		}
 		for _, b := range blocks(ev.Message.Content) {
 			if b.Type != "tool_use" {
@@ -131,10 +141,7 @@ func (r *Reader) Line(line []byte) {
 			r.S.Checks = append(r.S.Checks, c)
 		}
 	case "result":
-		r.S.Done = true
-		if ev.NumTurns > 0 {
-			r.S.Turns = ev.NumTurns
-		}
+		r.S.Done = true // Turns stays the count of messages: num_turns counts otherwise and is not in a stopped run
 		r.S.CostUSD = ev.Cost
 		r.S.Denied = len(ev.Denials)
 		if ev.Terminal == "api_error" || ev.APIError != 0 {

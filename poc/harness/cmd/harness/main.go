@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/robot-accomplice/vulcan/poc/harness/agentlog"
 	"github.com/robot-accomplice/vulcan/poc/harness/analysis"
 	"github.com/robot-accomplice/vulcan/poc/harness/grade"
 	"github.com/robot-accomplice/vulcan/poc/harness/record"
@@ -56,6 +57,8 @@ func main() {
 		err = cmdPublic(args)
 	case "gradeall":
 		err = cmdGradeAll(args)
+	case "restream":
+		err = cmdRestream(args)
 	case "synth":
 		err = cmdSynth(args)
 	case "tools":
@@ -472,6 +475,45 @@ func cmdPublic(args []string) error {
 
 // cmdGradeAll grades every run of an evaluation that ran with -no-grade, and rewrites
 // runs.jsonl with the graded records.
+// cmdRestream reads the stream of each run again and updates what the stream tells (turns,
+// tool calls, tokens, cost, checks, denials). It corrects runs recorded by an older reader.
+func cmdRestream(args []string) error {
+	fs := flag.NewFlagSet("restream", flag.ExitOnError)
+	outDir := fs.String("out", "", "the directory of the runs")
+	fs.Parse(args)
+	entries, err := os.ReadDir(*outDir)
+	if err != nil {
+		return err
+	}
+	var runs []record.Run
+	for _, e := range entries {
+		dir := filepath.Join(*outDir, e.Name())
+		r, err := loadRun(dir)
+		if err != nil {
+			continue // not a run directory
+		}
+		f, err := os.Open(filepath.Join(dir, "stream.jsonl"))
+		if err != nil {
+			return err
+		}
+		s, err := agentlog.Parse(r.Arm, f)
+		f.Close()
+		if err != nil {
+			return fmt.Errorf("%s: %w", e.Name(), err)
+		}
+		r.Turns, r.ToolCalls, r.TokensIn, r.TokensOut, r.CostUSD, r.Checks, r.Denied = s.Turns, s.ToolCalls, s.TokensIn, s.TokensOut, s.CostUSD, s.Checks, s.Denied
+		r.UsagePartial = !s.Done
+		b, _ := json.MarshalIndent(r, "", "  ")
+		if err := os.WriteFile(filepath.Join(dir, "run.json"), b, 0o644); err != nil {
+			return err
+		}
+		runs = append(runs, *r)
+	}
+	path := filepath.Join(*outDir, "runs.jsonl")
+	os.Remove(path)
+	return record.Append(path, runs...)
+}
+
 func cmdGradeAll(args []string) error {
 	fs := flag.NewFlagSet("gradeall", flag.ExitOnError)
 	var c common

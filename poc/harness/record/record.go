@@ -28,13 +28,16 @@ type Run struct {
 	BudgetHit   string    `json:"budget_hit,omitempty"` // "turns", "time", "tokens", or ""
 
 	// M4: cost.
-	Turns      int     `json:"turns"`
-	ToolCalls  int     `json:"tool_calls"`
-	TokensIn   int64   `json:"tokens_in"` // input, with cache reads and writes
-	TokensOut  int64   `json:"tokens_out"`
-	CostUSD    float64 `json:"cost_usd"`
-	AgentError string  `json:"agent_error,omitempty"`
-	Denied     int     `json:"denied"` // tool calls that the permission rules denied
+	Turns     int     `json:"turns"`
+	ToolCalls int     `json:"tool_calls"`
+	TokensIn  int64   `json:"tokens_in"` // input, with cache reads and writes
+	TokensOut int64   `json:"tokens_out"`
+	CostUSD   float64 `json:"cost_usd"`
+	// The stream has no final result (the runner stopped the run), so TokensOut and CostUSD
+	// are not known: the events of a message carry its input tokens, not its output.
+	UsagePartial bool   `json:"usage_partial,omitempty"`
+	AgentError   string `json:"agent_error,omitempty"`
+	Denied       int    `json:"denied"` // tool calls that the permission rules denied
 	// An API error of the provider ended the run. Such a run says nothing about the agent: it is
 	// not counted, and evaluate runs the slot again.
 	ProviderFailed bool `json:"provider_failed,omitempty"`

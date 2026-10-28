@@ -6,7 +6,7 @@ The harness runs, grades, and analyzes the evaluation of [docs/poc/plan.md](../.
 | Package | Job |
 |---|---|
 | `record` | The record of one run (`runs.jsonl`), and the task and rule metadata (`meta.json`) |
-| `agentlog` | Reads the JSON stream of `claude -p --output-format stream-json --verbose`: turns, tool calls, tokens, cost, and each run of the arm's check command with its Vulcan codes |
+| `agentlog` | Reads the JSON stream of `claude -p --output-format stream-json --verbose`: turns (one per message: Claude Code writes one event per content block), tool calls, tokens, cost, and each run of the arm's check command with its Vulcan codes |
 | `runner` | One run: a fresh copy of the arm's workspace with `RULES.md`, the agent in it, the budget (60 turns, 45 minutes, a cost cap), the stream, and the diff (M7) |
 | `schedule` | Every task, arm, and run index, in a random order fixed by a seed |
 | `grade` | Builds the final workspace, and runs the acceptance tests, the rule tests and detectors, and the holdout tests |
@@ -73,12 +73,15 @@ harness seal -dir MATERIAL -out material.sealed
 harness schedule -tasks T01,...,T12 -runs 3 -seed SEED > schedule.json
 harness open -in material.sealed -dir MATERIAL # only to grade
 harness evaluate -schedule schedule.json -material MATERIAL -out RUNS -model MODEL -budget-usd X
+harness gradeall -material MATERIAL -out RUNS    # grade runs made with evaluate -no-grade
+harness restream -out RUNS                      # read each run's stream again (a fixed reader)
 harness analyze -runs RUNS/runs.jsonl -meta MATERIAL/meta.json > report.md
 ```
 
 `evaluate` runs and grades each slot that `runs.jsonl` does not hold yet, so an interrupted
 evaluation resumes. A run blocked by a compiler bug is marked by hand (`toolchain_bug`), and a run
-whose infrastructure failed is marked `excluded`.
+whose infrastructure failed is marked `excluded`. A run that the runner stops has no final result
+in its stream, so its output tokens and cost are not known (`usage_partial`).
 
 ## Checks
 

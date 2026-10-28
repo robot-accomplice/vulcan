@@ -65,3 +65,20 @@ func TestProviderError(t *testing.T) {
 		t.Fatalf("provider %q", s.Provider)
 	}
 }
+
+// Claude Code writes one event per content block, each with the message's id and usage.
+func TestSplitMessage(t *testing.T) {
+	split := `{"type":"assistant","message":{"id":"m1","content":[{"type":"thinking","thinking":"x"}],"usage":{"input_tokens":10,"cache_read_input_tokens":100,"output_tokens":0}}}
+{"type":"assistant","message":{"id":"m1","content":[{"type":"text","text":"I will check."}],"usage":{"input_tokens":10,"cache_read_input_tokens":100,"output_tokens":0}}}
+{"type":"assistant","message":{"id":"m1","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go vet ./..."}}],"usage":{"input_tokens":10,"cache_read_input_tokens":100,"output_tokens":0}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":""}]}}
+{"type":"assistant","message":{"id":"m2","content":[{"type":"text","text":"Done."}],"usage":{"input_tokens":5,"output_tokens":0}}}
+`
+	s, err := Parse("G", strings.NewReader(split))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Turns != 2 || s.ToolCalls != 1 || len(s.Checks) != 1 || s.TokensIn != 115 {
+		t.Fatalf("summary %+v", s)
+	}
+}
