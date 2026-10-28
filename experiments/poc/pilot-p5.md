@@ -70,3 +70,21 @@ The same schedule then runs again with a second model, `moonshotai/kimi-k3.1-pro
 OpenRouter, as a replicate across models. The two models are reported apart, never pooled.
 
 The two pilots ran again on each agent before its main runs, as a check of the pipeline.
+
+### Pilots on deepseek-v4-pro (2026-10-28)
+
+| Run | Turns | Wall time | Builds | Acceptance | Holdout | Rules broken |
+|---|---|---|---|---|---|---|
+| P01 V | 61 (turn budget) | 218 s | yes | 6 of 6 | 14 of 14 | none |
+| P01 G | 61 (turn budget) | 180 s | yes | 6 of 6 | 14 of 14 | none |
+| P02 V | 25 | 244 s | yes | 5 of 5 | 14 of 14 | none |
+| P02 G | 21 | 100 s | yes | 5 of 5 | 14 of 14 | none |
+
+The four runs cost 0.31 USD (from the provider's balance). In P01 the agent passed the check
+early, then used its turns to test by hand: it started the service several times and wrote a
+test server. It wrote those files in `/tmp`, outside the workspace, where a later run could see
+them. Git for Windows maps `/tmp` to the user's temp directory whatever `TMP` says, so the
+runner now (1) sets `TMP`, `TEMP`, and `TMPDIR` to a directory of the run, (2) adds one sentence
+to the preamble of both arms, "Keep any scratch files inside the current directory.", and (3)
+records the new entries of the user's temp directory after each run (`temp_leftovers`). The
+pilot's files were removed before the main runs.

@@ -51,7 +51,7 @@ const Preamble = `You are working on Stockroom, a service written in {{language}
 Read README.md first: it gives the layout, the check command, and how to run the service.
 The team rules are in RULES.md. Make the change below. You are done when the change works and
 the check command of README.md passes. Do not ask questions; if something is unclear, choose the
-simplest reading of the request.
+simplest reading of the request. Keep any scratch files inside the current directory.
 
 `
 
@@ -112,6 +112,10 @@ func Run(c *Config) (*record.Run, error) {
 			}
 		}
 	}
+	if err := os.MkdirAll(filepath.Join(c.OutDir, "tmp"), 0o755); err != nil {
+		return nil, err
+	}
+	tempBefore := tempEntries()
 	r := &record.Run{Task: c.Task, Arm: c.Arm, Index: c.Index, Order: c.Order, Start: time.Now().UTC()}
 
 	args := c.Agent
@@ -171,6 +175,7 @@ func Run(c *Config) (*record.Run, error) {
 	case waitErr != nil && r.BudgetHit == "" && !s.Done:
 		r.AgentError = waitErr.Error()
 	}
+	r.TempLeftovers = newEntries(tempBefore, tempEntries())
 	if err := diffStats(c, base, ws, r); err != nil {
 		return nil, err
 	}
@@ -184,7 +189,8 @@ func (c *Config) env() []string {
 	for _, e := range os.Environ() {
 		k, _, _ := strings.Cut(e, "=")
 		switch u := strings.ToUpper(k); {
-		case u == "PATH", u == "GOPROXY", u == "GOFLAGS", u == "GONOSUMDB", u == "GOSUMDB", u == "VULCAN_AGENT_TOKEN":
+		case u == "PATH", u == "GOPROXY", u == "GOFLAGS", u == "GONOSUMDB", u == "GOSUMDB", u == "VULCAN_AGENT_TOKEN",
+			u == "TMP", u == "TEMP", u == "TMPDIR":
 			continue
 		case strings.HasPrefix(u, "CLAUDE"), strings.HasPrefix(u, "ANTHROPIC"), u == "AI_AGENT", u == "BAGGAGE":
 			// The session that starts the harness may itself run in Claude Code: its variables
@@ -198,7 +204,8 @@ func (c *Config) env() []string {
 	if c.ToolDir != "" {
 		path = c.ToolDir + string(os.PathListSeparator) + path
 	}
-	out = append(out, "PATH="+path, "GOPROXY=off", "GOSUMDB=off")
+	tmp, _ := filepath.Abs(filepath.Join(c.OutDir, "tmp"))
+	out = append(out, "PATH="+path, "GOPROXY=off", "GOSUMDB=off", "TMP="+tmp, "TEMP="+tmp, "TMPDIR="+tmp)
 	if c.BaseURL != "" {
 		// Claude Code with another provider: every model role is the run's model, so no request
 		// goes to a Claude model. The cost that Claude Code reports, and so --max-budget-usd, uses
@@ -212,6 +219,29 @@ func (c *Config) env() []string {
 			}
 		}
 	}
+	return out
+}
+
+// The shell of Git for Windows maps /tmp to the user's temp directory whatever TMP says, so a
+// run can leave files there that a later run sees. tempEntries lists that directory, and the run
+// records what is new in it (TempLeftovers), without removing anything: other programs use it too.
+func tempEntries() map[string]bool {
+	m := map[string]bool{}
+	des, _ := os.ReadDir(os.TempDir())
+	for _, d := range des {
+		m[d.Name()] = true
+	}
+	return m
+}
+
+func newEntries(before, after map[string]bool) []string {
+	var out []string
+	for n := range after {
+		if !before[n] {
+			out = append(out, n)
+		}
+	}
+	sort.Strings(out)
 	return out
 }
 
