@@ -36,7 +36,8 @@ or 45 minutes; `--max-budget-usd` is the token cap.
 
 The agent has only the tools of `runner.AllowedTools`, the same in both arms: the file tools,
 and the shell for `go`, `gofmt`, `vulcan`, `fakepay`, `curl`, `cd`, `ls`, `pwd`, and `sleep`.
-Claude Code denies every other tool and command without a prompt (`dontAsk`).
+Claude Code denies every other tool and command without a prompt (`dontAsk`), except the shell
+commands that it holds to be read-only (for example `whoami`), which it always allows.
 
 Limit: the allowed commands run with the user's rights on the machine, and `curl` can reach
 the web; the briefs need neither. Keep the hidden material sealed

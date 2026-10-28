@@ -164,10 +164,10 @@ hidden material from separate sessions, its validation, and two pilot tasks with
 tests, detectors, seeded cases, and reference solutions. It validates and is sealed outside the
 repository ([material-p5.md](../experiments/poc/material-p5.md)). The owner then had strict mode
 (§5.4d) implemented and turned on in arm V; after it, 2 of 16 rules are enforced by V (R03, R05),
-and the compiler rejects 9 of the 36 seeded cases of arm V (5 before). Not done: the two pilot
-runs. The tool permission check of the session refused to start headless agents with
-`bypassPermissions`; the owner must decide how the runs start (by hand, or a narrower permission
-mode).
+and the compiler rejects 9 of the 36 seeded cases of arm V (5 before). The runner now starts the
+agent with `dontAsk` and a tool allowlist. The two [pilot tasks](../experiments/poc/pilot-p5.md)
+ran in both arms; all four runs build, pass every acceptance and holdout test, and break no rule.
+Next: the decisions that the pilot record lists, then the main runs.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
