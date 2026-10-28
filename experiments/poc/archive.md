@@ -11,6 +11,7 @@ read the same data.
 |---|---|---|
 | Working copy | `C:\Users\jonat\vulcan-poc\runs` (system disk) | Everything, unsealed, with built binaries (3.5 GB) |
 | Archive | `D:\vulcan-poc-archive\2026-10-28` (second physical disk) | Each run set sealed, its manifest, `material.sealed`, and `SHA256SUMS` |
+| Off-site | Proton Drive, `My files/vulcan-poc-archive/2026-10-28` (synced by the owner's client) | The same files as the archive, checked with `SHA256SUMS`; never the key |
 
 The archive leaves out only what can be built again: each run's `bin/` (tool copies), `tmp/`,
 the grader's `prepared/`, and `.exe` files. It keeps each run's `run.json`, `stream.jsonl`,
