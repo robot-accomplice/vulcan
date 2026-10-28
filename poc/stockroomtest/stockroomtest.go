@@ -6,6 +6,9 @@ package stockroomtest
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net"
@@ -14,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -140,4 +144,63 @@ func (a *App) Stock(t *testing.T, sku string, onHand, reserved int64) {
 	if Num(p, "on_hand") != onHand || Num(p, "reserved") != reserved || Num(p, "available") != onHand-reserved {
 		t.Fatalf("stock of %s: %v, want on_hand %d reserved %d", sku, p, onHand, reserved)
 	}
+}
+
+// Receiver is a webhook subscriber for tests: it records each request, and answers 204, or 500
+// while it is set to fail.
+type Receiver struct {
+	URL string
+
+	mu       sync.Mutex
+	hooks    []Hook
+	failNext int
+}
+
+// Hook is one webhook that a Receiver got.
+type Hook struct {
+	Event     string // the Stockroom-Event header
+	Signature string // the Stockroom-Signature header
+	Body      []byte
+}
+
+// NewReceiver starts a receiver, and stops it when the test ends.
+func NewReceiver(t *testing.T) *Receiver {
+	t.Helper()
+	rc := &Receiver{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		rc.mu.Lock()
+		defer rc.mu.Unlock()
+		rc.hooks = append(rc.hooks, Hook{Event: r.Header.Get("Stockroom-Event"), Signature: r.Header.Get("Stockroom-Signature"), Body: body})
+		if rc.failNext > 0 {
+			rc.failNext--
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+	rc.URL = srv.URL
+	return rc
+}
+
+// FailNext makes the next n requests fail with status 500.
+func (rc *Receiver) FailNext(n int) {
+	rc.mu.Lock()
+	rc.failNext = n
+	rc.mu.Unlock()
+}
+
+// Hooks returns the webhooks received so far, failed ones included, in order.
+func (rc *Receiver) Hooks() []Hook {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	return append([]Hook(nil), rc.hooks...)
+}
+
+// Signed reports whether a hook carries the signature of its body with the secret.
+func (h Hook) Signed(secret string) bool {
+	m := hmac.New(sha256.New, []byte(secret))
+	m.Write(h.Body)
+	return h.Signature == "sha256="+hex.EncodeToString(m.Sum(nil))
 }
