@@ -263,7 +263,7 @@ func cmdTools(args []string) error {
 	if os.PathSeparator == '\\' {
 		exe = ".exe"
 	}
-	pkgs := map[string]string{"vulcan": "./cmd/vulcan", "fakepay": "./poc/fakepay/cmd/fakepay"}
+	pkgs := map[string]string{"vulcan": "./cmd/vulcan", "fakepay": "./poc/fakepay/cmd/fakepay", "vulcan-lint": "./poc/golint/cmd/vulcan-lint"}
 	var env []string
 	if *linux {
 		tools := c.linuxTools
