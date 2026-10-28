@@ -4,7 +4,8 @@ Run 2026-10-28. This round compares arm V (Vulcan, with strict mode) with arm G 
 the rules in prose in `RULES.md`), on 12 tasks of the Stockroom-lite application, 3 runs a task
 and arm: 72 runs. The design is in [docs/poc/plan.md](../../docs/poc/plan.md), the hidden material
 in [material-p5.md](material-p5.md), the pilots and the decisions before the round in
-[pilot-p5.md](pilot-p5.md). The data is in [data/p5-deepseek](data/p5-deepseek).
+[pilot-p5.md](pilot-p5.md). The data is in [data/p5-deepseek](data/p5-deepseek). The raw runs are sealed and archived, and the analyses still to
+do are listed, in [archive.md](archive.md).
 
 ## The answer
 
