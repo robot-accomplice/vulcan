@@ -14,8 +14,17 @@ section 5). So round 2 does not try to show a rule that only Vulcan can enforce.
 It tests what Vulcan was built for, **its objectives in spec §1.1 and §3**, against plain Go, and
 asks of each one whether the *language* is needed or a *Go linter of Vulcan's model* gets it too.
 That is decision 6's Q1 (do the rules help?) with arm R built as a generic linter of Vulcan's
-model, plus Vulcan itself as a third arm, because the compiler exists. If the linter gets the
-gains, decision 6 row 4 applies: **pivot to the rules**, and continue as a Go tool.
+model, plus Vulcan itself as a third arm, because the compiler exists. Decision 6 fixed the
+consequences of each result before any of them exists: if the linter gets the gains, its row 4
+applies (pivot to the rules, and continue as a Go tool).
+
+**Stance.** The round measures; it does not seek an outcome. Every verdict, for Vulcan or against
+it, is reached by the same tests, needs the same replication, and is reported with the same
+effect sizes and intervals. No verdict carries a burden that another does not. Two inputs of the
+design lean one way, and are named here so that a reader can weigh them: the desk test's session
+was asked to argue the Go side as strongly as it could, so its finding that no check is "V only"
+is a prediction, which the labels of step 3 measure (set U); and the tasks are chosen where arm P
+breaks rules (section 4), which works against arms L and V.
 
 Every measure below is computed by a script from the run's stream, final workspace, and the
 graders' tests. No measure depends on a person's judgment, and every run can be graded again from
@@ -88,17 +97,24 @@ informative" in a quarter of the cases.)
 | # | Condition | Verdict |
 |---|---|---|
 | 1 | Validity gate fails, the cost gate (section 6) stops the round, or a toolchain fault blocks more than 10% of an arm's runs | **Not informative** |
-| 2 | QA passes, L is within the margins of P (N0, N1, N6), and V is not better than L (QV: equivalent, worse, or unclear) | **The model helps; the language does not.** Decision 6 row 4: pivot to the rules, as a Go tool |
-| 3 | QA passes, and V is better than L on clean success by more than 12 points with the bound above 0, or on review (QR) by a ratio bound below 0.87 | **The language adds something the linter does not.** Not expected after the desk test: the report must find the cause before any claim, and a new round with a fresh rule set tests it |
+| 2 | QA passes, L is within the margins of P (N0, N1, N6), and V is not better than L (QV: equivalent, worse, or unclear) | **The model helps; no measured gain of the language over the linter.** Decision 6 row 4: pivot to the rules, as a Go tool |
+| 3 | QA passes, and V is better than L on clean success by more than 12 points with the bound above 0, or on review (QR) by a ratio bound below 0.87 | **The model helps, and the language adds a measured gain over the linter** |
 | 4 | QA passes, but L fails N0, N1, or N6 against P | **The model helps, at a cost too high.** Find the cost in the check loop (O2) and the primer (O6) |
-| 5 | QA fails, and L's rate on S is not lower than P's | **The model does not help this agent.** Neither the language nor the linter is supported |
+| 5 | QA fails, and L's rate on S is not lower than P's | **No measured help from the model for this agent.** The round supports neither the linter nor the language |
 | 6 | Anything else | **Unclear**: more runs on the same tasks, decided and sized before they run |
+
+Every verdict is reported with every effect size and interval of this section, whichever row it
+is. Every verdict holds only if the replication (section 5) gives the same row; a verdict that the
+second model does not repeat is reported as such, and leads to no decision. Whatever the verdict,
+the measures that explain it (the check loop O2, the costs O6, the reported O7 and O8) are reported
+for every arm.
 
 ## 4. Rules and tasks
 
 - **Rules:** a fresh rule-writer session with no Vulcan material, from the functional brief, at
   least 24 rules in the four classes. A labeler session then labels each rule by running the
-  seeded cases: S (L and V enforce it), G (L only), U (V only; expected empty), N (neither).
+  seeded cases: S (L and V enforce it), G (L only), U (V only; the desk test predicts it empty,
+  and the labels measure it), N (neither).
   At least 8 rules in S and 4 in N, or the round stops before tasks are written.
 - **Tasks:** a fresh task-writer session writes 36 tempting and 10 ordinary tasks, with briefs in
   a user's words, a larger application (Stockroom-lite with two more services), and chains of 3
@@ -120,7 +136,7 @@ informative" in a quarter of the cases.)
   agreement of clean success between the two runs of a slot, so a reader can see how much one run
   can vary.
 - **Replication:** the main schedule runs again on a second model (Kimi through OpenRouter). A
-  verdict of row 2 or 3 holds only if the second model gives the same row. The models are reported
+  verdict holds only if the second model gives the same row. The models are reported
   apart, never pooled.
 - **Archive:** each round's runs are sealed, hashed, and kept off the machine before any working
   copy is deleted ([archive.md](../../experiments/poc/archive.md)). All scripts are in this
@@ -164,7 +180,8 @@ calibration's measured rates. The main runs start only if P(verdict 2 or 3 \| a 
 at least 0.8 and P(verdict 2 or 3 \| no effect) at most 0.05.
 
 **Cost gate.** The pilot prices a run. If the main runs and the replication would cost more than
-the funds left, they shrink in this order before they start: the replication waits; then 2 runs
+the funds left, they shrink in this order before they start (a verdict without its replication is
+reported as not yet replicated): the replication waits; then 2 runs
 per task and arm; then 24 tasks. No arm is ever dropped. The order is fixed now, so that the size
 is not chosen after seeing data.
 

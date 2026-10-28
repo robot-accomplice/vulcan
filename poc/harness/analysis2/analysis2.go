@@ -583,13 +583,13 @@ func verdict(rep *Report, lCostsOK bool) (int, string, []string) {
 	case !rep.Valid:
 		return 1, "Not informative", reasons
 	case rep.QA.P1 && lCostsOK && rep.QVState != "better":
-		return 2, "The model helps; the language does not. Pivot to the rules, as a Go tool (decision 6, row 4)", reasons
+		return 2, "The model helps; no measured gain of the language over the linter. Decision 6, row 4: pivot to the rules, as a Go tool", reasons
 	case rep.QA.P1 && rep.QVState == "better":
-		return 3, "The language adds something the linter does not. Find the cause before any claim; test again with a fresh rule set", reasons
+		return 3, "The model helps, and the language adds a measured gain over the linter", reasons
 	case rep.QA.P1 && !lCostsOK:
 		return 4, "The model helps, at a cost too high", reasons
 	case !rep.QA.P1 && !(rep.QA.MeanX < rep.QA.MeanY):
-		return 5, "The model does not help this agent. Neither the language nor the linter is supported", reasons
+		return 5, "No measured help from the model for this agent. The round supports neither the linter nor the language", reasons
 	}
 	return 6, "Unclear: more runs on the same tasks, decided and sized before they run", reasons
 }

@@ -63,6 +63,7 @@ func boundTable(w io.Writer, title string, m map[string]Bound, points bool) {
 // Markdown writes the report.
 func (r *Report) Markdown(w io.Writer, title string) {
 	fmt.Fprintf(w, "# %s\n\n**Verdict (row %d): %s.**\n\n", title, r.Row, r.Verdict)
+	fmt.Fprintf(w, "A verdict holds only if the replication on a second model gives the same row (plan-r2, sections 3 and 5). Every verdict is read with all the effect sizes and intervals below.\n\n")
 	for _, s := range r.Reasons {
 		fmt.Fprintf(w, "- %s\n", s)
 	}
