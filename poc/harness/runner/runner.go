@@ -162,6 +162,8 @@ func Run(c *Config) (*record.Run, error) {
 	s := reader.S
 	r.Turns, r.ToolCalls, r.TokensIn, r.TokensOut, r.CostUSD, r.Checks, r.Denied = s.Turns, s.ToolCalls, s.TokensIn, s.TokensOut, s.CostUSD, s.Checks, s.Denied
 	switch {
+	case s.Provider != "":
+		r.AgentError, r.ProviderFailed = "provider: "+s.Provider, true
 	case s.Error == "error_max_budget_usd" || strings.Contains(s.Error, "budget"):
 		r.BudgetHit = "tokens"
 	case s.Error != "":

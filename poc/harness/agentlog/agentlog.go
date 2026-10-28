@@ -6,6 +6,7 @@ package agentlog
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -22,6 +23,7 @@ type Summary struct {
 	CostUSD   float64
 	Checks    []record.Check
 	Denied    int    // tool calls that the permission rules denied
+	Provider  string // the API error that ended the run, such as "api_error 429", or ""
 	Done      bool   // the stream has its final result
 	Error     string // the agent's error, if the run ended with one
 }
@@ -49,6 +51,8 @@ type event struct {
 	Usage    *usage            `json:"usage"`
 	Result   string            `json:"result"`
 	Denials  []json.RawMessage `json:"permission_denials"`
+	Terminal string            `json:"terminal_reason"`
+	APIError int               `json:"api_error_status"`
 }
 
 type usage struct {
@@ -133,6 +137,9 @@ func (r *Reader) Line(line []byte) {
 		}
 		r.S.CostUSD = ev.Cost
 		r.S.Denied = len(ev.Denials)
+		if ev.Terminal == "api_error" || ev.APIError != 0 {
+			r.S.Provider = fmt.Sprintf("api_error %d", ev.APIError)
+		}
 		if u := ev.Usage; u != nil {
 			r.S.TokensIn = u.Input + u.CacheCreate + u.CacheRead
 			r.S.TokensOut = u.Output

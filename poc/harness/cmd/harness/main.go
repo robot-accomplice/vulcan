@@ -270,33 +270,56 @@ func cmdEvaluate(args []string) error {
 			return err
 		}
 	}
-	for _, s := range slots {
-		key := fmt.Sprintf("%s/%s/%d", s.Task, s.Arm, s.Index)
-		if done[key] {
-			continue
-		}
-		brief, err := readFile(filepath.Join(*material, "tasks", s.Task, "brief.md"))
-		if err != nil {
-			return err
-		}
-		dir := filepath.Join(*outDir, fmt.Sprintf("%03d-%s-%s-%d", s.Order, s.Task, s.Arm, s.Index))
-		cfg := c.config(s.Arm, s.Task, s.Index, s.Order, brief, rules, dir)
-		fmt.Fprintf(os.Stderr, "run %d: %s\n", s.Order, key)
-		r, err := runner.Run(cfg)
-		if err != nil {
-			return fmt.Errorf("run %s: %w", key, err)
-		}
-		if g != nil {
-			if err := g.Grade(dir, r); err != nil {
-				return fmt.Errorf("grade %s: %w", key, err)
+	// A run that an API error of the provider ended is kept apart and run again, up to three
+	// passes over the schedule.
+	for pass := 1; pass <= 3; pass++ {
+		failed := 0
+		for _, s := range slots {
+			key := fmt.Sprintf("%s/%s/%d", s.Task, s.Arm, s.Index)
+			if done[key] {
+				continue
 			}
+			brief, err := readFile(filepath.Join(*material, "tasks", s.Task, "brief.md"))
+			if err != nil {
+				return err
+			}
+			dir := filepath.Join(*outDir, fmt.Sprintf("%03d-%s-%s-%d", s.Order, s.Task, s.Arm, s.Index))
+			if err := os.RemoveAll(dir); err != nil {
+				return err
+			}
+			cfg := c.config(s.Arm, s.Task, s.Index, s.Order, brief, rules, dir)
+			fmt.Fprintf(os.Stderr, "run %d: %s\n", s.Order, key)
+			r, err := runner.Run(cfg)
+			if err != nil {
+				return fmt.Errorf("run %s: %w", key, err)
+			}
+			if r.ProviderFailed {
+				failed++
+				_ = runner.Save(cfg, r)
+				aside := fmt.Sprintf("%s.provider-failed-%d", dir, time.Now().Unix())
+				fmt.Fprintf(os.Stderr, "run %d: %s, kept in %s, run again later\n", s.Order, r.AgentError, filepath.Base(aside))
+				if err := os.Rename(dir, aside); err != nil {
+					return err
+				}
+				continue
+			}
+			if g != nil {
+				if err := g.Grade(dir, r); err != nil {
+					return fmt.Errorf("grade %s: %w", key, err)
+				}
+			}
+			if err := runner.Save(cfg, r); err != nil {
+				return err
+			}
+			if err := record.Append(runsPath, *r); err != nil {
+				return err
+			}
+			done[key] = true
 		}
-		if err := runner.Save(cfg, r); err != nil {
-			return err
+		if failed == 0 {
+			break
 		}
-		if err := record.Append(runsPath, *r); err != nil {
-			return err
-		}
+		fmt.Fprintf(os.Stderr, "pass %d: %d runs ended by the provider\n", pass, failed)
 	}
 	return nil
 }

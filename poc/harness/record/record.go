@@ -35,6 +35,9 @@ type Run struct {
 	CostUSD    float64 `json:"cost_usd"`
 	AgentError string  `json:"agent_error,omitempty"`
 	Denied     int     `json:"denied"` // tool calls that the permission rules denied
+	// An API error of the provider ended the run. Such a run says nothing about the agent: it is
+	// not counted, and evaluate runs the slot again.
+	ProviderFailed bool `json:"provider_failed,omitempty"`
 
 	// M5 and M6: the check loop. Each run of the arm's check command, in order.
 	Checks []Check `json:"checks"`

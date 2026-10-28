@@ -26,6 +26,9 @@ func TestParse(t *testing.T) {
 	if s.Turns != 4 || s.ToolCalls != 4 || !s.Done || s.CostUSD != 0.25 {
 		t.Fatalf("summary %+v", s)
 	}
+	if s.Provider != "" {
+		t.Fatalf("provider %q", s.Provider)
+	}
 	if s.Denied != 1 {
 		t.Fatalf("denied %d", s.Denied)
 	}
@@ -49,5 +52,16 @@ func TestParse(t *testing.T) {
 func TestIsCheck(t *testing.T) {
 	if !IsCheck("G", "go vet ./... && go test ./...") || IsCheck("G", "vulcan check") || !IsCheck("V", "cd x && vulcan test Orders") {
 		t.Fatal("IsCheck")
+	}
+}
+
+func TestProviderError(t *testing.T) {
+	line := `{"type":"result","subtype":"success","is_error":true,"num_turns":2,"terminal_reason":"api_error","api_error_status":429,"result":"API Error: Request rejected (429)"}`
+	s, err := Parse("V", strings.NewReader(line+"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Provider != "api_error 429" {
+		t.Fatalf("provider %q", s.Provider)
 	}
 }

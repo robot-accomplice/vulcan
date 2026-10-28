@@ -40,7 +40,8 @@ Each run ended with a passing check command.
    the agent can run any command with the user's rights, and can reach the web through the
    shell. The other tools stay limited to `runner.AllowedTools` (`dontAsk`): no web or MCP
    tools. The hidden material stays sealed during the runs.
-2. Model: first `claude-sonnet-5-5`, then `kimi-k3.1-pro` (Main runs, below). Cost cap: 5 USD a run.
+2. Model: first `claude-sonnet-5-5`, then `deepseek-v4-pro`, and `kimi-k3.1-pro` as a second
+   model (Main runs, below). Cost cap: 5 USD a run.
 3. Each run records the number of denied tool calls (`denied` in run.json).
 4. Claude Code was updated from 2.1.77 to 2.1.312 (the latest) before the main runs; the pilots
    ran on 2.1.77.
@@ -55,7 +56,17 @@ A first start used `claude-sonnet-5-5` on the owner's Claude login. The owner st
 runs, so as not to spend the login's usage limit. Those runs were never graded, are kept apart
 (`runs/main-sonnet-stopped`), and do not count.
 
-Agent of the counted runs: Claude Code 2.1.312 against Moonshot's Anthropic-compatible endpoint
-(`https://api.moonshot.ai/anthropic`), model `kimi-k3.1-pro` for every model role, 5 USD a run (at the
-prices that Claude Code assumes), 60 turns, 45 minutes. The two pilots ran again on this agent
-before the main runs, as a check of the pipeline.
+Agent of the counted runs: Claude Code 2.1.312 against DeepSeek's Anthropic-compatible endpoint
+(`https://api.deepseek.com/anthropic`), model `deepseek-v4-pro` for every model role, 5 USD a run
+(at the prices that Claude Code assumes), 60 turns, 45 minutes. The owner asked for the most runs
+for the funds: by the token use of the Sonnet runs, a run costs about 0.06 USD on this model.
+
+`kimi-k3.1-pro` on Moonshot's own endpoint was tried first. The provider answered 429 (engine
+overloaded) on every request, so its two pilot runs never got past the second turn; they do not
+count. A run that an API error of the provider ends is now kept apart and run again
+(`provider_failed`), because it says nothing about the agent.
+
+The same schedule then runs again with a second model, `moonshotai/kimi-k3.1-pro` through
+OpenRouter, as a replicate across models. The two models are reported apart, never pooled.
+
+The two pilots ran again on each agent before its main runs, as a check of the pipeline.
