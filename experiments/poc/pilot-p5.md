@@ -44,3 +44,10 @@ Each run ended with a passing check command.
 3. Each run records the number of denied tool calls (`denied` in run.json).
 4. Claude Code was updated from 2.1.77 to 2.1.312 (the latest) before the main runs; the pilots
    ran on 2.1.77.
+
+## Main runs
+
+Schedule: 12 tasks (T01 to T12) × 3 runs × 2 arms = 72 runs, seed 20261028, committed in
+[schedule-main.json](schedule-main.json) before the first run. Agent: Claude Code 2.1.312,
+`claude-sonnet-5-5`, 5 USD a run, 60 turns, 45 minutes. The runs are not graded until all have
+ended, so the hidden material stays sealed while they go on.

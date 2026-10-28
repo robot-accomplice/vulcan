@@ -1,0 +1,434 @@
+[
+  {
+    "order": 1,
+    "task": "T03",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 2,
+    "task": "T03",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 3,
+    "task": "T10",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 4,
+    "task": "T05",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 5,
+    "task": "T10",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 6,
+    "task": "T12",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 7,
+    "task": "T02",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 8,
+    "task": "T01",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 9,
+    "task": "T06",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 10,
+    "task": "T08",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 11,
+    "task": "T11",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 12,
+    "task": "T01",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 13,
+    "task": "T09",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 14,
+    "task": "T02",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 15,
+    "task": "T07",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 16,
+    "task": "T07",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 17,
+    "task": "T09",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 18,
+    "task": "T04",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 19,
+    "task": "T10",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 20,
+    "task": "T10",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 21,
+    "task": "T08",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 22,
+    "task": "T02",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 23,
+    "task": "T01",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 24,
+    "task": "T07",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 25,
+    "task": "T05",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 26,
+    "task": "T11",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 27,
+    "task": "T09",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 28,
+    "task": "T06",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 29,
+    "task": "T09",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 30,
+    "task": "T11",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 31,
+    "task": "T12",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 32,
+    "task": "T09",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 33,
+    "task": "T02",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 34,
+    "task": "T05",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 35,
+    "task": "T02",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 36,
+    "task": "T04",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 37,
+    "task": "T09",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 38,
+    "task": "T05",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 39,
+    "task": "T06",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 40,
+    "task": "T08",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 41,
+    "task": "T03",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 42,
+    "task": "T01",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 43,
+    "task": "T04",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 44,
+    "task": "T12",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 45,
+    "task": "T06",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 46,
+    "task": "T05",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 47,
+    "task": "T12",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 48,
+    "task": "T08",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 49,
+    "task": "T02",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 50,
+    "task": "T04",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 51,
+    "task": "T04",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 52,
+    "task": "T03",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 53,
+    "task": "T03",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 54,
+    "task": "T01",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 55,
+    "task": "T01",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 56,
+    "task": "T07",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 57,
+    "task": "T10",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 58,
+    "task": "T03",
+    "arm": "G",
+    "index": 3
+  },
+  {
+    "order": 59,
+    "task": "T10",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 60,
+    "task": "T12",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 61,
+    "task": "T07",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 62,
+    "task": "T11",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 63,
+    "task": "T04",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 64,
+    "task": "T08",
+    "arm": "V",
+    "index": 2
+  },
+  {
+    "order": 65,
+    "task": "T07",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 66,
+    "task": "T06",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 67,
+    "task": "T11",
+    "arm": "V",
+    "index": 3
+  },
+  {
+    "order": 68,
+    "task": "T12",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 69,
+    "task": "T05",
+    "arm": "V",
+    "index": 1
+  },
+  {
+    "order": 70,
+    "task": "T06",
+    "arm": "G",
+    "index": 1
+  },
+  {
+    "order": 71,
+    "task": "T08",
+    "arm": "G",
+    "index": 2
+  },
+  {
+    "order": 72,
+    "task": "T11",
+    "arm": "V",
+    "index": 2
+  }
+]
