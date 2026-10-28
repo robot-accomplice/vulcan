@@ -32,6 +32,11 @@ type Store interface {
 	SaveOrder(o shop.Order) error
 }
 
+// Events tells the subscribers what happened.
+type Events interface {
+	Publish(t shop.EventType, subject string)
+}
+
 // Service runs the life cycle of orders. One lock serializes the changes of orders, so that two
 // requests never change one order at once.
 type Service struct {
@@ -39,11 +44,12 @@ type Service struct {
 	stock   Stock
 	billing Billing
 	store   Store
+	events  Events
 }
 
 // NewService returns the service.
-func NewService(stock Stock, billing Billing, store Store) *Service {
-	return &Service{stock: stock, billing: billing, store: store}
+func NewService(stock Stock, billing Billing, store Store, events Events) *Service {
+	return &Service{stock: stock, billing: billing, store: store, events: events}
 }
 
 // Create creates an order and reserves its stock: all lines, or none.
@@ -84,6 +90,7 @@ func (s *Service) Create(customer shop.CustomerID, wants []shop.Want) (shop.Orde
 		return shop.Order{}, err
 	}
 	o.ID = id
+	s.events.Publish(shop.EventOrderCreated, string(o.ID))
 	return o, nil
 }
 
@@ -116,6 +123,7 @@ func (s *Service) Pay(id shop.OrderID) (shop.Order, error) {
 	if err := s.store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	s.events.Publish(shop.EventOrderPaid, string(o.ID))
 	return o, nil
 }
 
@@ -137,6 +145,7 @@ func (s *Service) Ship(id shop.OrderID) (shop.Order, error) {
 	if err := s.store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	s.events.Publish(shop.EventOrderShipped, string(o.ID))
 	return o, nil
 }
 
@@ -166,6 +175,7 @@ func (s *Service) Cancel(id shop.OrderID) (shop.Order, error) {
 	if err := s.store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	s.events.Publish(shop.EventOrderCancelled, string(o.ID))
 	return o, nil
 }
 
@@ -191,6 +201,7 @@ func (s *Service) Refund(id shop.OrderID, amount shop.Money) (shop.Order, error)
 	if err := s.store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	s.events.Publish(shop.EventOrderRefunded, string(o.ID))
 	return o, nil
 }
 
