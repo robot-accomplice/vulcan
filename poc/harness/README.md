@@ -24,7 +24,8 @@ Each run calls headless Claude Code in the run's workspace:
 ```
 claude -p --output-format stream-json --verbose --setting-sources local --strict-mcp-config
        --mcp-config {"mcpServers":{}} --disallowedTools WebFetch,WebSearch
-       --permission-mode bypassPermissions [--model M] [--max-budget-usd X] <prompt>
+       --permission-mode dontAsk --allowedTools <runner.AllowedTools>
+       [--model M] [--max-budget-usd X] <prompt>
 ```
 
 No user or project settings load, so no one's CLAUDE.md or memories reach the agent; no MCP
@@ -33,7 +34,12 @@ server runs; the web is off. Go modules come from the local cache only (`GOPROXY
 task brief, the same in both arms except the language name. The runner stops a run at 60 turns
 or 45 minutes; `--max-budget-usd` is the token cap.
 
-Limit: the agent runs with the user's rights on the machine. Keep the hidden material sealed
+The agent has only the tools of `runner.AllowedTools`, the same in both arms: the file tools,
+and the shell for `go`, `gofmt`, `vulcan`, `fakepay`, `curl`, `cd`, `ls`, `pwd`, and `sleep`.
+Claude Code denies every other tool and command without a prompt (`dontAsk`).
+
+Limit: the allowed commands run with the user's rights on the machine, and `curl` can reach
+the web; the briefs need neither. Keep the hidden material sealed
 while the runs go on; it is opened only to grade.
 
 ## The hidden material

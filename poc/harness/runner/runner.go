@@ -62,13 +62,25 @@ func (c *Config) Prompt() string {
 	return strings.ReplaceAll(Preamble+c.Brief, "{{language}}", lang)
 }
 
+// AllowedTools are the only tools of a run, the same in both arms: the file tools, and the
+// shell only for the commands that the workspace README names (go, gofmt, vulcan, fakepay), curl
+// to try the service, and a few harmless helpers. Any other tool or command is denied without a
+// prompt (--permission-mode dontAsk), so the agent cannot act outside these commands.
+var AllowedTools = []string{
+	"Read", "Edit", "Write", "Glob", "Grep", "TodoWrite",
+	"BashOutput", "KillShell", "TaskOutput", "TaskStop",
+	"Bash(go:*)", "Bash(gofmt:*)", "Bash(vulcan:*)", "Bash(fakepay:*)", "Bash(curl:*)",
+	"Bash(cd:*)", "Bash(ls:*)", "Bash(pwd)", "Bash(sleep:*)",
+}
+
 // claudeArgs is the headless Claude Code command: no user or project settings (so no
-// CLAUDE.md or memories of anyone reach the agent), no MCP servers, no web access, and every
-// tool allowed inside the workspace.
+// CLAUDE.md or memories of anyone reach the agent), no MCP servers, no web tools, and only the
+// tools of AllowedTools.
 func (c *Config) claudeArgs() []string {
 	args := []string{"claude", "-p", "--output-format", "stream-json", "--verbose",
 		"--setting-sources", "local", "--strict-mcp-config", "--mcp-config", `{"mcpServers":{}}`,
-		"--disallowedTools", "WebFetch,WebSearch", "--permission-mode", "bypassPermissions"}
+		"--disallowedTools", "WebFetch,WebSearch", "--permission-mode", "dontAsk",
+		"--allowedTools", strings.Join(AllowedTools, ",")}
 	if c.Model != "" {
 		args = append(args, "--model", c.Model)
 	}
@@ -167,8 +179,13 @@ func (c *Config) env() []string {
 	var out []string
 	for _, e := range os.Environ() {
 		k, _, _ := strings.Cut(e, "=")
-		switch strings.ToUpper(k) {
-		case "PATH", "GOPROXY", "GOFLAGS", "GONOSUMDB", "GOSUMDB", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT":
+		switch u := strings.ToUpper(k); {
+		case u == "PATH", u == "GOPROXY", u == "GOFLAGS", u == "GONOSUMDB", u == "GOSUMDB":
+			continue
+		case strings.HasPrefix(u, "CLAUDE"), strings.HasPrefix(u, "ANTHROPIC"), u == "AI_AGENT", u == "BAGGAGE":
+			// The session that starts the harness may itself run in Claude Code: its variables
+			// change the agent (CLAUDE_CODE_SIMPLE, CLAUDE_EFFORT, ANTHROPIC_BASE_URL) and are
+			// not the same in every run, so the agent gets none of them.
 			continue
 		}
 		out = append(out, e)
