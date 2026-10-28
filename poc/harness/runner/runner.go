@@ -39,6 +39,8 @@ type Config struct {
 	// empty, the runner uses Claude Code in headless mode with Model and MaxBudgetUSD.
 	Agent        []string
 	Model        string
+	BaseURL      string        // an Anthropic-compatible endpoint of another provider, or "" for Claude Code's own login
+	Token        string        // the key of BaseURL
 	MaxTurns     int           // 60
 	MaxTime      time.Duration // 45 minutes
 	MaxBudgetUSD float64       // the token cap, as a cost
@@ -180,7 +182,7 @@ func (c *Config) env() []string {
 	for _, e := range os.Environ() {
 		k, _, _ := strings.Cut(e, "=")
 		switch u := strings.ToUpper(k); {
-		case u == "PATH", u == "GOPROXY", u == "GOFLAGS", u == "GONOSUMDB", u == "GOSUMDB":
+		case u == "PATH", u == "GOPROXY", u == "GOFLAGS", u == "GONOSUMDB", u == "GOSUMDB", u == "VULCAN_AGENT_TOKEN":
 			continue
 		case strings.HasPrefix(u, "CLAUDE"), strings.HasPrefix(u, "ANTHROPIC"), u == "AI_AGENT", u == "BAGGAGE":
 			// The session that starts the harness may itself run in Claude Code: its variables
@@ -194,7 +196,21 @@ func (c *Config) env() []string {
 	if c.ToolDir != "" {
 		path = c.ToolDir + string(os.PathListSeparator) + path
 	}
-	return append(out, "PATH="+path, "GOPROXY=off", "GOSUMDB=off")
+	out = append(out, "PATH="+path, "GOPROXY=off", "GOSUMDB=off")
+	if c.BaseURL != "" {
+		// Claude Code with another provider: every model role is the run's model, so no request
+		// goes to a Claude model. The cost that Claude Code reports, and so --max-budget-usd, uses
+		// Claude prices; the tokens are exact.
+		out = append(out, "ANTHROPIC_BASE_URL="+c.BaseURL, "ANTHROPIC_AUTH_TOKEN="+c.Token, "ANTHROPIC_API_KEY=",
+			"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
+		if c.Model != "" {
+			for _, k := range []string{"ANTHROPIC_MODEL", "ANTHROPIC_SMALL_FAST_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL",
+				"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "CLAUDE_CODE_SUBAGENT_MODEL"} {
+				out = append(out, k+"="+c.Model)
+			}
+		}
+	}
+	return out
 }
 
 func killTree(p *os.Process) error {

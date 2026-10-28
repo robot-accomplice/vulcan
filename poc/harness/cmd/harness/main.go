@@ -75,6 +75,7 @@ func main() {
 
 type common struct {
 	repo, tools, model string
+	baseURL, tokenFile string
 	budget             float64
 	agent              string
 	maxTurns           int
@@ -85,10 +86,25 @@ func (c *common) flags(fs *flag.FlagSet) {
 	fs.StringVar(&c.repo, "repo", ".", "the root of the vulcan repository")
 	fs.StringVar(&c.tools, "tools", "", "the directory of the vulcan and fakepay commands (default <repo>/.harness/tools)")
 	fs.StringVar(&c.model, "model", "", "the model of the agent")
+	fs.StringVar(&c.baseURL, "base-url", "", "an Anthropic-compatible endpoint of another provider")
+	fs.StringVar(&c.tokenFile, "token-file", "", "a file that holds the key of -base-url (else VULCAN_AGENT_TOKEN)")
 	fs.Float64Var(&c.budget, "budget-usd", 0, "the token cap of a run, as a cost")
 	fs.StringVar(&c.agent, "agent", "", "a command that replaces claude, for tests of the harness")
 	fs.IntVar(&c.maxTurns, "max-turns", 60, "the turn budget of a run")
 	fs.DurationVar(&c.maxTime, "max-time", 45*time.Minute, "the time budget of a run")
+}
+
+// token is the key of the other provider, from -token-file or VULCAN_AGENT_TOKEN.
+func (c *common) token() string {
+	if c.tokenFile != "" {
+		b, err := os.ReadFile(c.tokenFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "token-file:", err)
+			os.Exit(2)
+		}
+		return strings.TrimSpace(string(b))
+	}
+	return os.Getenv("VULCAN_AGENT_TOKEN")
 }
 
 func (c *common) toolDir() string {
@@ -104,7 +120,7 @@ func (c *common) config(arm, task string, index, order int, brief, rules, out st
 		tmpl = filepath.Join(c.repo, "poc", "app", "vulcan")
 	}
 	cfg := &runner.Config{Template: tmpl, Arm: arm, Task: task, Index: index, Order: order, Brief: brief, RulesMD: rules,
-		OutDir: out, ToolDir: c.toolDir(), Model: c.model, MaxBudgetUSD: c.budget, MaxTurns: c.maxTurns, MaxTime: c.maxTime}
+		OutDir: out, ToolDir: c.toolDir(), Model: c.model, BaseURL: c.baseURL, Token: c.token(), MaxBudgetUSD: c.budget, MaxTurns: c.maxTurns, MaxTime: c.maxTime}
 	if c.agent != "" {
 		cfg.Agent = strings.Fields(c.agent)
 	}

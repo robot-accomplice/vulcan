@@ -28,6 +28,11 @@ claude -p --output-format stream-json --verbose --setting-sources local --strict
        [--model M] [--max-budget-usd X] <prompt>
 ```
 
+With `-base-url URL` and `-token-file F` (or `VULCAN_AGENT_TOKEN`), Claude Code talks to another
+provider's Anthropic-compatible endpoint, and every model role is the `-model` of the run. The
+cost that Claude Code reports, and so `--max-budget-usd`, uses Claude prices; the token counts
+are exact.
+
 No user or project settings load, so no one's CLAUDE.md or memories reach the agent; no MCP
 server runs; the web is off. Go modules come from the local cache only (`GOPROXY=off`). The
 `vulcan` and `fakepay` commands are first on the PATH. The prompt is `runner.Preamble` and the
