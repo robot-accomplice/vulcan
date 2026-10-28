@@ -175,7 +175,7 @@ succeeded in 28 of 36 runs, arm G in 35 of 36, and neither arm broke a rule in t
 Faults found after the runs: the turn budget counted stream events (about 26 real turns, not 60;
 fixed in `agentlog`, and `harness restream` corrected the data), the usage of stopped runs is
 partial (`usage_partial`), scratch files in the workspace were graded as code, and runs still
-shared `/tmp`. Next: the owner reviews the draft of round 2, [plan-r2.md](poc/plan-r2.md): a desk test of what Go tools cannot do, a third arm of Go with linters, calibrated tasks, the harness fixes, and verdicts written before the runs.
+shared `/tmp`. The [desk test](poc/desk-test-r2.md) then found every PoC check "Same in Go" (gate 0), and its hole H1 (code files named `vulcan_*` skipped every rule) is fixed. Next: the owner reviews the second draft of round 2, [plan-r2.md](poc/plan-r2.md): each objective of spec §1.1 and §3 measured by script against plain Go, with a third arm that is Vulcan's model as a Go linter and primer, and verdicts written before the runs.
 
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.

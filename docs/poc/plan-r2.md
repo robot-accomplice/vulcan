@@ -1,169 +1,173 @@
-# Round 2: the litmus test of Vulcan against Go
+# Round 2: Vulcan's objectives against plain Go
 
-Status: draft for the owner's review, 2026-10-28. Nothing here runs before the owner accepts it.
+Status: draft for the owner's review, 2026-10-28 (second draft). Nothing here runs before the
+owner accepts it. The first draft was replaced after the [desk test](desk-test-r2.md).
 
-Round 1 ([results-p5.md](../../experiments/poc/results-p5.md)) could not answer its question.
-Neither arm broke a rule in the product code, so there was nothing for Vulcan to prevent. Arm V
-enforced 2 of the 16 rules, and an analyzer could enforce both, so a win would not have shown
-that Vulcan differs from Go with good tools. A harness fault cut the turn budget to about 26
-turns. This plan is built so that round 2 gives a clear answer, yes or no, and says in advance
-which results mean which.
+## 0. Why this draft
 
-## 1. The questions
+The [desk test](desk-test-r2.md) found that every check of the PoC compiler is "Same in Go": a
+Go analyzer can enforce each one on the same facts. Decision 6 already says what that means:
+when fewer than 4 rules need the language (set U\*), "no rule needs the language", and the
+language's case is not judged by runs ([decision 6](../decisions/0006-evidence-protocol.md),
+section 5). So round 2 does not try to show a rule that only Vulcan can enforce.
 
-1. **Value:** when an AI agent changes an application, does Vulcan keep the team's rules more
-   often than plain Go, at an acceptable cost?
-2. **Difference:** does Vulcan do better than Go *with the best tools a Go team could add*:
-   linters for every rule that a linter can decide, and the same contracts written as checks in
-   Go?
+It tests what Vulcan was built for, **its objectives in spec §1.1 and §3**, against plain Go, and
+asks of each one whether the *language* is needed or a *Go linter of Vulcan's model* gets it too.
+That is decision 6's Q1 (do the rules help?) with arm R built as a generic linter of Vulcan's
+model, plus Vulcan itself as a third arm, because the compiler exists. If the linter gets the
+gains, decision 6 row 4 applies: **pivot to the rules**, and continue as a Go tool.
 
-Question 2 is the litmus test. If Go with linters gets the same result, Vulcan adds a language
-where a linter would do, and the honest conclusion is to build the linter.
+Every measure below is computed by a script from the run's stream, final workspace, and the
+graders' tests. No measure depends on a person's judgment, and every run can be graded again from
+the sealed archive ([archive.md](../../experiments/poc/archive.md)).
 
-## 2. Step 0: the desk test (no runs)
+## 1. The objectives, and what measures each one
 
-Before any run, a fresh session that has written none of Vulcan answers one question in writing:
-**which of Vulcan's checks can a Go team not get from `go/analysis` analyzers, build rules, and
-in-code checks?** It goes through each diagnostic that the PoC compiler gives in strict mode
-(architecture, effects, contracts, startup) and labels it:
+Spec §1.1: the developer spends most time on telling the model the requirements (task 1), reading
+the code (task 2), and validating and correcting it (task 3). Vulcan claims to make tasks 2 and 3
+shorter. §3 lists eight failures it answers.
 
-| Label | Meaning |
-|---|---|
-| **Same in Go** | An analyzer, or an assert in the Go code, gives the same guarantee on the same code |
-| **Harder in Go** | Possible in Go, but only with a convention that the agent can break without a diagnostic (for example a comment that marks a gateway) |
-| **Not in Go** | No Go tool can check it from the code |
+| # | Objective (spec) | Measure (scripted) | In the PoC? |
+|---|---|---|---|
+| O1 | **H-A: the rules leave review.** An enforced rule cannot be broken in a change that passes the check (§1.1) | Rule breaks in the final change (decision 6, X2), by rule set | Yes |
+| O2 | **H-B: breaks are stopped before review.** The agent fixes them against the diagnostics (§1.1) | Breaks that appear at a check run and are gone by the end; check runs failed by a rule code before the first pass; recovery within two check runs (M5, M6) | Yes |
+| O3 | **Task 2 is shorter: less to review** (§1.1, R6) | Review load: lines, files, and units changed (M7); the rules a reviewer must still check by hand (the rules that the arm does not enforce); reviewer cost (O3b below) | Yes |
+| O3b | A reviewer finds the remaining faults with less work | An AI reviewer session per accepted change, fixed prompt and checklist: tokens and turns to a verdict, and its recall of the grader's known breaks | Yes |
+| O4 | **Task 3 is shorter: fewer rounds of correction** | Review rejections before an accepted change; escaped defects (holdout failures per accepted change, X6) | Yes |
+| O5 | **H-C: no gain on logic that no rule covers** (§1.1) | Class D breaks and holdout failures equal across arms (a control) | Yes |
+| O6 | **R8: a new language costs little** (primer, Go syntax) | Task success and tokens on ordinary tasks (decision 6, N6) | Yes |
+| O7 | **R2, R3, R4: less duplication, fewer masked errors, fewer invented APIs** | Clone lines added (a fixed clone detector), masked or dropped errors added (`errcheck` and a fixed pattern list), build failures with `undefined:` in check runs | **No:** the PoC has none of K0701, K0702, the duplication warning, or `query`. Measured in all arms, reported, not credited to Vulcan |
+| O8 | **R1: small context** (`vulcan context`) | Input tokens to the first passing check after the first edit | **No:** `context` is deferred. Reported only |
 
-**Gate 0.** If every check is "Same in Go", round 2 cannot show a difference by enforcement. Then
-it does not run as planned: the result is written down, and the owner decides whether Vulcan's
-case rests on something else (the primer, the architecture that the code shows), which needs its
-own test. This step costs no runs and may be the most useful result of the plan.
+O7 and O8 are measured so that a later round with those features has a baseline, and so that the
+report does not credit Vulcan with them.
 
-## 3. Arms
+## 2. Arms
 
 | Arm | What the agent gets | Check command |
 |---|---|---|
-| **G** | Plain Go and `RULES.md`, as in round 1 | `go vet ./... && go test ./...` |
-| **GL** | Plain Go, `RULES.md`, a `golint-rules` command with one analyzer for each rule that a linter can decide, and the app's contracts written as Go checks that run in every test | `go vet ./... && golint-rules ./... && go test ./...` |
-| **V** | Vulcan in strict mode, the primer, `RULES.md` | `vulcan check && vulcan test` |
+| **P** (plain Go) | The Go app and `RULES.md` | `go vet ./... && go test ./...` |
+| **L** (Vulcan's model as a Go linter) | The Go app, `RULES.md`, the manifest of the architecture (packages and their kinds), `vulcan-lint` (the analyzers A1 to A8 of the desk test, section 1), contracts as calls to a small `contract` package, and a primer of the model in Go terms with the same token budget as Vulcan's | `go vet ./... && vulcan-lint ./... && go test ./...` |
+| **V** (Vulcan) | Vulcan in strict mode, its primer, `RULES.md` | `vulcan check && vulcan test` |
 
-The analyzers of GL are written by a fresh session that gets the rules in prose and the Go app,
-and nothing of Vulcan. It also gets the seeded violations of each rule in arm G, and an analyzer
-counts only if it rejects all of them and accepts the reference solutions. That makes GL the best
-Go baseline we can build, not a weak one. The contracts in GL are the same as in V, written as Go
-code that panics or returns an error, so that both arms start with the same checks in the code.
+- **Arm L is generic, not written to the rules.** A fresh session writes `vulcan-lint` and the
+  Go primer from the spec and the desk test **before the rules exist**, as Vulcan's checks were.
+  It must pass a port of the conformance cases that the desk test maps to its analyzers. This is
+  the fair rival: the same model of architecture, without a new language.
+- **Same contracts.** L holds the same contracts as V, in Go, so that both start with the same
+  checks in the code.
+- **No arm may change its check configuration** (decision 6, section 2): a change to the
+  manifest's kinds, the linter, `strict_exempt`, `strict_interfaces`, `strict_shared`, or an
+  in-source suppression, fails the run unless the brief asks for it. This closes hole H2 of the
+  desk test in both arms. H1 is fixed in the compiler (K0005 now covers file names).
+- Everything else is the same in the three arms: model, harness, budget, briefs, README.
 
-Everything else is the same in the three arms: model, harness, budget, briefs, and README.
+## 3. Questions and how each is decided
 
-## 4. Rules
+The unit is the task; differences are paired by task. Tests and bounds are those of decision 6,
+section 8 (one-sided exact sign-flip test at α = 0.05 over informative tasks; one-sided 95%
+t-bounds over tasks).
 
-A fresh rule-writer session writes 18 to 24 rules, in the four classes of round 1, then a labeler
-session labels each one before any task exists. Labels: enforced by V, enforced by GL, in the
-prose only. The rule set must have at least 6 rules in each of these groups:
-
-| Group | Enforced by | Purpose |
+| Q | Question | Test |
 |---|---|---|
-| **Both** | V and GL | Vulcan should equal GL here, and both should beat G |
-| **V only** | V, not GL (from step 0: "Harder" or "Not in Go") | The difference under test |
-| **Neither** | prose only | The control: no arm should beat G |
+| QA | Do enforced rules keep the agent within them? (O1) | P1(L better than P) on rule set S (rules that both L and V enforce) |
+| QV | Does the language add to the linter? (O1 to O4) | V against L on S: two one-sided bounds, equivalence within 12 points of clean success |
+| QR | Is review shorter? (O3, O4) | Review load and reviewer tokens, L/P and V/L: one-sided 95% bound of the per-task log ratio |
+| QC | What does each approach cost? (O6) | Decision 6's N0, N1 (tokens and turns in place of working time), N2, N6: L against P, and V against L |
+| — | Controls (O5) and the reported measures (O7, O8) | Reported with intervals, not tested |
 
-If the rule-writer cannot reach 6 rules of "V only" that a real team would write, that is a
-result in itself (gate 0 again), and the round stops there.
+**Validity gate.** Before any verdict: on tempting tasks, P breaks a targeted rule in at least
+30% of its runs; and each arm succeeds on at least 70% of its ordinary-task runs. If not, the
+round is **not informative**, as round 1 was, and no claim is made.
 
-## 5. Tasks
+**Verdicts, applied in order** (written before any run):
 
-Round 1's tasks did not tempt the model. Round 2 makes the temptation real and checks it before
-the main runs.
+| # | Condition | Verdict |
+|---|---|---|
+| 1 | Validity gate fails, the cost gate (section 6) stops the round, or a toolchain fault blocks more than 10% of an arm's runs | **Not informative** |
+| 2 | QA passes, L is within the margins of P (N0, N1, N6), and V is not better than L (QV: equivalent, or worse) | **The model helps; the language does not.** Decision 6 row 4: pivot to the rules, as a Go tool |
+| 3 | QA passes, and V is better than L on clean success by more than 12 points with the bound above 0, or on review (QR) by a ratio bound below 0.87 | **The language adds something the linter does not.** Not expected after the desk test: the report must find the cause before any claim, and a new round with a fresh rule set tests it |
+| 4 | QA passes, but L fails N0, N1, or N6 against P | **The model helps, at a cost too high.** Find the cost in the check loop (O2) and the primer (O6) |
+| 5 | QA fails, and L's rate on S is not lower than P's | **The model does not help this agent.** Neither the language nor the linter is supported |
+| 6 | Anything else | **Unclear**: more runs on the same tasks, decided and sized before they run |
 
-- **More pressure:** a larger application (Stockroom-lite with two more services), briefs that
-  ask for the feature in the words of a user, with the shortcut the natural way to do it, and
-  some tasks in a chain of 3 changes on the same code, where a break in step 1 makes step 3
-  easier.
-- **Calibration:** a task-writer session writes 36 tempting tasks and 10 ordinary ones. Each
-  tempting task runs 3 times in arm G only, with a separate seed. A tempting task is kept if G
-  broke a targeted rule in at least 1 of 3 runs. The first 24 kept tasks, by a committed random
-  order, go into the main runs. The calibration runs are not counted in the result.
-  Choosing tasks where G broke rules lets G's rate fall in the main runs (regression to the
-  mean). That works against V, so it does not make a V win look larger.
-- **Ordinary tasks:** 8, to measure the cost of each arm on normal work.
+## 4. Rules and tasks
+
+- **Rules:** a fresh rule-writer session with no Vulcan material, from the functional brief, at
+  least 24 rules in the four classes. A labeler session then labels each rule by running the
+  seeded cases: S (L and V enforce it), G (L only), U (V only; expected empty), N (neither).
+  At least 8 rules in S and 4 in N, or the round stops before tasks are written.
+- **Tasks:** a fresh task-writer session writes 36 tempting and 10 ordinary tasks, with briefs in
+  a user's words, a larger application (Stockroom-lite with two more services), and chains of 3
+  changes on the same code. Each tempting task targets at least one rule of S.
+- **Calibration:** each tempting task runs 3 times in arm P only, on its own seed. A task is kept
+  if P broke a targeted rule in at least 1 run. The first 24 kept tasks by a committed random
+  order go to the main runs, with 8 ordinary tasks. Calibration runs are not counted. Selecting on
+  P's breaks lowers P's rate in the main runs (regression to the mean), which works against L and
+  V, never for them.
+
+## 5. Repeatability
+
+- **Pinned:** the model and provider, the Claude Code version, the toolchain, the harness, the
+  hidden material, and the analysis script, each by version or hash, committed before the runs.
+- **Seeds:** the schedule and the task choice come from committed seeds.
+- **Scripted grading** only: tests, detectors, and the reviewer's fixed prompt. The reviewer
+  session is run twice on each change; the report gives the agreement of the two.
+- **Test-retest:** 10% of the main slots, chosen by seed, run a second time. The report gives the
+  agreement of clean success between the two runs of a slot, so a reader can see how much one run
+  can vary.
+- **Replication:** the main schedule runs again on a second model (Kimi through OpenRouter). A
+  verdict of row 2 or 3 holds only if the second model gives the same row. The models are reported
+  apart, never pooled.
+- **Archive:** each round's runs are sealed, hashed, and kept off the machine before any working
+  copy is deleted ([archive.md](../../experiments/poc/archive.md)). All scripts are in this
+  repository, so a third party with the seal key can grade every run again.
 
 ## 6. Harness fixes before any run
 
-Round 1 found these faults. Each fix comes with a test, and the pilot (section 8) checks them.
-
-| # | Fault in round 1 | Fix |
+| # | Fault (round 1) | Fix |
 |---|---|---|
-| F1 | The turn budget counted stream events | Done: one turn per message (`agentlog`, `TestSplitMessage`). Budget: 60 messages |
-| F2 | A stopped run has no output tokens or cost | Run with `--include-partial-messages` and read the output tokens from each message's final usage; compute the cost from a price table for the provider's model, not Claude's prices |
-| F3 | Scratch files in the workspace were graded and counted as diff | Give the agent a scratch directory outside the workspace (`--add-dir`); the grader and the detectors read only the product packages; the diff counts only source files |
-| F4 | Runs shared the user's `/tmp` | Run each agent in WSL (Ubuntu) under `bwrap`: its own `/tmp` and home, only the workspace and scratch writable. On Linux the check commands also add the race detector, which the plan wanted from the start |
-| F5 | A passing check on unchanged code looked like progress | Record the first passing check *after the first edit* |
-| F6 | V runs went on after the task was done | Both arms' preamble: "When the check passes and the brief is met, stop." Same words in all arms |
-| F7 | Provider errors | Done: the run is kept apart and run again |
-| F8 | The spend was not known per round | Record the provider's balance before and after each batch of runs |
+| F1 | The turn budget counted stream events | Done: one turn per message. Budget: 60 messages |
+| F2 | Stopped runs have no output tokens or cost | `--include-partial-messages`, output tokens from each message's last usage, cost from the provider's price table |
+| F3 | Scratch files were graded as code | A scratch directory outside the workspace (`--add-dir`); grading and diff stats read only product source |
+| F4 | Runs shared `/tmp` | Each run in WSL under `bwrap`: own `/tmp` and home, only workspace and scratch writable; the race detector on, as the plan wanted |
+| F5 | A pass on unchanged code looked like progress | Measures start at the first edit |
+| F6 | V runs went on after the task was done | Every preamble: "When the check passes and the brief is met, stop." |
+| F7 | A changed check configuration was not caught | The grader fails a run that changes the arm's check configuration (section 2) |
+| F8 | Spend per round unknown | The provider's balance before and after each batch |
+| F9 | No reviewer | The reviewer session of O3b, with a fixed prompt, checklist, and model |
+| F10 | Two arms only | The analysis grows to three arms and the verdicts of section 3; it reads synthetic data sets right first, including "L equals V", "V worse than L", and "no effect" |
 
-The analysis grows to three arms (V−G, V−GL, GL−G, each paired by task) and the verdict table of
-section 7. It is frozen, and it reads synthetic data sets right before the runs, including one
-where GL equals V and one where V helps only on "V only" rules.
-
-## 7. Reading the result (written now, before any run)
-
-Primary measure: **clean success on tempting tasks** (the acceptance tests pass and no targeted
-rule is broken), per task, paired across arms. Intervals: bootstrap 95% over tasks. "Above" means
-the lower end of the interval is above 0.
-
-**Validity gate.** The round counts only if (a) G breaks a targeted rule in at least 30% of its
-runs on tempting tasks, and (b) each arm succeeds on at least 70% of ordinary-task runs. If (a)
-fails, the tasks did not tempt; if (b) fails, the budget or the setup was too hard. In both cases
-the result is "not informative", as in round 1, and no claim is made.
-
-| Verdict | Condition |
-|---|---|
-| **Vulcan adds value and differs from Go** | V−G at least +15 points and above 0; V−GL at least +10 points and above 0; the gain over GL comes from the "V only" rules; no-harm holds |
-| **Go with tools is enough** | V−G at least +15 and above 0, but V−GL below +5 or its interval includes 0, and GL−G at least +10. Build the linter, not the language |
-| **No value** | V−G below +5, or the upper end of V−G's interval below +15 |
-| **Harmful** | Task success on ordinary tasks, V−G, has its interval below −10, or the cost ratio V/G is above 1.5 |
-| **Unclear** | Anything else: more runs on the same tasks, decided before they run |
-
-No-harm: ordinary-task success V−G is at least −10 points, and the cost ratio V/G (input and
-output tokens, geometric mean) is at most 1.5.
-
-**Replication.** A "differs from Go" verdict counts only if a second model (Kimi through
-OpenRouter) gives V−GL with the same sign on the same tasks. The two models are reported apart,
-never pooled.
-
-## 8. Size and cost
+## 7. Size and cost
 
 | Stage | Runs |
 |---|---|
-| Pilot: 2 tasks × 3 arms × 1 run, to check F1 to F8 | 6 |
-| Calibration: 36 tempting tasks × 3 runs, arm G | 108 |
-| Main: 32 tasks (24 tempting, 8 ordinary) × 3 arms × 3 runs | 288 |
-| Replicate on a second model, only if the main result is positive | 288 |
+| Pilot: 2 tasks × 3 arms × 1 run, to check F1 to F10 and to price a run | 6 |
+| Calibration: 36 tempting tasks × 3 runs, arm P | 108 |
+| Main: 32 tasks × 3 arms × 3 runs, plus 10% test-retest | about 317 |
+| Replication on a second model | about 317 |
 
-Why this size: with 12 tasks, round 1's intervals were about 40 points wide. With 24 tempting
-tasks the width is about 25 points, enough to tell +15 from 0, and the sign-flip test can reach
-p below 0.01.
+Before the main runs, `experiments/sizing/sizing.py`, adapted to three arms and these tests, is run with the
+calibration's measured rates. The main runs start only if P(verdict 2 or 3 \| a large effect) is
+at least 0.8 and P(verdict 2 or 3 \| no effect) at most 0.05.
 
-Cost: round 1's spend per run is not known exactly (F2, F8). The pilot measures it. **Cost gate:**
-if the main runs would cost more than the funds left, the round shrinks in this order before it
-starts: first the replicate waits; then 2 runs per task and arm instead of 3; then 18 tempting
-tasks. It never drops an arm. The order is fixed now so that the size is not chosen after seeing
-data.
+**Cost gate.** The pilot prices a run. If the main runs and the replication would cost more than
+the funds left, they shrink in this order before they start: the replication waits; then 2 runs
+per task and arm; then 24 tasks. No arm is ever dropped. The order is fixed now, so that the size
+is not chosen after seeing data.
 
-## 9. Work order and who does it
+## 8. Work order
 
 | Step | Who | Gate |
 |---|---|---|
-| 1. Step 0, the desk test | A fresh session | Gate 0 |
-| 2. Harness fixes F2 to F8, three-arm analysis, dry run | This project's builder | Tests pass, synthetic scenarios read right |
-| 3. Rules and labels | Fresh rule-writer and labeler sessions | At least 6 rules in each group |
-| 4. GL analyzers and contracts in Go | A fresh session with no Vulcan material | Reject every seeded violation, accept the reference solutions |
-| 5. Tasks, reference solutions in three arms | A fresh task-writer session | Each reference passes in all arms |
-| 6. Independent audit of steps 3 to 5 | A fresh session | No open High finding |
-| 7. Seal, commit hashes and schedules | Builder | |
-| 8. Pilot, then calibration | Builder | F1 to F8 work; at least 24 tempting tasks kept |
-| 9. Main runs, grading, frozen analysis | Builder | Validity gate |
-| 10. Results in `experiments/poc`, summary in the README | Builder | |
+| 1. Harness fixes F1 to F10, the three-arm analysis, its dry run | Builder | Tests pass; synthetic data read right |
+| 2. `vulcan-lint`, the manifest, the `contract` package, the Go primer | A fresh session, from the spec and the desk test, before the rules | It passes the ported conformance cases |
+| 3. Rules, then labels from the seeded cases | Fresh rule-writer and labeler sessions | At least 8 rules in S and 4 in N |
+| 4. Tasks, reference solutions in three arms | A fresh task-writer session | Each reference passes in all arms |
+| 5. Independent audit of steps 2 to 4 | A fresh session | No open High finding |
+| 6. Seal, commit hashes, seeds, and schedules | Builder | |
+| 7. Pilot, calibration, sizing | Builder | F1 to F10 work; 24 tasks kept; sizing passes; cost gate |
+| 8. Main runs, grading, frozen analysis, replication | Builder | Validity gate |
+| 9. Results in `experiments/poc`, summary in the README, archive | Builder | |
 
-The builder sees ids, counts, and pass or fail of the hidden material, never its text, as in
-round 1.
+The builder sees ids, counts, and pass or fail of the hidden material, never its text.
