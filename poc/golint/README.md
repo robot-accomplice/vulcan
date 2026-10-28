@@ -225,3 +225,39 @@ open, the linter follows the code:
 11. **`StrictExempt` names directories** (`"api/orders"`), as the manifest does; Vulcan names leaves.
 12. A **file that the build ignores** is reported at the package clause of the package's first
     file, since a diagnostic needs a position in a file that the driver parsed.
+
+## Every other judgment call, and which way it leans
+
+The aim was arm L as Vulcan's model in Go, no stronger and no weaker than the spec and the desk
+test make it, and tuned toward no result. The departures above, and the calls below, are each a
+place where a reader may weigh that aim. "Stricter" and "looser" compare with Vulcan's PoC
+compiler on the same change.
+
+| # | Call | Reason | Leans |
+|---|---|---|---|
+| J1 | The H3 extension of departure 8 (network values, types, `RoundTripper.RoundTrip`) | The desk test says Go can do more than the PoC there; this is the cheap part of it | Stricter than the PoC on network use |
+| J2 | No call graph or facts (departure 8) | Check-loop cost, not reach: facts load every dependency from source | Equal to the PoC |
+| J3 | `Keep` at every return, also nested (departure 6) | `defer` cannot tell an outer call from an inner one without state per goroutine | Stricter at run time |
+| J4 | Main outside strict mode, and free to call the standard library and other modules | Vulcan generates main; a Go main must read flags and signals, so it needs them | Looser than Vulcan, whose main is generated, not written by the agent |
+| J5 | Main may call no function of a library of the module (VL0907) | Vulcan's generated main calls none; wiring needs none | Stricter than a typical Go team, equal to Vulcan |
+| J6 | A "flag value" is a local variable or `m["key"]` (VL0606) | No generic rule can see that a variable came from a flag; this is the narrowest form that the existing main fits | Looser than Vulcan: a variable can hold a computed value |
+| J7 | One constructor called twice is not reported (K0607 not ported) | The driver has no warning level; an error would be stricter than Vulcan's warning | Equal in effect: Vulcan's warning does not fail the check |
+| J8 | Main's flag table and secret flag defaults are not checked (K0602, part of K0605) | Main's flag reading is hand-written Go with no generic form | Looser than Vulcan |
+| J9 | A port that no constructor takes is VL0104 | The Go form of "a port wired never" (K0104); the compiler covers the rest | Equal |
+| J10 | Ports with a contract need a wrapper, and the constructor must store it wrapped (VL0906) | Vulcan checks a port contract for every provider and fake; in Go only a wrapper does | Equal in what is checked; more code to write (a cost, measured by the round) |
+| J11 | Which ports have wrappers in the workspace | Exactly the ports whose `.vulcan` methods have contracts | Equal |
+| J12 | Constructors found by signature; an exported leaf function that returns a leaf type must have the constructor shape | Go has no constructor declaration; Vulcan's wire names a constructor | Stricter: a helper with that signature must be unexported |
+| J13 | Lifecycle methods by signature, any name | Vulcan's `setup`/`startup` are fixed names; requiring names would rename `web.Serve` and change arm P's code more | Looser: any method of that shape may be called from main |
+| J14 | An empty literal `T{}` needs no `contract.Valid` (departure 4) | VL0506 guarantees the zero value; Vulcan checks it anyway, and it cannot fail | Equal in effect |
+| J15 | `Invariant` must have a value receiver (VL0513) | So that `T` and `*T` both meet `contract.Checked`; Vulcan has no receiver | A form rule, no effect on what is checked |
+| J16 | Rules apply to test files as well, except A4 and the constructor shape | Vulcan's leaf rules read its test files too | Equal |
+| J17 | No code may import the manifest (VL0118) | The manifest is configuration, as `system.vulcan` is not importable | Equal |
+| J18 | `PROTECTED` lists `lib/contract/*.go` as well as the manifest | A change to the contract package can switch every check off, as a change to the compiler would; Vulcan's runtime is outside the workspace | Equal: neither arm can weaken its checker unseen |
+| J19 | Adding a package means a change to the protected manifest | Plan-r2 section 2 makes the manifest's kinds check configuration; in Vulcan a new leaf edits `system.vulcan`, whose `config` block alone is checked | Stricter on arm L: a task that adds a package needs `allow_config` in L and not in V |
+| J20 | `Ensures` reads the parameters at return, not at entry (departure 7) | A closure reads current values; saving every parameter would be code that Vulcan generates | Looser, in a body that changes a parameter that its `ensures` reads |
+| J21 | `err == nil => X` is written `err != nil || X`; results are named | Go has no `=>` and no `result` | Equal in what is checked |
+| J22 | The primer's scope | Section for section the same as `docs/poc/guide.md` (layout, wiring, contracts, tests, commands), plus a table of every VL code with its fix, as the brief asks; written once, not revised against any run | It is about 25% longer than Vulcan's primer, by the code table |
+| J23 | The primer's size is an estimate (bytes / 4) | No Claude tokenizer runs offline; both primers are measured the same way | Unknown error, the same for both |
+| J24 | The README's added line (the primer) and its blank line | The brief allows one line; Markdown needs the blank line to keep it a paragraph | None |
+| J25 | A02 gives two codes (VL0101 and VL0112) | The Go form of the change breaks two rules; Vulcan reports the one at the boundary | Equal in effect |
+| J26 | Names in messages and the primer are plain words, with a fix in each message | As Vulcan's messages give fix hints; no wording was tuned against an agent | Equal in intent |
