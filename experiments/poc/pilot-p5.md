@@ -40,7 +40,7 @@ Each run ended with a passing check command.
    the agent can run any command with the user's rights, and can reach the web through the
    shell. The other tools stay limited to `runner.AllowedTools` (`dontAsk`): no web or MCP
    tools. The hidden material stays sealed during the runs.
-2. Model: `claude-sonnet-5-5`, as in the pilots. Cost cap: 5 USD a run.
+2. Model: first `claude-sonnet-5-5`, then `kimi-k3.1-pro` (Main runs, below). Cost cap: 5 USD a run.
 3. Each run records the number of denied tool calls (`denied` in run.json).
 4. Claude Code was updated from 2.1.77 to 2.1.312 (the latest) before the main runs; the pilots
    ran on 2.1.77.
@@ -48,6 +48,14 @@ Each run ended with a passing check command.
 ## Main runs
 
 Schedule: 12 tasks (T01 to T12) × 3 runs × 2 arms = 72 runs, seed 20261028, committed in
-[schedule-main.json](schedule-main.json) before the first run. Agent: Claude Code 2.1.312,
-`claude-sonnet-5-5`, 5 USD a run, 60 turns, 45 minutes. The runs are not graded until all have
-ended, so the hidden material stays sealed while they go on.
+[schedule-main.json](schedule-main.json) before the first run. The runs are not graded until all
+have ended, so the hidden material stays sealed while they go on.
+
+A first start used `claude-sonnet-5-5` on the owner's Claude login. The owner stopped it after 33
+runs, so as not to spend the login's usage limit. Those runs were never graded, are kept apart
+(`runs/main-sonnet-stopped`), and do not count.
+
+Agent of the counted runs: Claude Code 2.1.312 against Moonshot's Anthropic-compatible endpoint
+(`https://api.moonshot.ai/anthropic`), model `kimi-k3.1-pro` for every model role, 5 USD a run (at the
+prices that Claude Code assumes), 60 turns, 45 minutes. The two pilots ran again on this agent
+before the main runs, as a check of the pipeline.
