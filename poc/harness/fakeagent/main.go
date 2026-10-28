@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func emit(v any) {
@@ -25,7 +26,7 @@ func emit(v any) {
 // message emits one message in the shape of partial messages: its start, its final output
 // tokens, and the message itself.
 func message(id string, content []any, in, out int) {
-	id = fmt.Sprintf("%s-%d", id, os.Getpid()) // each invocation's messages are its own
+	id = fmt.Sprintf("%s-%d", id, time.Now().UnixNano()) // each invocation's messages are its own, also in a PID namespace
 	emit(map[string]any{"type": "stream_event", "event": map[string]any{"type": "message_start", "message": map[string]any{"id": id}}})
 	emit(map[string]any{"type": "stream_event", "event": map[string]any{"type": "message_delta", "usage": map[string]any{"output_tokens": out}}})
 	emit(map[string]any{"type": "assistant", "message": map[string]any{"id": id, "content": content,

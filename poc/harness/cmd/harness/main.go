@@ -168,11 +168,17 @@ func (c *common) token() string {
 	return os.Getenv("VULCAN_AGENT_TOKEN")
 }
 
+// toolDir is absolute: exec resolves a relative command path against the command's directory,
+// which is the workspace.
 func (c *common) toolDir() string {
-	if c.tools != "" {
-		return c.tools
+	d := c.tools
+	if d == "" {
+		d = filepath.Join(c.repo, ".harness", "tools")
 	}
-	return filepath.Join(c.repo, ".harness", "tools")
+	if abs, err := filepath.Abs(d); err == nil {
+		return abs
+	}
+	return d
 }
 
 func (c *common) config(arm, task string, index, order int, brief, rules, out string) (*runner.Config, error) {
@@ -270,6 +276,16 @@ func cmdTools(args []string) error {
 		exe = ""
 		env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0")
 		pkgs["fakeagent"] = "./poc/harness/fakeagent"
+	}
+	if *linux {
+		// Vulcan's runtime module, which vulcan finds through VULCAN_RUNTIME in the sandbox.
+		rt := filepath.Join(filepath.Dir(dir), "runtime")
+		if err := os.RemoveAll(rt); err != nil {
+			return err
+		}
+		if err := copyDir(filepath.Join(c.repo, "vulcan"), rt); err != nil {
+			return err
+		}
 	}
 	for name, pkg := range pkgs {
 		cmd := exec.Command("go", "build", "-o", filepath.Join(dir, name+exe), pkg)
@@ -744,4 +760,22 @@ func cmdGradeAll(args []string) error {
 	path := filepath.Join(*outDir, "runs.jsonl")
 	os.Remove(path)
 	return record.Append(path, graded...)
+}
+
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(src, p)
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, b, 0o644)
+	})
 }

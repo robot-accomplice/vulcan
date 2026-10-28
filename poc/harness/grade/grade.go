@@ -39,6 +39,11 @@ type Grader struct {
 // Grade fills the grading fields of r, for the run in outDir (its workspace is outDir/workspace).
 func (g *Grader) Grade(outDir string, r *record.Run) error {
 	ws := filepath.Join(outDir, "workspace")
+	// The agent's build output is generated, and from the sandbox it names sandbox paths: build
+	// from the source alone.
+	if err := os.RemoveAll(filepath.Join(ws, ".vulcan")); err != nil {
+		return err
+	}
 	logf, err := os.Create(filepath.Join(outDir, "grade.log"))
 	if err != nil {
 		return err
@@ -162,7 +167,7 @@ func (g *Grader) build(arm, ws, bin string, logf *os.File) bool {
 	cmd.Env = append(g.env(), "GOPROXY=off")
 	_ = os.MkdirAll(filepath.Dir(bin), 0o755)
 	out, err := cmd.CombinedOutput()
-	fmt.Fprintf(logf, "== build (%s)\n%s\n", arm, out)
+	fmt.Fprintf(logf, "== build (%s): %v\n%s\n", arm, err, out)
 	return err == nil
 }
 

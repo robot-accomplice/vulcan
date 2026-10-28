@@ -15,8 +15,8 @@ import (
 // own root inside the namespace, with the rights of the user outside it. Inside:
 //
 //   - /tmp is a fresh tmpfs; the run's directory is at /tmp/run (workspace, scratch, home);
-//   - the tools are at /tmp/tools, read-only: bin/ (claude, vulcan, fakepay, vulcan-lint) and
-//     go/ (the Go toolchain);
+//   - the tools are at /tmp/tools, read-only: bin/ (claude, vulcan, fakepay, vulcan-lint), go/
+//     (the Go toolchain), and runtime/ (Vulcan's runtime module, VULCAN_RUNTIME);
 //   - Go modules come from a read-only file proxy of the host's module cache, so no module comes
 //     from the network;
 //   - the user's home, /mnt (the Windows drives), /var/tmp, and /dev/shm are hidden by empty
@@ -76,6 +76,7 @@ func (sb *Sandbox) script(c *Config, args []string) string {
 		"TMPDIR=/tmp/t",
 		"GOTOOLCHAIN=local", "GOFLAGS=-mod=mod", "GOPROXY=file:///tmp/modproxy", "GOSUMDB=off",
 		"GOMODCACHE=/tmp/go/mod", "GOCACHE=/tmp/go/cache", "GOPATH=/tmp/go/path",
+		"VULCAN_RUNTIME=/tmp/tools/runtime",
 	}
 	env = append(env, c.providerEnv()...)
 	for _, e := range env {
@@ -102,7 +103,7 @@ func (sb *Sandbox) command(ctx context.Context, c *Config, args []string) (*exec
 		return nil, nil, err
 	}
 	marker := wslPath(path)
-	cmd := exec.CommandContext(ctx, "wsl.exe", "-d", sb.Distro, "--", "unshare", "--user", "--map-root-user",
+	cmd := exec.CommandContext(ctx, "wsl.exe", "-d", sb.Distro, "--exec", "unshare", "--user", "--map-root-user",
 		"--mount", "--pid", "--fork", "--kill-child", "--mount-proc", "sh", marker)
 	var env []string
 	wslenv := tokenVar
@@ -119,7 +120,7 @@ func (sb *Sandbox) command(ctx context.Context, c *Config, args []string) (*exec
 	}
 	cmd.Env = append(env, "WSLENV="+wslenv, tokenVar+"="+c.Token)
 	kill := func() {
-		_ = exec.Command("wsl.exe", "-d", sb.Distro, "--", "pkill", "-KILL", "-f", marker).Run()
+		_ = exec.Command("wsl.exe", "-d", sb.Distro, "--exec", "pkill", "-KILL", "-f", marker).Run()
 	}
 	cmd.Cancel = func() error {
 		kill()
