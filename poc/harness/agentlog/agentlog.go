@@ -21,6 +21,7 @@ type Summary struct {
 	TokensOut int64
 	CostUSD   float64
 	Checks    []record.Check
+	Denied    int    // tool calls that the permission rules denied
 	Done      bool   // the stream has its final result
 	Error     string // the agent's error, if the run ended with one
 }
@@ -42,11 +43,12 @@ type event struct {
 		Content json.RawMessage `json:"content"`
 		Usage   *usage          `json:"usage"`
 	} `json:"message"`
-	IsError  bool    `json:"is_error"`
-	NumTurns int     `json:"num_turns"`
-	Cost     float64 `json:"total_cost_usd"`
-	Usage    *usage  `json:"usage"`
-	Result   string  `json:"result"`
+	IsError  bool              `json:"is_error"`
+	NumTurns int               `json:"num_turns"`
+	Cost     float64           `json:"total_cost_usd"`
+	Usage    *usage            `json:"usage"`
+	Result   string            `json:"result"`
+	Denials  []json.RawMessage `json:"permission_denials"`
 }
 
 type usage struct {
@@ -130,6 +132,7 @@ func (r *Reader) Line(line []byte) {
 			r.S.Turns = ev.NumTurns
 		}
 		r.S.CostUSD = ev.Cost
+		r.S.Denied = len(ev.Denials)
 		if u := ev.Usage; u != nil {
 			r.S.TokensIn = u.Input + u.CacheCreate + u.CacheRead
 			r.S.TokensOut = u.Output

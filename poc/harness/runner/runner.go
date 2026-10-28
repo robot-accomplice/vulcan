@@ -64,13 +64,20 @@ func (c *Config) Prompt() string {
 
 // AllowedTools are the only tools of a run, the same in both arms: the file tools, and the
 // shell only for the commands that the workspace README names (go, gofmt, vulcan, fakepay), curl
-// to try the service, and a few harmless helpers. Any other tool or command is denied without a
-// prompt (--permission-mode dontAsk), so the agent cannot act outside these commands.
+// to try the service, and the helpers of pipes that the pilots used (owner's decision after the
+// pilots, experiments/poc/pilot-p5.md). Any other tool or command is denied without a prompt
+// (--permission-mode dontAsk). Claude Code checks each part of a pipe or a list, and denies every
+// shell loop unless the whole shell is allowed. The patterns with * are loose: "timeout * go *"
+// also matches a command that only has go as an argument.
 var AllowedTools = []string{
 	"Read", "Edit", "Write", "Glob", "Grep", "TodoWrite",
 	"BashOutput", "KillShell", "TaskOutput", "TaskStop",
 	"Bash(go:*)", "Bash(gofmt:*)", "Bash(vulcan:*)", "Bash(fakepay:*)", "Bash(curl:*)",
-	"Bash(cd:*)", "Bash(ls:*)", "Bash(pwd)", "Bash(sleep:*)",
+	"Bash(cd:*)", "Bash(ls:*)", "Bash(pwd)", "Bash(sleep:*)", "Bash(rm:*)",
+	"Bash(timeout * go *)", "Bash(timeout * vulcan *)", "Bash(timeout * fakepay *)", "Bash(timeout * curl *)",
+	"Bash(*=* go *)", "Bash(*=* vulcan *)", "Bash(*=* fakepay *)",
+	"Bash(echo:*)", "Bash(printf:*)", "Bash(cat:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(grep:*)",
+	"Bash(sort:*)", "Bash(wc:*)", "Bash(diff:*)", "Bash(mkdir:*)",
 }
 
 // claudeArgs is the headless Claude Code command: no user or project settings (so no
@@ -158,7 +165,7 @@ func Run(c *Config) (*record.Run, error) {
 		r.BudgetHit = "time"
 	}
 	s := reader.S
-	r.Turns, r.ToolCalls, r.TokensIn, r.TokensOut, r.CostUSD, r.Checks = s.Turns, s.ToolCalls, s.TokensIn, s.TokensOut, s.CostUSD, s.Checks
+	r.Turns, r.ToolCalls, r.TokensIn, r.TokensOut, r.CostUSD, r.Checks, r.Denied = s.Turns, s.ToolCalls, s.TokensIn, s.TokensOut, s.CostUSD, s.Checks, s.Denied
 	switch {
 	case s.Error == "error_max_budget_usd" || strings.Contains(s.Error, "budget"):
 		r.BudgetHit = "tokens"

@@ -31,9 +31,15 @@ Each run ended with a passing check command.
   in V; a `go run` line in G). The agent went on in both runs. A denial is a cost that the two
   arms can bear differently, so the main runs record the denials of each run from the stream.
 
-## Before the main runs
+## Decisions after the pilots
 
-1. Decide whether the allowlist stays as it is, or also allows shell loops and pipes. The
-   decision must be made before the main runs and stays the same in both arms.
-2. Decide the model and the cost cap of the main runs.
-3. Record the denials of each run in run.json (now they are in stream.jsonl only).
+1. Allowlist: the owner decided to allow loops and pipes. Pipes, lists, `timeout`, and
+   `NAME=value` before an allowed command now run, with the helpers of `runner.AllowedTools`.
+   Loops do not: Claude Code denies every shell loop unless the whole shell is allowed, even when
+   each command in the loop is allowed. Tested on Claude Code 2.1.312: a forbidden command stays
+   denied in a pipe, a loop, after `timeout`, or after `NAME=value`, and `rm` outside the
+   workspace is denied.
+2. Model: `claude-sonnet-5-5`, as in the pilots. Cost cap: 5 USD a run.
+3. Each run records the number of denied tool calls (`denied` in run.json).
+4. Claude Code was updated from 2.1.77 to 2.1.312 (the latest) before the main runs; the pilots
+   ran on 2.1.77.

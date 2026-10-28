@@ -15,7 +15,7 @@ const stream = `{"type":"system","subtype":"init","session_id":"s"}
 {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t3","is_error":true,"content":[{"type":"text","text":"build failed: undefined: x"}]}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","id":"t4","name":"Bash","input":{"command":"vulcan check"}}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t4","content":""}]}}
-{"type":"result","subtype":"success","is_error":false,"num_turns":4,"total_cost_usd":0.25,"usage":{"input_tokens":40,"cache_creation_input_tokens":200,"cache_read_input_tokens":1000,"output_tokens":90}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":4,"total_cost_usd":0.25,"usage":{"input_tokens":40,"cache_creation_input_tokens":200,"cache_read_input_tokens":1000,"output_tokens":90},"permission_denials":[{"tool_name":"Bash"}]}
 `
 
 func TestParse(t *testing.T) {
@@ -25,6 +25,9 @@ func TestParse(t *testing.T) {
 	}
 	if s.Turns != 4 || s.ToolCalls != 4 || !s.Done || s.CostUSD != 0.25 {
 		t.Fatalf("summary %+v", s)
+	}
+	if s.Denied != 1 {
+		t.Fatalf("denied %d", s.Denied)
 	}
 	if s.TokensIn != 1240 || s.TokensOut != 90 {
 		t.Fatalf("tokens %d %d", s.TokensIn, s.TokensOut)

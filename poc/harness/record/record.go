@@ -34,6 +34,7 @@ type Run struct {
 	TokensOut  int64   `json:"tokens_out"`
 	CostUSD    float64 `json:"cost_usd"`
 	AgentError string  `json:"agent_error,omitempty"`
+	Denied     int     `json:"denied"` // tool calls that the permission rules denied
 
 	// M5 and M6: the check loop. Each run of the arm's check command, in order.
 	Checks []Check `json:"checks"`
