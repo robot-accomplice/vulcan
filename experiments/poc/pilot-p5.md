@@ -88,3 +88,10 @@ runner now (1) sets `TMP`, `TEMP`, and `TMPDIR` to a directory of the run, (2) a
 to the preamble of both arms, "Keep any scratch files inside the current directory.", and (3)
 records the new entries of the user's temp directory after each run (`temp_leftovers`). The
 pilot's files were removed before the main runs.
+
+## Correction after the main runs
+
+The turn counts above are stream events, not turns: Claude Code writes one event for each
+content block of a message, and the reader counted each event. "61 (turn budget)" means 61
+events, about 26 messages. The reader now counts messages ([results-p5.md](results-p5.md),
+fault 1).

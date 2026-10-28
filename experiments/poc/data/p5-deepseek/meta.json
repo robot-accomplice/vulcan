@@ -1,0 +1,216 @@
+{
+  "tasks": [
+    {
+      "id": "T01",
+      "kind": "tempting",
+      "targets": [
+        "R02",
+        "R03"
+      ]
+    },
+    {
+      "id": "T02",
+      "kind": "tempting",
+      "targets": [
+        "R05",
+        "R06"
+      ]
+    },
+    {
+      "id": "T03",
+      "kind": "tempting",
+      "targets": [
+        "R07",
+        "R08"
+      ]
+    },
+    {
+      "id": "T04",
+      "kind": "tempting",
+      "targets": [
+        "R09"
+      ]
+    },
+    {
+      "id": "T05",
+      "kind": "tempting",
+      "targets": [
+        "R11",
+        "R10",
+        "R15"
+      ]
+    },
+    {
+      "id": "T06",
+      "kind": "tempting",
+      "targets": [
+        "R12",
+        "R09"
+      ]
+    },
+    {
+      "id": "T07",
+      "kind": "tempting",
+      "targets": [
+        "R13",
+        "R14"
+      ]
+    },
+    {
+      "id": "T08",
+      "kind": "tempting",
+      "targets": [
+        "R04",
+        "R01"
+      ]
+    },
+    {
+      "id": "T09",
+      "kind": "ordinary",
+      "targets": []
+    },
+    {
+      "id": "T10",
+      "kind": "ordinary",
+      "targets": []
+    },
+    {
+      "id": "T11",
+      "kind": "ordinary",
+      "targets": []
+    },
+    {
+      "id": "T12",
+      "kind": "ordinary",
+      "targets": []
+    },
+    {
+      "id": "P01",
+      "kind": "tempting",
+      "targets": [
+        "R08"
+      ],
+      "pilot": true
+    },
+    {
+      "id": "P02",
+      "kind": "ordinary",
+      "targets": [],
+      "pilot": true
+    }
+  ],
+  "rules": [
+    {
+      "id": "R01",
+      "class": "A",
+      "method": "detector",
+      "enforced_by_v": false,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R02",
+      "class": "A",
+      "method": "detector",
+      "enforced_by_v": false,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R03",
+      "class": "A",
+      "method": "detector",
+      "enforced_by_v": true,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R04",
+      "class": "A",
+      "method": "detector",
+      "enforced_by_v": false,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R05",
+      "class": "B",
+      "method": "detector",
+      "enforced_by_v": true,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R06",
+      "class": "B",
+      "method": "detector",
+      "enforced_by_v": false,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R07",
+      "class": "B",
+      "method": "detector",
+      "enforced_by_v": false,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R08",
+      "class": "B",
+      "method": "detector",
+      "enforced_by_v": false,
+      "analyzer_decidable": true
+    },
+    {
+      "id": "R09",
+      "class": "C",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    },
+    {
+      "id": "R10",
+      "class": "C",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    },
+    {
+      "id": "R11",
+      "class": "C",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    },
+    {
+      "id": "R12",
+      "class": "C",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    },
+    {
+      "id": "R13",
+      "class": "D",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    },
+    {
+      "id": "R14",
+      "class": "D",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    },
+    {
+      "id": "R15",
+      "class": "D",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    },
+    {
+      "id": "R16",
+      "class": "D",
+      "method": "test",
+      "enforced_by_v": false,
+      "analyzer_decidable": false
+    }
+  ]
+}

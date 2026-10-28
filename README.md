@@ -10,12 +10,10 @@ together. It is Go with an enforced architecture layer, contracts, and tools aro
   build, and reviewers can audit them.
 - **The tools teach the model** how to use the language, from a primer with a fixed token budget.
 
-**Status:** specification draft, with a proof-of-concept compiler in progress
-([PoC plan](docs/poc/plan.md)). Phases P1 and P2 work: declarations, the architecture and wiring rules,
-contracts and invariants, the network rule, generated startup, and `check`, `build`, `run`,
-`test`, `mod tidy`, and `guide`. Next is the application (P3) and the measurement harness (P4). Source
-files end in `.vulcan`, and the command is `vulcan`. The experiments keep the earlier working name, Keel.
-See [Status and handoff](docs/status.md).
+**Status:** specification draft, with a proof-of-concept compiler and a first evaluation against
+plain Go ([PoC plan](docs/poc/plan.md), [results](#evidence-so-far)). Source files end in
+`.vulcan`, and the command is `vulcan`. The experiments keep the earlier working name, Keel. See
+[Status and handoff](docs/status.md).
 
 ## Why Vulcan
 
@@ -92,6 +90,23 @@ compiler rejects a reference to another leaf that does not go through a port, an
 
 Non-goals for now (§12): manual memory management, inheritance, macros, and a general effect
 system.
+
+## Evidence so far
+
+This section sums up each round of the evaluation against plain Go. It changes with each round;
+each round's full record stays in `experiments/poc`.
+
+| Round | Agent | Runs | Result | Record |
+|---|---|---|---|---|
+| 1 (2026-10-28) | Claude Code with deepseek-v4-pro | 72 (12 tasks × 3 × 2 arms) | No signal; Vulcan arm worse on task success | [results-p5.md](experiments/poc/results-p5.md) |
+
+**Round 1.** Arm V (Vulcan, strict mode) succeeded in 28 of 36 runs, arm G (Go, rules in prose)
+in 35 of 36: −19.4 points, 95% interval −38.9 to −2.8. Neither arm broke a rule in the product
+code, so the round could not show what Vulcan is for: stopping rule breaks that plain Go lets
+through. All 9 failures were runs that the turn budget stopped, and a harness fault made that
+budget about 26 turns, not the planned 60. The round says the tasks were not hard enough to tempt
+this model, and that Vulcan cost runs under a tight budget. It does not yet say whether Vulcan
+adds value over Go. The next round must be built to answer that.
 
 ## Repository layout
 

@@ -169,6 +169,14 @@ agent with `dontAsk` and a tool allowlist. The two [pilot tasks](../experiments/
 ran in both arms; all four runs build, pass every acceptance and holdout test, and break no rule.
 Next: the decisions that the pilot record lists, then the main runs.
 
+**Round 1 (2026-10-28):** 72 main runs on deepseek-v4-pro through Claude Code
+([results-p5.md](../experiments/poc/results-p5.md)). The frozen analysis reads No signal: arm V
+succeeded in 28 of 36 runs, arm G in 35 of 36, and neither arm broke a rule in the product code.
+Faults found after the runs: the turn budget counted stream events (about 26 real turns, not 60;
+fixed in `agentlog`, and `harness restream` corrected the data), the usage of stopped runs is
+partial (`usage_partial`), scratch files in the workspace were graded as code, and runs still
+shared `/tmp`. Next: fix the last two, then plan the litmus test of value against Go.
+
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
 3. **Optional review 10.** Reviews 8 and 9 changed much text. The trend is 55, then 29 findings,
