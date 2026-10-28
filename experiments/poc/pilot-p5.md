@@ -33,12 +33,13 @@ Each run ended with a passing check command.
 
 ## Decisions after the pilots
 
-1. Allowlist: the owner decided to allow loops and pipes. Pipes, lists, `timeout`, and
-   `NAME=value` before an allowed command now run, with the helpers of `runner.AllowedTools`.
-   Loops do not: Claude Code denies every shell loop unless the whole shell is allowed, even when
-   each command in the loop is allowed. Tested on Claude Code 2.1.312: a forbidden command stays
-   denied in a pipe, a loop, after `timeout`, or after `NAME=value`, and `rm` outside the
-   workspace is denied.
+1. Allowlist: the owner decided to allow loops and pipes. A command allowlist allows pipes,
+   lists, `timeout`, and `NAME=value` before an allowed command, but Claude Code (2.1.312)
+   denies every shell loop unless the whole shell is allowed, even when each command in the loop
+   is allowed. So the owner allowed the whole shell. **The shell of a run is not restricted**:
+   the agent can run any command with the user's rights, and can reach the web through the
+   shell. The other tools stay limited to `runner.AllowedTools` (`dontAsk`): no web or MCP
+   tools. The hidden material stays sealed during the runs.
 2. Model: `claude-sonnet-5-5`, as in the pilots. Cost cap: 5 USD a run.
 3. Each run records the number of denied tool calls (`denied` in run.json).
 4. Claude Code was updated from 2.1.77 to 2.1.312 (the latest) before the main runs; the pilots

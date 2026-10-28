@@ -35,15 +35,14 @@ task brief, the same in both arms except the language name. The runner stops a r
 or 45 minutes; `--max-budget-usd` is the token cap.
 
 The agent has only the tools of `runner.AllowedTools`, the same in both arms: the file tools,
-and the shell for `go`, `gofmt`, `vulcan`, `fakepay`, `curl`, and helpers of pipes (`cd`, `ls`,
-`echo`, `cat`, `head`, `tail`, `grep`, `sort`, `wc`, `diff`, `mkdir`, `rm` in the workspace,
-`sleep`), also after `timeout` or `NAME=value`. Shell loops are denied.
-Claude Code denies every other tool and command without a prompt (`dontAsk`), except the shell
-commands that it holds to be read-only (for example `whoami`), which it always allows.
+the task tools of background commands, and the shell. Claude Code denies every other tool without
+a prompt (`dontAsk`), so there are no web tools and no MCP tools.
 
-Limit: the allowed commands run with the user's rights on the machine, and `curl` can reach
-the web; the briefs need neither. Keep the hidden material sealed
-while the runs go on; it is opened only to grade.
+Limit: the shell is not restricted. The agent can run any command with the user's rights on the
+machine, and `curl` or `go` can reach the web; the briefs need neither. Claude Code allows shell
+loops only when the whole shell is allowed, and the owner chose loops over a command allowlist
+(experiments/poc/pilot-p5.md). Keep the hidden material sealed while the runs go on; it is opened
+only to grade, and it is not on any path that the workspace names.
 
 ## The hidden material
 
