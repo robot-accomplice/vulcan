@@ -1,0 +1,9 @@
+A leaf directory that the manifest does not list (K0003). Go has no component file, so a package that the manifest does not list is VL0002, as P10.
+-- want.txt --
+error api/extra/extra.go:2:9 VL0002
+-- api/extra/extra.go --
+// Package extra is not in the manifest.
+package extra
+
+// X does nothing.
+func X() {}

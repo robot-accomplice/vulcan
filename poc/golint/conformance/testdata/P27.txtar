@@ -1,0 +1,56 @@
+A setting with no value (K0603).
+-- want.txt --
+error cmd/shop/main.go:17:44 VL0603
+-- api/web/web.go --
+// Package web is the entry of the customer.
+package web
+
+import (
+	"context"
+	"fmt"
+	"time"
+)
+
+// Settings configure Web.
+type Settings struct {
+	Wait time.Duration
+}
+
+// API is the entry of the customer.
+type API struct {
+	orders Orders
+}
+
+// New returns the API.
+func New(orders Orders) *API { return &API{orders: orders} }
+
+// Start places one order.
+func (a *API) Start(ctx context.Context, s Settings) error {
+	r, err := a.orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount, s.Wait)
+	return nil
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	payer := billing.NewPayer()
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(context.Background(), web.Settings{}); err != nil {
+		os.Exit(1)
+	}
+}

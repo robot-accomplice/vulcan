@@ -1,0 +1,31 @@
+A library imports a leaf (K0204).
+-- want.txt --
+error lib/util/util.go:4:8 VL0204
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+		Library("lib/util"),
+	},
+}
+-- lib/util/util.go --
+// Package util imports a leaf.
+package util
+
+import "shop/api/billing"
+
+// Pay makes a payer.
+var Pay = billing.NewPayer

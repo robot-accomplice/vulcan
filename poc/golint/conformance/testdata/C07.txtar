@@ -1,0 +1,30 @@
+Old of a slice (K0509).
+-- want.txt --
+error api/billing/billing.go:10:25 VL0509
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+func grow(xs []int) (out []int) {
+	before := contract.Old(xs)
+	defer contract.Ensures(func() bool { return len(out) == len(before)+1 })
+	return append(xs, 1)
+}
+
+var _ = grow
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

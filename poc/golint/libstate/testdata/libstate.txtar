@@ -1,0 +1,68 @@
+A6: an init of the library may set its vars; an init of a leaf may not; strict mode allows a
+value type and error.
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+import "errors"
+
+// Rate is the tax rate.
+var Rate = 20
+
+// Limits are limits.
+var Limits = [2]int{1, 2}
+
+// ErrBad is an error.
+var ErrBad = errors.New("bad")
+
+// Names are names.
+var Names = []string{"a"} // want "VL0210"
+
+func init() { Rate = 21; Limits[0] = 3 }
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+func init() { money.Rate = 1 } // want "VL0202"
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	money.Rate++ // want "VL0202"
+	return money.Receipt{Amount: amt}, nil
+}

@@ -1,0 +1,31 @@
+An invariant against a typed constant that the zero value breaks (K0506).
+-- want.txt --
+error api/billing/billing.go:16:41 VL0506
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+// Qty is a count.
+type Qty int
+
+// MinQty is the smallest line.
+const MinQty Qty = 1
+
+// Line is an order line.
+type Line struct{ N Qty }
+
+// Invariant holds for every line.
+func (l Line) Invariant() bool { return l.N >= MinQty }
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

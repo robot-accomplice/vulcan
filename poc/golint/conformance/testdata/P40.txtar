@@ -1,0 +1,29 @@
+A library outside lib/ (K0003).
+-- want.txt --
+error arch/arch.go:17:3 VL0003
+-- api/util/util.go --
+// Package util is a library in the wrong place.
+package util
+
+// Twice doubles n.
+func Twice(n int) int { return 2 * n }
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+		Library("api/util"),
+	},
+}

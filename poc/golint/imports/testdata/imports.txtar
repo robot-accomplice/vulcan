@@ -1,0 +1,91 @@
+A2: code imports the manifest; //go:linkname in a library; in strict mode main may import
+syscall, a library may not.
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+import (
+	_ "unsafe" // want "VL0124"
+
+	"syscall" // want "VL0124"
+)
+
+//go:linkname now runtime.nanotime // want "VL0122"
+func now() int64
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// Signal is a signal number.
+const Signal = syscall.SIGINT
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/arch" // want "VL0118"
+	"shop/lib/money"
+)
+
+var _ = arch.Manifest
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer stop()
+	payer := billing.NewPayer()
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(ctx); err != nil {
+		os.Exit(1)
+	}
+}

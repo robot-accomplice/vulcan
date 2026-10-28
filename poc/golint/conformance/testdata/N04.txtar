@@ -1,0 +1,23 @@
+A library queries through a *sql.DB that it receives: accepted.
+-- want.txt --
+accept
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+import "database/sql"
+
+// Count counts the receipts.
+func Count(db *sql.DB) (int, error) {
+	var n int
+	err := db.QueryRow("select count(*) from receipts").Scan(&n)
+	return n, err
+}
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}

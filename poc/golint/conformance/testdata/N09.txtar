@@ -1,0 +1,37 @@
+Strict: a library var holds a channel (K0210).
+-- want.txt --
+error lib/money/money.go:5:5 VL0210
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+// Events carries events.
+var Events = make(chan int)
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}

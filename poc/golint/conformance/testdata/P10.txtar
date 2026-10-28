@@ -1,0 +1,8 @@
+A package that the manifest does not list (K0002: code outside a leaf or a library).
+-- want.txt --
+error misc/x.go:1:9 VL0002
+-- misc/x.go --
+package misc
+
+// X does nothing.
+func X() {}

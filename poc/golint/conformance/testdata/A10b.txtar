@@ -1,0 +1,24 @@
+A range statement that assigns to a port (K0116).
+-- want.txt --
+error api/orders/orders.go:17:6 VL0116
+-- api/orders/orders.go --
+// Package orders places orders.
+package orders
+
+import "shop/lib/money"
+
+// Service places orders.
+type Service struct {
+	checkout Checkout
+}
+
+// NewService returns a Service.
+func NewService(checkout Checkout) *Service { return &Service{checkout: checkout} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	var ch chan Checkout
+	for s.checkout = range ch {
+	}
+	return money.Receipt{}, nil
+}

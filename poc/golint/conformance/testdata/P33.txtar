@@ -1,0 +1,24 @@
+The manifest imports a leaf (K0110: system.vulcan imports a leaf).
+-- want.txt --
+error arch/arch.go:3:10 VL0110
+-- arch/arch.go --
+package arch
+
+import _ "shop/api/billing"
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}

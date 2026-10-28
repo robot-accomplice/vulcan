@@ -1,0 +1,23 @@
+Two gateway leaves for one external system (K0207).
+-- want.txt --
+error arch/arch.go:15:3 VL0207
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person   = "Customer" // buys goods
+	Stripe   External = "Stripe"   // cards
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Gateway("api/billing", Stripe),
+		Gateway("api/orders", Stripe),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}

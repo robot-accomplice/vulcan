@@ -1,0 +1,10 @@
+A library that declares a port (K0201).
+-- want.txt --
+error lib/money/ports.go:1:9 VL0201
+-- lib/money/ports.go --
+package money
+
+// Clock tells the time.
+type Clock interface {
+	Now() int64
+}

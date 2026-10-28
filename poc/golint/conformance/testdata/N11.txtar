@@ -1,0 +1,106 @@
+Strict: N05, N08, and N10 in leaves listed in StrictExempt: accepted.
+-- want.txt --
+accept
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"os"
+
+	"shop/lib/money"
+)
+
+func mode() { _ = os.Setenv("MODE", "x") }
+
+var _ = mode
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money, done func(money.Receipt)) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- api/orders/orders.go --
+// Package orders places orders.
+package orders
+
+import "shop/lib/money"
+
+// Service places orders.
+type Service struct {
+	checkout Checkout
+}
+
+// NewService returns a Service.
+func NewService(checkout Checkout) *Service { return &Service{checkout: checkout} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return s.checkout.Pay(amt, nil)
+}
+-- api/orders/ports.go --
+package orders
+
+import "shop/lib/money"
+
+// Checkout takes payment for an order.
+type Checkout interface {
+	Pay(amt money.Money, done func(money.Receipt)) (money.Receipt, error)
+}
+-- api/web/web.go --
+// Package web is the entry of the customer.
+package web
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+)
+
+func ping() { _, _ = http.Get("http://127.0.0.1:1") }
+
+var _ = ping
+
+// API is the entry of the customer.
+type API struct {
+	orders Orders
+}
+
+// New returns the API.
+func New(orders Orders) *API { return &API{orders: orders} }
+
+// Start places one order.
+func (a *API) Start(ctx context.Context) error {
+	r, err := a.orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	StrictExempt: []string{"api/orders", "api/web", "api/billing"},
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}

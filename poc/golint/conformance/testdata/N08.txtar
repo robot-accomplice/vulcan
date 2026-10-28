@@ -1,0 +1,54 @@
+Strict: an entry leaf calls http.Get (K0125).
+-- want.txt --
+error api/web/web.go:10:27 VL0125
+-- api/web/web.go --
+// Package web is the entry of the customer.
+package web
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+)
+
+func ping() { _, _ = http.Get("http://127.0.0.1:1") }
+
+var _ = ping
+
+// API is the entry of the customer.
+type API struct {
+	orders Orders
+}
+
+// New returns the API.
+func New(orders Orders) *API { return &API{orders: orders} }
+
+// Start places one order.
+func (a *API) Start(ctx context.Context) error {
+	r, err := a.orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}

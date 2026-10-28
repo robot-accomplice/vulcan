@@ -1,0 +1,29 @@
+Requires len(xs) > 0 && xs[0] > 0: accepted.
+-- want.txt --
+accept
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+func first(xs []int) int {
+	contract.Requires(len(xs) > 0 && xs[0] > 0)
+	return xs[0]
+}
+
+var _ = first
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

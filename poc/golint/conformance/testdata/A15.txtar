@@ -1,0 +1,20 @@
+A library var assigned in a function after startup (K0202).
+-- want.txt --
+error lib/money/money.go:8:23 VL0202
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+// Rate is the tax rate.
+var Rate = 20
+
+// SetRate changes the rate.
+func SetRate(r int) { Rate = r }
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}

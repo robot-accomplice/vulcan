@@ -1,0 +1,46 @@
+Strict: a library var of an error type, and of a type in StrictShared, is accepted.
+-- want.txt --
+accept
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	StrictShared: []string{"*regexp.Regexp"},
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+import (
+	"errors"
+	"regexp"
+)
+
+// ErrBad is an error.
+var ErrBad = errors.New("bad")
+
+// Code matches a code.
+var Code = regexp.MustCompile(`^[A-Z]+$`)
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}

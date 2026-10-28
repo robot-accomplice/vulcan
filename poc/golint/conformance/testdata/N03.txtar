@@ -1,0 +1,22 @@
+A library calls os.Open (K0203).
+-- want.txt --
+error lib/money/money.go:8:15 VL0203
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+import "os"
+
+// Load opens a rate file.
+func Load() error {
+	_, err := os.Open("rates.txt")
+	return err
+}
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}

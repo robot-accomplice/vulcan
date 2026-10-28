@@ -1,0 +1,31 @@
+The address of a field outside the methods (K0508).
+-- want.txt --
+error api/billing/billing.go:14:35 VL0508
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+// Window is a range.
+type Window struct {
+	Lo, Hi int
+}
+
+// Invariant holds for every window.
+func (w Window) Invariant() bool { return w.Lo <= w.Hi }
+
+func low(w *Window) *int { return &w.Lo }
+
+var _ = low
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

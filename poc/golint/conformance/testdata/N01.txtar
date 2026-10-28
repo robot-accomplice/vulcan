@@ -1,0 +1,30 @@
+A leaf that is not a gateway or an entry leaf calls http.Get (K0205).
+-- want.txt --
+error api/billing/billing.go:11:17 VL0205
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"net/http"
+
+	"shop/lib/money"
+)
+
+func ping() error {
+	_, err := http.Get("https://example.com")
+	return err
+}
+
+var _ = ping
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

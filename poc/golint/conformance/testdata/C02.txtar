@@ -1,0 +1,29 @@
+Requires amt > 0, and a caller passes the constant 0 (K0501).
+-- want.txt --
+error api/billing/billing.go:14:37 VL0501
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+func charge(amt money.Money) money.Money {
+	contract.Requires(amt > 0)
+	return amt
+}
+
+var _ = func() money.Money { return charge(0) }
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

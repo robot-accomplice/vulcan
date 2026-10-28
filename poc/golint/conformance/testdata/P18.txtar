@@ -1,0 +1,40 @@
+A constructor with a parameter that is not a settings struct (K0604).
+-- want.txt --
+error api/billing/billing.go:10:6 VL0604
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer(n int) *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	payer := billing.NewPayer(1)
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}

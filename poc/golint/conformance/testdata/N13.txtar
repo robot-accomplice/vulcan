@@ -1,0 +1,84 @@
+Strict: the base system, a serving entry leaf, and a dialing gateway are accepted.
+-- want.txt --
+accept
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"net/http"
+
+	"shop/lib/money"
+)
+
+func ping() { _, _ = http.Get("http://127.0.0.1:1") }
+
+var _ = ping
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- api/web/web.go --
+// Package web is the entry of the customer.
+package web
+
+import (
+	"context"
+	"fmt"
+	"net"
+)
+
+func listen() {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err == nil {
+		l.Close()
+	}
+}
+
+var _ = listen
+
+// API is the entry of the customer.
+type API struct {
+	orders Orders
+}
+
+// New returns the API.
+func New(orders Orders) *API { return &API{orders: orders} }
+
+// Start places one order.
+func (a *API) Start(ctx context.Context) error {
+	r, err := a.orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person   = "Customer" // buys goods
+	Bank     External = "Bank"     // cards
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Gateway("api/billing", Bank),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}

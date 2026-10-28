@@ -1,0 +1,98 @@
+A8: Invariant methods, Keep, Valid, and values built in another package.
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// Range is a range of amounts.
+type Range struct{ Lo, Hi Money }
+
+// Invariant holds for every range.
+func (r Range) Invariant() bool { return r.Lo <= r.Hi }
+
+// Ptr has an invariant with a pointer receiver.
+type Ptr struct{ N int }
+
+// Invariant is declared on the pointer.
+func (p *Ptr) Invariant() bool { return p.N >= 0 } // want "VL0513"
+
+// Count is not a struct.
+type Count int
+
+// Invariant of a non-struct.
+func (c Count) Invariant() bool { return c >= 0 } // want "VL0513"
+
+// Long has an invariant of two statements.
+type Long struct{ N int }
+
+// Invariant is not one return.
+func (l Long) Invariant() bool { // want "VL0503"
+	ok := l.N >= 0
+	return ok
+}
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+// Account holds money.
+type Account struct{ Balance int }
+
+// Invariant holds after every change.
+func (a Account) Invariant() bool { return a.Balance >= 0 }
+
+// Add adds money.
+func (a *Account) Add(n int) {
+	defer contract.Keep(a)
+	a.Balance += n
+}
+
+// Sub forgets its Keep.
+func (a *Account) Sub(n int) { // want "VL0904"
+	a.Balance -= n
+}
+
+// Show has a value receiver: no Keep.
+func (a Account) Show() int { return a.Balance }
+
+func keepOther(a *Account) {
+	defer contract.Keep(a) // want "VL0904"
+}
+
+type other struct{ Lo, Hi money.Money }
+
+func build(o other) {
+	_ = contract.Valid(money.Range{Lo: 1, Hi: 2})
+	_ = contract.Valid(&money.Range{Lo: 1, Hi: 2})
+	_ = money.Range{}
+	_ = money.Range{Lo: 1, Hi: 2}     // want "VL0905"
+	_ = []money.Range{{Lo: 1, Hi: 2}} // want "VL0905"
+	_ = money.Range(o)                // want "VL0905"
+	_ = contract.Valid(money.Range(o))
+	_ = &Account{Balance: 1} // want "VL0905"
+	_ = contract.Valid((Account{Balance: 1}))
+}
+
+var _ = []any{keepOther, build}
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

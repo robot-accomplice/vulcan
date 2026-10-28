@@ -1,0 +1,33 @@
+A contract that calls a function with an effect (K0503).
+-- want.txt --
+error api/billing/billing.go:14:20 VL0503
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+var count int
+
+func bump() bool { count++; return true }
+
+func charge(x int) int {
+	contract.Requires(bump() && x > 0)
+	return x
+}
+
+var _ = charge
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

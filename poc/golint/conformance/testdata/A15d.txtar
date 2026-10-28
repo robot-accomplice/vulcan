@@ -1,0 +1,52 @@
+A library var assigned in package-level function literals (K0202).
+-- want.txt --
+error api/billing/billing.go:6:23 VL0202
+error api/billing/billing.go:8:22 VL0202
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+var _ = func() bool { money.Limit = 1; return true }()
+
+var reset = func() { money.Limit = 0 }
+
+var _ = reset
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+// Config holds fees.
+type Config struct{ Fee Money }
+
+// Default is the default config.
+var Default = Config{Fee: 1}
+
+// Rates are the tax rates.
+var Rates = [2]Money{1, 2}
+
+// Limit is the largest order.
+var Limit Money = 100
+
+// Fees are the fees by country.
+var Fees = map[string]Money{}
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}

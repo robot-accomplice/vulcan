@@ -1,0 +1,44 @@
+A port contract that names an identifier of its own leaf (K0120).
+-- want.txt --
+error api/orders/ports.go:17:26 VL0120
+-- api/orders/orders.go --
+// Package orders places orders.
+package orders
+
+import "shop/lib/money"
+
+// MaxAmount is the largest payment.
+const MaxAmount = 1000
+
+// Service places orders.
+type Service struct {
+	checkout Checkout
+}
+
+// NewService returns a Service.
+func NewService(checkout Checkout) *Service { return &Service{checkout: checkedCheckout{checkout}} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return s.checkout.Pay(amt)
+}
+-- api/orders/ports.go --
+package orders
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+// Checkout takes payment for an order.
+type Checkout interface {
+	Pay(amt money.Money) (money.Receipt, error)
+}
+
+// checkedCheckout checks the contract of Checkout at each call.
+type checkedCheckout struct{ Checkout }
+
+func (c checkedCheckout) Pay(amt money.Money) (money.Receipt, error) {
+	contract.Requires(amt < MaxAmount)
+	return c.Checkout.Pay(amt)
+}

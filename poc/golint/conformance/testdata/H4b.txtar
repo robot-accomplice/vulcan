@@ -1,0 +1,29 @@
+Near miss: len, cap, and conversions in a contract.
+-- want.txt --
+accept
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+func fill(xs []int, n int) int {
+	contract.Requires(len(xs) <= cap(xs) && money.Money(n) >= 0)
+	return n
+}
+
+var _ = fill
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

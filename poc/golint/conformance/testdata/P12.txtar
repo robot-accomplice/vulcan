@@ -1,0 +1,40 @@
+A package clause that does not name its directory (K0004).
+-- want.txt --
+error api/billing/billing.go:2:9 VL0004
+-- api/billing/billing.go --
+// Package billing takes payments.
+package bill
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	bill "shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	payer := bill.NewPayer()
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}

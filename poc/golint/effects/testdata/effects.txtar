@@ -1,0 +1,170 @@
+A5: network values and types, calls through an interface, main, a gateway, an entry leaf, and
+strict-mode reflection and mutators.
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person   = "Customer" // buys goods
+	Bank     External = "Bank"     // cards
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict:   true,
+	Mutators: []string{"shop/lib/money.SetDefault"},
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Gateway("api/billing", Bank),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+import "os"
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// SetDefault is a mutator that the manifest lists.
+func SetDefault() {}
+
+// Size reads a file that the caller gives.
+func Size(f *os.File) (int64, error) {
+	st, err := f.Stat()
+	return st.Size(), err
+}
+
+// Read chooses a file by name.
+func Read() ([]byte, error) { return os.ReadFile("x") } // want "VL0203"
+-- api/orders/orders.go --
+// Package orders places orders.
+package orders
+
+import (
+	"net/http"
+	"reflect"
+
+	"shop/lib/money"
+)
+
+// Service places orders.
+type Service struct {
+	checkout Checkout
+}
+
+// NewService returns a Service.
+func NewService(checkout Checkout) *Service { return &Service{checkout: checkout} }
+
+func dial(req *http.Request, rt http.RoundTripper) {
+	_, _ = http.DefaultClient.Do(req) // want "VL0205" "VL0205"
+	c := &http.Client{}              // want "VL0205"
+	_, _ = rt.RoundTrip(req)         // want "VL0205"
+	_ = c
+	var d interface {
+		Do(*http.Request) (*http.Response, error)
+	} = http.DefaultClient // want "VL0205"
+	_ = d
+	_ = reflect.ValueOf(dial).Call(nil) // want "VL0124"
+	money.SetDefault()                  // want "VL0211"
+}
+
+var _ = dial
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return s.checkout.Pay(amt)
+}
+-- api/billing/billing.go --
+// Package billing is the gateway of the bank.
+package billing
+
+import (
+	"net/http"
+	"os"
+
+	"shop/lib/money"
+)
+
+// Payer takes payments.
+type Payer struct{ c *http.Client }
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{c: &http.Client{}} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	_, err := http.Get("https://bank.example")
+	_ = os.Setenv("X", "y") // want "VL0211"
+	return money.Receipt{Amount: amt}, err
+}
+-- api/web/web.go --
+// Package web is the entry of the customer.
+package web
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/http"
+)
+
+// API is the entry of the customer.
+type API struct {
+	orders Orders
+}
+
+// New returns the API.
+func New(orders Orders) *API { return &API{orders: orders} }
+
+// Start serves, and places one order.
+func (a *API) Start(ctx context.Context) error {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return err
+	}
+	ln.Close()
+	_, _ = net.Dial("tcp", "127.0.0.1:1") // want "VL0125"
+	srv := &http.Server{}
+	_ = srv
+	r, err := a.orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"net/http"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	_, _ = http.Get("https://example.com") // want "VL0205"
+	_ = os.Setenv("MODE", "x")
+	payer := billing.NewPayer()
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}

@@ -1,0 +1,45 @@
+A secret setting given a literal (K0605).
+-- want.txt --
+error cmd/shop/main.go:14:50 VL0605
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+// Settings configure a Payer.
+type Settings struct {
+	Key string `vulcan:"secret"`
+}
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer(s Settings) *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	payer := billing.NewPayer(billing.Settings{Key: "sk_live_123"})
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}

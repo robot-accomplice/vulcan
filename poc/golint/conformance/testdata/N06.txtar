@@ -1,0 +1,61 @@
+Strict: a port method returns io.ReadCloser (K0123).
+-- want.txt --
+error api/orders/ports.go:12:2 VL0123
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"io"
+	"strings"
+
+	"shop/lib/money"
+)
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+
+// Statement returns the statement.
+func (p *Payer) Statement() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("")), nil }
+-- api/orders/ports.go --
+package orders
+
+import (
+	"io"
+
+	"shop/lib/money"
+)
+
+// Checkout takes payment for an order.
+type Checkout interface {
+	Pay(amt money.Money) (money.Receipt, error)
+	Statement() (io.ReadCloser, error)
+}
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}

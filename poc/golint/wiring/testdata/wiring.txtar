@@ -1,0 +1,81 @@
+A4: main calls only constructors, lifecycle methods, the standard library, and its own code.
+-- api/web/web.go --
+// Package web is the entry of the customer.
+package web
+
+import (
+	"context"
+	"fmt"
+)
+
+// Settings configure the API.
+type Settings struct {
+	Addr string
+	Key  string `vulcan:"secret"`
+}
+
+// API is the entry of the customer.
+type API struct {
+	orders Orders
+}
+
+// New returns the API.
+func New(orders Orders) *API { return &API{orders: orders} }
+
+// Start places one order.
+func (a *API) Start(ctx context.Context, s Settings) error {
+	r, err := a.orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount, s.Addr)
+	return nil
+}
+
+// Handler is not a lifecycle method.
+func (a *API) Handler() string { return "" }
+
+// Helper is not a constructor.
+func Helper(n int) int { return n }
+-- lib/money/extra.go --
+package money
+
+// Round rounds.
+func Round(m Money) Money { return m }
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+	"shop/lib/money"
+)
+
+func flags() map[string]string { return map[string]string{"addr": ":1", "key": "k"} }
+
+func main() {
+	f := flags()
+	addr := f["addr"]
+	payer := billing.NewPayer()
+	service := orders.NewService(payer)
+	api := web.New(service)
+	_ = &orders.Service{}   // want "VL0908"
+	_ = new(billing.Payer)  // want "VL0908"
+	_ = money.Round(1)      // want "VL0907"
+	_ = web.Helper(1)       // want "VL0907"
+	_ = api.Handler()       // want "VL0907"
+	_ = payer.Pay           // a method value, not a call
+	s := web.Settings{Addr: addr, Key: f["key"]}
+	_ = api.Start(context.Background(), s) // want "VL0606"
+	_ = api.Start(context.Background(), web.Settings{addr, f["key"]})
+	_ = api.Start(context.Background(), web.Settings{Addr: addr + "x", Key: f["key"]}) // want "VL0606"
+	_ = api.Start(context.Background(), web.Settings{Addr: ":8080", Key: "k"})         // want "VL0605"
+	if err := api.Start(context.Background(), web.Settings{Addr: addr, Key: f["key"]}); err != nil {
+		os.Exit(1)
+	}
+}

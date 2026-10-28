@@ -1,0 +1,51 @@
+The port of Orders names a type of Billing (K0110). In Go the import is VL0101, and the type in the port signature is VL0112.
+-- want.txt --
+error api/orders/ports.go:10:2 VL0112
+error api/orders/ports.go:4:2 VL0101
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (*Payer, error) {
+	return p, nil
+}
+-- api/orders/orders.go --
+// Package orders places orders.
+package orders
+
+import "shop/lib/money"
+
+// Service places orders.
+type Service struct {
+	checkout Checkout
+}
+
+// NewService returns a Service.
+func NewService(checkout Checkout) *Service { return &Service{checkout: checkout} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	_, err := s.checkout.Pay(amt)
+	return money.Receipt{Amount: amt}, err
+}
+-- api/orders/ports.go --
+package orders
+
+import (
+	"shop/api/billing"
+	"shop/lib/money"
+)
+
+// Checkout takes payment for an order.
+type Checkout interface {
+	Pay(amt money.Money) (*billing.Payer, error)
+}

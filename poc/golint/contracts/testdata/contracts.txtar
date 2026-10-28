@@ -1,0 +1,80 @@
+A7: contracts that are not first, of the wrong form, and constant calls across packages.
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+import "shop/lib/contract"
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// MaxCents is the largest amount.
+const MaxCents = 1000
+
+// Check requires a positive amount.
+func Check(m Money) Money {
+	contract.Requires(m > 0 && m <= MaxCents)
+	return m
+}
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+func late(n int) (out int) {
+	out = n
+	contract.Requires(n > 0)                                // want "VL0903"
+	defer contract.Ensures(func() bool { return out == n }) // want "VL0903"
+	return out
+}
+
+func notDeferred(n int) (out int) {
+	contract.Ensures(func() bool { return out == n }) // want "VL0903"
+	return n
+}
+
+func twoStatements(n int) (out int) {
+	defer contract.Ensures(func() bool { x := n; return out == x }) // want "VL0503"
+	return n
+}
+
+func inLiteral(n int) int {
+	f := func() int {
+		before := contract.Old(n) // want "VL0903"
+		return before
+	}
+	return f()
+}
+
+func good(n int) (out int) {
+	contract.Requires(n > 0)
+	before := contract.Old(n)
+	defer contract.Ensures(func() bool { return out == before+1 })
+	return n + 1
+}
+
+var _ = []any{late, notDeferred, twoStatements, inLiteral, good}
+
+var _ = money.Check(0)    // want "VL0501"
+var _ = money.Check(2000) // want "VL0501"
+var _ = money.Check(5)
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

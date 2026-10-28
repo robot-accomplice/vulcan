@@ -1,0 +1,29 @@
+Near miss: float arguments that keep Requires are accepted.
+-- want.txt --
+accept
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+func half(f float64) float64 {
+	contract.Requires(f/2 > 0.4)
+	return f / 2
+}
+
+var _ = half(0.9) + half(1.0)
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}

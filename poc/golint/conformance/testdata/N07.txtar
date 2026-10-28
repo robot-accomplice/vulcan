@@ -1,0 +1,47 @@
+Strict: a leaf imports unsafe (K0124).
+-- want.txt --
+error api/billing/billing.go:5:2 VL0124
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import (
+	"unsafe"
+
+	"shop/lib/money"
+)
+
+var size = unsafe.Sizeof(0)
+
+var _ = size
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person = "Customer" // buys goods
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Strict: true,
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}

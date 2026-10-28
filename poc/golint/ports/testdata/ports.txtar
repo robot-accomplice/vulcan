@@ -1,0 +1,132 @@
+A3: what ports.go may hold, wrappers, constructors, port fields, and a port no constructor takes.
+-- api/orders/ports.go --
+package orders
+
+import (
+	"shop/lib/contract"
+	"shop/lib/money"
+)
+
+// Checkout takes payment for an order.
+type Checkout interface {
+	Pay(amt money.Money) (money.Receipt, error)
+	Refund(amt money.Money) error
+}
+
+// Clock tells the time.
+type Clock interface { // want "VL0104"
+	Now() int64
+}
+
+// unexported is a port that is not exported.
+type unexported interface { // want "VL0110" "VL0104"
+	Do()
+}
+
+// Limit is not a port.
+const Limit = 3 // want "VL0110"
+
+func helper() {} // want "VL0110"
+
+type extra struct{} // want "VL0110"
+
+// checkedCheckout checks the contract of Checkout at each call.
+type checkedCheckout struct{ Checkout }
+
+func (c checkedCheckout) Pay(amt money.Money) (money.Receipt, error) {
+	contract.Requires(amt > 0)
+	return c.Checkout.Pay(amt)
+}
+
+func (c checkedCheckout) Refund(amt money.Money) error { // want "VL0906"
+	contract.Requires(amt > 0)
+	if amt > 10 {
+		return nil
+	}
+	return c.Checkout.Refund(amt)
+}
+
+func (c checkedCheckout) Extra() {} // want "VL0906"
+-- api/orders/orders.go --
+// Package orders places orders.
+package orders
+
+import (
+	"fmt"
+
+	"shop/lib/money"
+)
+
+// scanner is an interface outside ports.go, which is not a port: allowed.
+type scanner interface{ Scan() error }
+
+var _ scanner
+
+var fallback Checkout // want "VL0116"
+
+// Service places orders.
+type Service struct {
+	checkout Checkout
+}
+
+// Settings configure a Service.
+type Settings struct{ Limit int }
+
+type helperT struct{}
+
+// NewService returns a Service.
+func NewService(checkout Checkout) *Service {
+	s := &Service{checkout: checkedCheckout{checkout}}
+	s.checkout = checkedCheckout{checkout}
+	return s
+}
+
+// NewRaw stores the port unwrapped.
+func NewRaw(checkout Checkout) *Service { return &Service{checkout: checkout} } // want "VL0906"
+
+// NewHelper returns an unexported type.
+func NewHelper() *helperT { return &helperT{} } // want "VL0604"
+
+// NewWith takes settings first.
+func NewWith(s Settings, checkout Checkout) (*Service, error) { // want "VL0604"
+	return &Service{checkout: checkedCheckout{checkout}}, nil
+}
+
+// NewStringer takes an interface that is not a port.
+func NewStringer(x fmt.Stringer) *Service { return &Service{} } // want "VL0604"
+
+// NewSettings takes a port and settings: allowed.
+func NewSettings(checkout Checkout, s Settings) *Service {
+	return &Service{checkout: checkedCheckout{checkout}}
+}
+
+// Swap replaces the port.
+func (s *Service) Swap(c Checkout) {
+	s.checkout = c // want "VL0116"
+	p := &s.checkout // want "VL0116"
+	_ = p
+}
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return s.checkout.Pay(amt)
+}
+-- api/billing/billing.go --
+// Package billing takes payments.
+package billing
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, nil
+}
+
+// Refund refunds.
+func (p *Payer) Refund(amt money.Money) error { return nil }
