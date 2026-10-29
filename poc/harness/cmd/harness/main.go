@@ -601,7 +601,8 @@ func cmdSeal(cmd string, args []string) error {
 }
 
 // cmdValidate checks the hidden material (grade.Validation), and with -write-labels writes the
-// enforced_by_v label of each rule into meta.json. Its output names rules and tasks by id only.
+// enforced_by_v and enforced_by_l labels of each rule into meta.json. Its output names rules and
+// tasks by id only.
 func cmdValidate(args []string) error {
 	fs := flag.NewFlagSet("validate", flag.ExitOnError)
 	var c common
@@ -609,7 +610,8 @@ func cmdValidate(args []string) error {
 	material := fs.String("material", "", "the unsealed hidden material")
 	out := fs.String("out", "", "a scratch directory for the workspaces")
 	jobs := fs.Int("jobs", 3, "workspaces at once")
-	write := fs.Bool("write-labels", false, "write enforced_by_v into meta.json")
+	write := fs.Bool("write-labels", false, "write enforced_by_v, and enforced_by_l with arm L, into meta.json")
+	arms := fs.String("arms", "P,L,V", "the arms: P,L,V in round 2, G,V in round 1")
 	only := fs.String("only", "", "comma-separated prefixes of items to check: reference/T03, seeded/R05, base")
 	fs.Parse(args)
 	metaPath := filepath.Join(*material, "meta.json")
@@ -622,7 +624,10 @@ func cmdValidate(args []string) error {
 		return err
 	}
 	g := &grade.Grader{Repo: c.repo, Material: *material, ToolDir: tools, Meta: meta}
-	tmpl := grade.Templates{record.ArmV: filepath.Join(c.repo, "poc", "app", "vulcan"), record.ArmG: filepath.Join(c.repo, "poc", "app", "go")}
+	tmpl := grade.Templates{}
+	for _, arm := range strings.Split(*arms, ",") {
+		tmpl[arm] = c.template(arm)
+	}
 	if *only != "" {
 		g.Only = strings.Split(*only, ",")
 	}
@@ -637,6 +642,9 @@ func cmdValidate(args []string) error {
 	if *write {
 		for i := range meta.Rules {
 			meta.Rules[i].EnforcedByV = v.EnforcedByV[meta.Rules[i].ID]
+			if v.EnforcedByL != nil {
+				meta.Rules[i].EnforcedByL = v.EnforcedByL[meta.Rules[i].ID]
+			}
 		}
 		b, _ := json.MarshalIndent(meta, "", "  ")
 		if err := os.WriteFile(metaPath, b, 0o644); err != nil {

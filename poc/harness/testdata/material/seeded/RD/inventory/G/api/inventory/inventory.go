@@ -18,6 +18,7 @@ type Store interface {
 	Reserve(lines []shop.Line) error
 	Release(lines []shop.Line) error
 	Ship(lines []shop.Line) error
+	Restock(arrivals []shop.Arrival) error
 }
 
 // Catalog is the catalog and the stock.
@@ -77,6 +78,11 @@ func (c *Catalog) Release(lines []shop.Line) error {
 // Ship takes the reserved units of every line out of stock.
 func (c *Catalog) Ship(lines []shop.Line) error {
 	return c.store.Ship(lines)
+}
+
+// Restock adds the units of every arrival to the stock, or of none.
+func (c *Catalog) Restock(arrivals []shop.Arrival) error {
+	return c.store.Restock(arrivals)
 }
 
 // probe opens a database where it should not.

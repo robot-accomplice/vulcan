@@ -24,15 +24,20 @@ import (
 //     build. Other rules that also fire are listed.
 //   - Each rule has at least two seeded shapes in each arm.
 //   - Enforced by V: the compiler (vulcan check) rejects every seeded case of the rule in arm V.
+//   - Enforced by L (round 2): the linter (vulcan-lint ./...) rejects every seeded case of the rule
+//     in arm L. Arm P has no check beyond the build, so it gives no label.
 //
 // A seeded case or a reference solution is an overlay: a directory whose files replace or add
 // files of the arm's workspace; a file .delete in it lists workspace paths to remove, one a line.
 //
-//	seeded/<rule>/<shape>/<arm>/...     two or more shapes for each rule, arms V and G
+//	seeded/<rule>/<shape>/<arm>/...     two or more shapes for each rule, in each arm
 //	reference/<task>/<arm>/...
+//
+// The arms are those of the templates: G and V in round 1; P, L, and V in round 2.
 type Validation struct {
 	Items       []Item          `json:"items"`
 	EnforcedByV map[string]bool `json:"enforced_by_v"`
+	EnforcedByL map[string]bool `json:"enforced_by_l,omitempty"`
 	ShapeCounts map[string]int  `json:"shape_counts"` // "<rule>/<arm>" -> shapes
 	Problems    int             `json:"problems"`
 }
@@ -43,13 +48,27 @@ type Item struct {
 	ID       string   `json:"id"`   // task, or rule/shape
 	Arm      string   `json:"arm"`
 	OK       bool     `json:"ok"`
-	Rejected bool     `json:"rejected_by_vulcan,omitempty"`
+	Rejected bool     `json:"rejected_by_check,omitempty"` // by vulcan check in V, by vulcan-lint in L
 	Problem  string   `json:"problem,omitempty"`
 	Also     []string `json:"also_fired,omitempty"` // other rules that a seeded case breaks
 }
 
 // Templates names the workspace of each arm.
 type Templates map[string]string
+
+// Arms lists the arms of the templates, in a fixed order.
+func (t Templates) Arms() []string {
+	var out []string
+	for _, a := range []string{record.ArmP, record.ArmL, record.ArmG, record.ArmV} {
+		if _, ok := t[a]; ok {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// checked tells whether an arm has a check whose rejection labels a rule.
+func checked(arm string) bool { return arm == record.ArmV || arm == record.ArmL }
 
 // Validate checks the material, with up to jobs workspaces at once, in dir.
 func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, error) {
@@ -63,7 +82,8 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 		rule    string
 	}
 	var todo []work
-	for _, arm := range []string{record.ArmV, record.ArmG} {
+	arms := tmpl.Arms()
+	for _, arm := range arms {
 		todo = append(todo, work{item: Item{Kind: "base", ID: "base", Arm: arm}})
 		for _, t := range g.Meta.Tasks {
 			todo = append(todo, work{item: Item{Kind: "reference", ID: t.ID, Arm: arm}, task: t.ID,
@@ -71,13 +91,16 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 		}
 	}
 	v := &Validation{EnforcedByV: map[string]bool{}, ShapeCounts: map[string]int{}}
+	if _, ok := tmpl[record.ArmL]; ok {
+		v.EnforcedByL = map[string]bool{}
+	}
 	for _, r := range g.Meta.Rules {
 		shapes, _ := os.ReadDir(filepath.Join(g.Material, "seeded", r.ID))
 		for _, sh := range shapes {
 			if !sh.IsDir() {
 				continue
 			}
-			for _, arm := range []string{record.ArmV, record.ArmG} {
+			for _, arm := range arms {
 				ov := filepath.Join(g.Material, "seeded", r.ID, sh.Name(), arm)
 				if _, err := os.Stat(ov); err != nil {
 					continue
@@ -114,16 +137,22 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 	}
 	wg.Wait()
 	v.Items = results
-	for _, r := range g.Meta.Rules {
+	enforcedBy := func(arm, rule string) bool {
 		enforced, cases := true, 0
 		for _, it := range results {
-			if it.Kind == "seeded" && it.Arm == record.ArmV && strings.HasPrefix(it.ID, r.ID+"/") {
+			if it.Kind == "seeded" && it.Arm == arm && strings.HasPrefix(it.ID, rule+"/") {
 				cases++
 				enforced = enforced && it.Rejected
 			}
 		}
-		v.EnforcedByV[r.ID] = enforced && cases > 0
-		for _, arm := range []string{record.ArmV, record.ArmG} {
+		return enforced && cases > 0
+	}
+	for _, r := range g.Meta.Rules {
+		v.EnforcedByV[r.ID] = enforcedBy(record.ArmV, r.ID)
+		if v.EnforcedByL != nil {
+			v.EnforcedByL[r.ID] = enforcedBy(record.ArmL, r.ID)
+		}
+		for _, arm := range arms {
 			if v.ShapeCounts[r.ID+"/"+arm] < 2 && len(g.Only) == 0 {
 				v.Items = append(v.Items, Item{Kind: "shapes", ID: r.ID, Arm: arm, Problem: fmt.Sprintf("%d seeded shapes; at least 2 are needed", v.ShapeCounts[r.ID+"/"+arm])})
 			}
@@ -157,8 +186,12 @@ func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task,
 		b, _ := os.ReadFile(rules)
 		_ = writeFile(filepath.Join(ws, "RULES.md"), b)
 	}
-	if it.Arm == record.ArmV {
+	if checked(it.Arm) {
+		// exec looks a bare name up in this process's PATH, not in cmd.Env: name the tool.
 		cmd := exec.Command(filepath.Join(g.ToolDir, "vulcan"+exe()), "check")
+		if it.Arm == record.ArmL {
+			cmd = exec.Command(filepath.Join(g.ToolDir, "vulcan-lint"+exe()), "./...")
+		}
 		cmd.Dir = ws
 		cmd.Env = append(g.env(), "GOPROXY=off")
 		out, err := cmd.CombinedOutput()
@@ -188,7 +221,7 @@ func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task,
 		if !fileExists(overlay) {
 			it.OK, it.Problem = false, "no reference solution"
 		} else if !it.OK {
-			it.Problem = fmt.Sprintf("builds %v, acceptance %+v, holdout %+v, rules broken %v, rejected by vulcan %v", r.Builds, r.Acceptance, r.Holdout, broken, it.Rejected)
+			it.Problem = fmt.Sprintf("builds %v, acceptance %+v, holdout %+v, rules broken %v, rejected by the check %v", r.Builds, r.Acceptance, r.Holdout, broken, it.Rejected)
 		}
 	case "seeded":
 		caught := r.Violations[rule]
@@ -198,8 +231,8 @@ func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task,
 				method = ru.Method
 			}
 		}
-		if !caught && it.Arm == record.ArmV && it.Rejected && method == "test" {
-			caught = true // the compiler rejects it, so it can never build
+		if !caught && checked(it.Arm) && it.Rejected && method == "test" {
+			caught = true // the arm's check rejects it, so it never passes the check
 		}
 		it.OK = caught
 		if !caught {
@@ -302,14 +335,31 @@ func (v *Validation) Summary() string {
 	for _, k := range kinds {
 		fmt.Fprintf(&b, "%s: %d ok, %d with a problem\n", k, counts[k][0], counts[k][1])
 	}
-	var enforced []string
-	for id, e := range v.EnforcedByV {
-		if e {
-			enforced = append(enforced, id)
+	label := func(arm string, m map[string]bool) {
+		var enforced []string
+		for id, e := range m {
+			if e {
+				enforced = append(enforced, id)
+			}
+		}
+		sort.Strings(enforced)
+		fmt.Fprintf(&b, "enforced by %s: %d of %d rules (%s)\n", arm, len(enforced), len(m), strings.Join(enforced, ", "))
+	}
+	if v.EnforcedByL != nil {
+		label(record.ArmL, v.EnforcedByL)
+	}
+	label(record.ArmV, v.EnforcedByV)
+	if v.EnforcedByL != nil {
+		sets := map[string][]string{}
+		for id := range v.EnforcedByV {
+			s := record.Rule{EnforcedByL: v.EnforcedByL[id], EnforcedByV: v.EnforcedByV[id]}.Set()
+			sets[s] = append(sets[s], id)
+		}
+		for _, s := range []string{record.SetS, record.SetG, record.SetU, record.SetN} {
+			sort.Strings(sets[s])
+			fmt.Fprintf(&b, "set %s: %d (%s)\n", s, len(sets[s]), strings.Join(sets[s], ", "))
 		}
 	}
-	sort.Strings(enforced)
-	fmt.Fprintf(&b, "enforced by V: %d of %d rules (%s)\n", len(enforced), len(v.EnforcedByV), strings.Join(enforced, ", "))
 	for _, it := range v.Items {
 		if !it.OK {
 			fmt.Fprintf(&b, "PROBLEM %s %s %s: %s\n", it.Kind, it.ID, it.Arm, it.Problem)

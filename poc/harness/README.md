@@ -73,6 +73,12 @@ fixes to round 1 (plan-r2, section 6):
 | F9 | `-review`: after each agent round, a reviewer session (read-only tools, `runner.ReviewPrompt`, the brief, `RULES.md`, the diff) gives a verdict; a rejection goes back to the agent in the same session (`--resume`), up to `-resubmits` times within the run's budget; a second review of the final change measures the reviewer's agreement | `runner/review.go` |
 | F10 | `harness analyze2`, and its dry run: `go test ./poc/harness/analysis2` reads each world of `synth2` over 200 seeds | `analysis2`, `synth2` |
 
+`harness validate` checks the material in the arms of `-arms` (default `P,L,V`; `G,V` for round
+1): seeded cases in `seeded/<rule>/<shape>/<arm>`, reference solutions in `reference/<task>/<arm>`.
+A rule is enforced by L when `vulcan-lint ./...` rejects each of its seeded cases in arm L, and
+enforced by V when `vulcan check` rejects each of them in arm V; the summary lists the sets S, G,
+U, and N by id.
+
 Arm L's linter, written in step 2 of plan-r2, must print a code `VL` and four digits in each
 diagnostic, as Vulcan prints K-codes, so that the check loop (O2) reads both arms alike; and arm
 L's template must list its check configuration (the linter's settings, `arch/config.go`) in `PROTECTED`.
@@ -82,6 +88,7 @@ in `bin/claude`, and a Go toolchain in `go/`, of at least the version of `go.mod
 
 ```bash
 harness tools -linux                           # vulcan, fakepay, fakeagent for the sandbox
+harness validate -material MATERIAL -out DIR -write-labels   # arms P, L, V: enforced_by_l and enforced_by_v, and the sets
 harness schedule -tasks T01,...,T24 -ord-tasks T25,...,T32 -arms P,L,V -runs 3 -ord-runs 5 -retest 0.1 -seed SEED > schedule.json
 harness evaluate -schedule schedule.json -material PUBLIC -no-grade -out RUNS -model M -base-url URL -token-file F     -sandbox Ubuntu-22.04 -review -prices prices.json
 harness gradeall -material MATERIAL -out RUNS

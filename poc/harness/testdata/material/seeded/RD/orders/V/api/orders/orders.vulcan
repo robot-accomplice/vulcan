@@ -58,6 +58,7 @@ func (s *Service) Create(customer shop.CustomerID, wants []shop.Want) (shop.Orde
 		return shop.Order{}, err
 	}
 	o.ID = id
+	Events.Publish(shop.EventOrderCreated, string(o.ID))
 	return o, nil
 }
 
@@ -92,6 +93,7 @@ func (s *Service) Pay(id shop.OrderID) (shop.Order, error)
 	if err := Store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	Events.Publish(shop.EventOrderPaid, string(o.ID))
 	return o, nil
 }
 
@@ -115,6 +117,7 @@ func (s *Service) Ship(id shop.OrderID) (shop.Order, error)
 	if err := Store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	Events.Publish(shop.EventOrderShipped, string(o.ID))
 	return o, nil
 }
 
@@ -146,6 +149,7 @@ func (s *Service) Cancel(id shop.OrderID) (shop.Order, error)
 	if err := Store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	Events.Publish(shop.EventOrderCancelled, string(o.ID))
 	return o, nil
 }
 
@@ -173,6 +177,7 @@ func (s *Service) Refund(id shop.OrderID, amount shop.Money) (shop.Order, error)
 	if err := Store.SaveOrder(o); err != nil {
 		return shop.Order{}, err
 	}
+	Events.Publish(shop.EventOrderRefunded, string(o.ID))
 	return o, nil
 }
 
