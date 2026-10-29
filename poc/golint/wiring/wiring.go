@@ -3,6 +3,7 @@ package wiring
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"reflect"
 	"sort"
@@ -17,7 +18,7 @@ import (
 // Analyzer is A4.
 var Analyzer = &analysis.Analyzer{
 	Name: "wiring",
-	Doc:  "check main: it calls only the constructors and the lifecycle methods of the leaves, and the standard library; it passes no nil port; each settings value is a literal with every field, of constants and flag values; a secret field gets no constant (VL0104, VL0603, VL0605, VL0606, VL0907, VL0908)",
+	Doc:  "check main: it calls only the constructors and the lifecycle methods of the leaves, and the standard library; it passes no nil port; each settings value is a literal with every field, of constants and flag values; a secret field gets no constant; in strict mode, it calls each constructor once (VL0104, VL0603, VL0605, VL0606, VL0607, VL0907, VL0908)",
 	Run:  run,
 }
 
@@ -36,6 +37,7 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 		return nil
 	}
+	called := map[*types.Func]token.Pos{} // the first call of each constructor
 	for _, f := range pass.Files {
 		if model.IsTest(pass, f) {
 			continue
@@ -74,6 +76,13 @@ func run(pass *analysis.Pass) (any, error) {
 				case part == nil || !part.IsLeaf():
 					model.Report(pass, x.Pos(), "VL0907", "main calls %s; main only wires: it calls the constructors and the lifecycle methods of the leaves, and the standard library", fn.FullName())
 				case sig.Recv() == nil && ports.IsConstructor(fn):
+					// A second call makes a second instance, such as a second database: an error
+					// in strict mode, as K0607 is in Vulcan (parity review R2, item 2).
+					if first, ok := called[fn]; ok && m.StrictFor(part) {
+						model.Report(pass, x.Pos(), "VL0607", "main calls %s again (first at line %d), so it makes a second instance; call each constructor once and pass its value to every leaf that needs it", fn.FullName(), pass.Fset.Position(first).Line)
+					} else if !ok {
+						called[fn] = x.Pos()
+					}
 					args(pass, x, sig)
 				case sig.Recv() != nil && Lifecycle(sig):
 					args(pass, x, sig)

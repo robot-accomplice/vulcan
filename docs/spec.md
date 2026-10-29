@@ -673,6 +673,9 @@ exempt and in each library:
    `config { strict_shared: [...] }`, for example `*regexp.Regexp`.
 5. **No known global mutators (K0211).** Code cannot reach a global mutator of Appendix D, or a
    function in `config { mutators: [...] }`.
+6. **One instance per constructor (K0607).** Two wires that name one constructor of the leaf with
+   different settings are an error, not a warning: `main` would make a second instance, such as
+   a second database, and nothing in the code would show it.
 
 `vulcan audit` lists each entry of `strict_interfaces`, `strict_shared`, and `mutators`.
 
@@ -2308,7 +2311,7 @@ the long form.
 | K0604 | E | A constructor has parameters other than one settings struct, or results other than `T` or `(T, error)`; or a wire that names a type has settings | §5.3 |
 | K0605 | E | A literal, or a flag default, in a settings field tagged `vulcan:"secret"` | §5.3 |
 | K0606 | E | A settings value, a flag default, or a `config` value is not a constant of its field's type; a value can use only constants, the package `time`, and the libraries that `system.vulcan` imports | §5.3, App. B.2 |
-| K0607 | W | One constructor is wired with two different settings, so `main` makes two instances | §5.3 |
+| K0607 | W | One constructor is wired with two different settings, so `main` makes two instances; an error in strict mode, unless the supplier leaf is exempt | §5.3, §5.4d |
 | **K07** | | **Warnings on Go code** | |
 | K0701 | W | Unhandled error | §6 |
 | K0702 | W | Error masking | §6 |

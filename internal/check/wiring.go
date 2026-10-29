@@ -184,15 +184,20 @@ func (c *Checker) instance(sup *project.Package, w *decl.Wire, plan *Plan, seen 
 		return inst
 	}
 	// One constructor with two settings makes two instances: say so, because a provider that
-	// holds a resource (a database) is then opened twice (parity review P3, item 2).
+	// holds a resource (a database) is then opened twice (parity review P3, item 2). Strict mode
+	// makes it an error for a leaf that is not exempt (§5.4d; parity review R2, item 2).
 	ctor := sup.Name + "." + name
+	report := c.D.Warnf
+	if c.strictFor(sup.Name) {
+		report = c.D.Errorf
+	}
 	for k, other := range seen {
 		if strings.HasPrefix(k, ctor+"{") || k == ctor {
 			if other.Settings != nil {
 				line := c.P.SysSrc.Pos(other.Settings.Pos).Line
-				c.D.Warnf(sysPos(w.Supply.NamePos), "K0607", "%s is wired with other settings than at line %d, so main makes a second instance; wires with the same constructor and the same settings share one instance", ctor, line)
+				report(sysPos(w.Supply.NamePos), "K0607", "%s is wired with other settings than at line %d, so main makes a second instance; wires with the same constructor and the same settings share one instance", ctor, line)
 			} else {
-				c.D.Warnf(sysPos(w.Supply.NamePos), "K0607", "%s is wired with other settings than before, so main makes a second instance; wires with the same constructor and the same settings share one instance", ctor)
+				report(sysPos(w.Supply.NamePos), "K0607", "%s is wired with other settings than before, so main makes a second instance; wires with the same constructor and the same settings share one instance", ctor)
 			}
 			break
 		}

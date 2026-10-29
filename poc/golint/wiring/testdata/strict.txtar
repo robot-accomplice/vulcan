@@ -1,0 +1,33 @@
+Strict mode: main calls a constructor a second time (VL0607), except a constructor of a leaf in
+StrictExempt.
+-- arch/config.go --
+package arch
+
+// Config is the check configuration of vulcan-lint.
+var Config = Settings{
+	Strict:       true,
+	StrictExempt: []string{"api/orders"},
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	payer := billing.NewPayer()
+	other := billing.NewPayer() // want "VL0607"
+	service := orders.NewService(payer)
+	_ = orders.NewService(other)
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}

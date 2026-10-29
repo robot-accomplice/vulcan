@@ -1,0 +1,32 @@
+Strict: main calls one constructor twice, so it makes a second instance (K0607 in strict mode).
+-- want.txt --
+error cmd/shop/main.go:16:6 VL0607
+-- arch/config.go --
+package arch
+
+// Config is the check configuration of vulcan-lint.
+var Config = Settings{
+	Strict: true,
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/web"
+)
+
+func main() {
+	payer := billing.NewPayer()
+	service := orders.NewService(payer)
+	_ = billing.NewPayer()
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}

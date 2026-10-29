@@ -422,6 +422,13 @@ CASES = {
         {"api/billing/billing.go": billing('// Window is a range.\ntype Window struct {\n\tLo, Hi int\n}\n\n// Invariant holds for every window.\nfunc (w Window) Invariant() bool { return w.Lo <= w.Hi }\n\nfunc low(w *Window) *int { return @VL0508@&w.Lo }\n\nvar _ = low\n\n')}),
 }
 
+# Cases added after the R2 parity review (experiments/poc/parity-r2.md, item 2)
+TWICE = BASE["cmd/shop/main.go"].replace("\tservice := orders.NewService(payer)\n", "\tservice := orders.NewService(payer)\n\t_ = %sbilling.NewPayer()\n")
+CASES["V03"] = ("Strict: main calls one constructor twice, so it makes a second instance (K0607 in strict mode).",
+    {**strict(), "cmd/shop/main.go": TWICE % "@VL0607@"})
+CASES["V04"] = ("Strict, with the supplier in StrictExempt: accepted (K0607 warns in Vulcan; the driver has no warning level).",
+    {**strict('\tStrictExempt: []string{"api/billing"},\n'), "cmd/shop/main.go": TWICE % ""})
+
 ACCOUNT = ('// Counter counts down.\ntype Counter struct{ N int }\n\n// Dec counts down.\nfunc (c *Counter) Dec() { c.N-- }\n\n'
            '// Account holds money.\ntype Account struct {\n\tBalance int\n\tC       Counter\n}\n\n'
            '// Invariant holds after every change.\nfunc (a Account) Invariant() bool { return a.Balance >= 0 && a.C.N >= 0 }\n\n')

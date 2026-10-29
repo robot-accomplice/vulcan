@@ -17,3 +17,10 @@ func TestWiring(t *testing.T) {
 	dir := lintest.Write(t, base, lintest.Read(t, filepath.Join("testdata", "wiring.txtar")))
 	analysistest.Run(t, dir, wiring.Analyzer, "./...")
 }
+
+// TestWiringStrict runs it with testdata/strict.txtar, in strict mode.
+func TestWiringStrict(t *testing.T) {
+	base := lintest.Read(t, filepath.Join("..", "conformance", "testdata", "base.txtar"))
+	dir := lintest.Write(t, base, lintest.Read(t, filepath.Join("testdata", "strict.txtar")))
+	analysistest.Run(t, dir, wiring.Analyzer, "./...")
+}

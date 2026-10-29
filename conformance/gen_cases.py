@@ -730,6 +730,17 @@ case("V02", "One constructor wired with two settings: K0607 warns of the second 
 # ---- Strict mode (spec §5.4d, decision 2): N05 to N12 of conformance.md
 def strict(extra=""):
     return ("system.vulcan", '    person Customer "Buys goods"', '    person Customer "Buys goods"\n\n    config { strict: true' + extra + ' }')
+V02_EDITS = [("system.vulcan", "        Web.Orders:      Orders.NewService\n        Orders.Checkout: Billing.NewPayer",
+              "        Web.Orders:      Orders.NewService\n        Orders.Checkout: Billing.NewPayer{ Fee: 1 }\n        Web.Extra:       Billing.NewPayer{ Fee: 2 }"),
+             ("api/billing/billing.vulcan", "func NewPayer() *Payer { return &Payer{} }", "// Settings configure a Payer.\ntype Settings struct {\n\tFee int\n}\n\nfunc NewPayer(s Settings) *Payer { return &Payer{} }"),
+             ("api/web/component.vulcan", "    needs port Orders {", "    needs port Extra {\n        func Pay(amt money.Money) (money.Receipt, error)\n    }\n\n    needs port Orders {")]
+# Cases added after the R2 parity review (experiments/poc/parity-r2.md, item 2)
+case("V03", "Strict: one constructor wired with two settings: K0607 is an error.",
+     [strict()] + V02_EDITS,
+     "error system.vulcan:@2@NewPayer@ K0607")
+case("V04", "Strict, with the supplier in strict_exempt: K0607 warns, as in ordinary mode.",
+     [strict(', strict_exempt: ["Billing"]')] + V02_EDITS,
+     "accept\nwarn system.vulcan:@2@NewPayer@ K0607")
 FUNC_PORT = [("api/orders/component.vulcan", "func Pay(amt money.Money) (money.Receipt, error)", "func Pay(amt money.Money, done func(money.Receipt)) (money.Receipt, error)"),
              ("api/orders/orders.vulcan", "return Checkout.Pay(amt)", "return Checkout.Pay(amt, nil)"),
              ("api/billing/billing.vulcan", "Pay(amt money.Money) (money.Receipt, error) {", "Pay(amt money.Money, done func(money.Receipt)) (money.Receipt, error) {")]

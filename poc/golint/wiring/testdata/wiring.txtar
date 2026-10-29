@@ -70,6 +70,7 @@ func main() {
 	_ = web.Helper(1)       // want "VL0907"
 	_ = api.Handler()       // want "VL0907"
 	_ = payer.Pay           // a method value, not a call
+	_ = billing.NewPayer()  // a second instance: reported in strict mode only
 	s := web.Settings{Addr: addr, Key: f["key"]}
 	_ = api.Start(context.Background(), s) // want "VL0606"
 	_ = api.Start(context.Background(), web.Settings{addr, f["key"]})

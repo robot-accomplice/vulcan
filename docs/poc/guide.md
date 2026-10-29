@@ -87,8 +87,8 @@ system Shop {
 - Every wire reads `needer: supplier`. Every needed port is wired exactly once. The wires have no
   cycle. One gateway leaf for each external system.
 - Wires that name the same constructor with the same settings share one instance; other
-  settings make a second instance (K0607 warns). So one database is one `Store.Open{...}`, written
-  the same on every wire.
+  settings make a second instance (K0607: a warning, an error in strict mode). So one database is
+  one `Store.Open{...}`, written the same on every wire.
 - A wire names an exported constructor or type of the supplier leaf. A constructor takes nothing
   or one exported settings struct, and returns `T` or `(T, error)`; `T` is an exported concrete
   type or a pointer to one. Pointer receivers need a pointer: return `*Payer`.

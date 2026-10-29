@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/robot-accomplice/vulcan/internal/decl"
+	"github.com/robot-accomplice/vulcan/internal/diag"
 	"github.com/robot-accomplice/vulcan/internal/gen"
 	"github.com/robot-accomplice/vulcan/internal/project"
 )
@@ -26,12 +27,21 @@ type strictConfig struct {
 }
 
 // strictConf reads the strict keys of config, and reports a bad value (K0606).
-func (c *Checker) strictConf() *strictConfig {
+func (c *Checker) strictConf() *strictConfig { return c.readStrict(c.D) }
+
+// strictFor reports whether strict mode applies to the leaf named name; it reports nothing.
+func (c *Checker) strictFor(name string) bool {
+	s := c.readStrict(&diag.List{})
+	return s.on && !s.exempt[name]
+}
+
+// readStrict reads the strict keys of config, and reports a bad value (K0606) to d.
+func (c *Checker) readStrict(d *diag.List) *strictConfig {
 	s := &strictConfig{exempt: map[string]bool{}, interfaces: map[string]bool{}, shared: map[string]bool{}, mutators: map[string]bool{}}
 	if v := c.P.Config("strict"); v != nil {
 		tv, err := types.Eval(c.Fset, types.NewPackage("vulcan/strict", "strict"), token.NoPos, v.Text)
 		if v.Kind != decl.ExprValue || err != nil || tv.Value == nil || tv.Value.Kind() != constant.Bool {
-			c.D.Errorf(c.P.SysSrc.Pos(v.Pos), "K0606", "config strict is true or false")
+			d.Errorf(c.P.SysSrc.Pos(v.Pos), "K0606", "config strict is true or false")
 		} else {
 			s.on = constant.BoolVal(tv.Value)
 		}
@@ -42,7 +52,7 @@ func (c *Checker) strictConf() *strictConfig {
 			continue
 		}
 		if v.Kind != decl.ListValue {
-			c.D.Errorf(c.P.SysSrc.Pos(v.Pos), "K0606", "config %s is a list of names, for example [\"x\"]", key)
+			d.Errorf(c.P.SysSrc.Pos(v.Pos), "K0606", "config %s is a list of names, for example [\"x\"]", key)
 			continue
 		}
 		for _, it := range v.List {
@@ -51,7 +61,7 @@ func (c *Checker) strictConf() *strictConfig {
 				name = u
 			}
 			if it.Kind != decl.ExprValue || name == "" {
-				c.D.Errorf(c.P.SysSrc.Pos(it.Pos), "K0606", "config %s holds names, for example \"x\"", key)
+				d.Errorf(c.P.SysSrc.Pos(it.Pos), "K0606", "config %s holds names, for example \"x\"", key)
 				continue
 			}
 			set[name] = true
@@ -59,7 +69,7 @@ func (c *Checker) strictConf() *strictConfig {
 	}
 	for name := range s.exempt {
 		if c.P.ByName[name] == nil {
-			c.D.Errorf(c.P.SysSrc.Pos(c.P.Config("strict_exempt").Pos), "K0606", "strict_exempt names %s, which is not a leaf", name)
+			d.Errorf(c.P.SysSrc.Pos(c.P.Config("strict_exempt").Pos), "K0606", "strict_exempt names %s, which is not a leaf", name)
 		}
 	}
 	return s
