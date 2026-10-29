@@ -321,3 +321,93 @@ ignored `.vulcan/build` directory there.
   overflow in all three arms.
 - The `go.mod` files say `go 1.26.0` while the host runs Go 1.27.3, equal in the three arms, as the
   growth note says. Upgrade them in one change, in all arms at once, before the freeze.
+
+## Fixes
+
+Made by a separate session, which neither wrote the review nor the arms, so that the review and
+the fixes stay independent. The owner approved every item, including the compiler change of item
+2. Each fix removes a difference between the arms; none is meant to favor one. Commits on main:
+C1 = fb0049c (item 1), C2 = 36f10f2 (item 2), C3 = da5ebfa (items 3 to 6), C4 = this section.
+
+1. **Fixed (C1, and C3 for the texts).** Arm L's manifest is split by meaning: `arch/config.go`
+   holds the check configuration, `var Config = Settings{Strict: true}` (`Strict`,
+   `StrictExempt`, `StrictInterfaces`, `StrictShared`, `Mutators`), and `arch/arch.go` holds the
+   persons, the externals, and the parts. `vulcan-lint` reads `Config` only from `config.go`, and
+   a check setting in `Manifest` or `Config` elsewhere is VL0902 (or a compile error first).
+   `PROTECTED` lists `arch/config.go`, `arch/schema.go` (the schema, which no task needs to
+   change), and `lib/contract/*.go`, with a one-line comment and no advice. The harness
+   (`runner/config.go`, `configChanges`) now also compares the kind of every part of the base: in
+   L, the constructor and its party of each directory of the base manifest (read with the
+   linter's own parser, `model.Read`); in V, the `gateway for` and `entry for` lines of each base
+   `component.vulcan`. A changed kind fails the run in both arms; an added part does not, and
+   neither does a removed one, in both arms (it is not a change of kind). Tests: `TestConfigChangesKinds`, next to
+   `TestConfigChangesAndStrays`. VL0002 no longer says "the manifest changes only when the
+   request asks for a change to the architecture", and `PRIMER.md` section 1 no longer says to
+   change the manifest only then, so the two diagnostics and the two primers say the same. The
+   tests of `poc/golint` and the conformance port pass, with the strict cases moved to
+   `arch/config.go`.
+
+   So point 4 of the review's fix (no task that adds a part, or `allow_config` for it) is no longer
+   needed.
+
+2. **Fixed (C2).** In the compiler, K0607 is an error in strict mode, for a supplier leaf that is
+   not in `strict_exempt`, and stays a warning in ordinary mode (`internal/check/wiring.go`,
+   `strictFor`). Spec: the K0607 row and §5.4d (rule 6 of strict mode); `docs/poc/guide.md`, so
+   `vulcan guide` too. Conformance cases V03 (strict: an error) and V04 (strict with the supplier
+   exempt: a warning) beside V02 (ordinary mode: a warning); `go test ./conformance/` passes (145
+   cases). `poc/app/vulcan` passes `vulcan check && vulcan test --race=false`; its comment on the
+   five Store wires says that K0607 rejects them when they differ (C3).
+
+   One addition beyond the review's text, made for the same reason: arm L reported no second
+   instance at all (K0607 was not ported, judgment J7, "equal in effect" while K0607 only warned).
+   With K0607 an error in V, a task that wants a second database would pass in L with a second
+   `store.Open` call in main and fail in V, a new difference. So `vulcan-lint` gets VL0607 in
+   strict mode: main calls a constructor of a leaf that is not in `StrictExempt` a second time
+   (in Go every second call is a second instance). Tests: `wiring/testdata/strict.txtar` and the
+   ported cases V03 and V04; `poc/app/golint` passes. Arm P, which has no checks, is unchanged.
+
+3. **Fixed (C3).** Both primers are counted with one method, `poc/golint/primer_count.py`
+   (bytes, words, and pieces: each run of word characters and each other non-space character, a
+   tokenizer-free proxy for tokens; no tokenizer of the run model runs offline here). L's primer
+   lost its table of 48 codes and gained what `vulcan guide` teaches and it did not: the layout,
+   calling a port, one gateway per external, one instance per constructor, `StrictExempt`, a test
+   with a fake, checking before a commit, the commands. L against V, after: 9,283 against 9,464
+   bytes (−1.9%), 1,427 against 1,461 words (−2.3%), 2,474 against 2,537 pieces (−2.5%). Before:
+   +23%, +39%, +18%. Both counts and the method are in `poc/golint/README.md`, section "The
+   primer". Also fixed in passing: `lib/contract/contract.go` pointed to section 4 of the primer
+   for contracts, which are section 3.
+
+4. **Fixed (C3).** The three READMEs have one sentence under "Check, build, and run", with the
+   same words but for the parenthesis that names the arm's own check configuration:
+   "Do not change the check configuration (…) or add suppression comments unless the request asks
+   for it." P: "none in this project"; L: "`arch/config.go`, `arch/schema.go`, `lib/contract`, and
+   the kinds of the existing parts in `arch/arch.go`"; V: "the `config` block of `system.vulcan`,
+   and the kinds of the existing leaves: `gateway for`, `entry for`". The parenthesis follows item
+   1, so it differs from the review's draft for L (`arch/`), and it names the kinds in L and V
+   alike, since a changed kind now fails the run in both. Each README names only its own arm.
+   `PROTECTED` stays the harness's list (item 1). `TestReadme` checks L's README against P's.
+
+5. **Fixed (C3).** L's README layout has the rows `lib/contract` "The contract checks" and `arch`
+   "The manifest of the architecture". Item 1 adds no directory.
+
+6. **Fixed (C3).** `system.vulcan` begins with the README's sentence: "Stockroom is an order,
+   inventory, purchasing, and payment service, with webhooks: an HTTP API and a SQLite database."
+
+7. **Kept, as the review says.** No change for parity. For the task writer and the grader: V's
+   check takes about 3 s more per run of the check; keep the run's time budget loose enough, and
+   report check time per arm.
+
+8. **Kept, as the review says.** No change. For the task writer: test fakes take more code in P
+   and L than in V (every port of the constructor, every method of the interface); count tasks
+   that ask for tests knowingly.
+
+9. **Kept, as the review says.** No change. A holdout test of a startup check reads the exit code
+   and the flag name only, not the text.
+
+Checked after the fixes: each app passes its own check command (P `go vet ./... && go test
+./...`; L `go vet ./... && vulcan-lint ./... && go test ./...`; V `vulcan check && vulcan test
+--race=false`); `STOCKROOM_BIN=<binary> go test ./poc/acceptance/...` passes for the three
+binaries; `go run ./poc/harness/cmd/harness tools` builds the tools into `.harness/tools`; `go test
+./poc/... ./conformance/` passes; and the round-1 analysis of `experiments/poc/data/p5-deepseek`
+prints exactly its `analysis.md`. Not done here: the `go.mod` files of the three arms still say `go
+1.26.0` (the review's shared note).
