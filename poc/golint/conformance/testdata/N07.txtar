@@ -25,23 +25,10 @@ func NewPayer() *Payer { return &Payer{} }
 func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
 	return money.Receipt{Amount: amt}, nil
 }
--- arch/arch.go --
+-- arch/config.go --
 package arch
 
-// The persons and the external systems.
-const (
-	Customer Person = "Customer" // buys goods
-)
-
-// Manifest is the architecture of the shop.
-var Manifest = System{
+// Config is the check configuration of vulcan-lint.
+var Config = Settings{
 	Strict: true,
-	Parts: []Part{
-		Main("cmd/shop"),
-		Entry("api/web", Customer),
-		Leaf("api/orders"),
-		Leaf("api/billing"),
-		Library("lib/money"),
-		Library("lib/contract"),
-	},
 }

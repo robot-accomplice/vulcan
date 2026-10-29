@@ -47,7 +47,7 @@ func run(pass *analysis.Pass) (any, error) {
 				return nil, nil
 			}
 		}
-		model.Report(pass, first.Name.Pos(), "VL0002", "package %s is not in the manifest; every package of the module is a part of the manifest (%s), and the manifest changes only when the request asks for a change to the architecture", u.Dir, model.ManifestDir)
+		model.Report(pass, first.Name.Pos(), "VL0002", "package %s is not in the manifest; every package of the module is a part of the manifest (%s)", u.Dir, model.ManifestDir)
 		return nil, nil
 	}
 	for _, f := range pass.Files {

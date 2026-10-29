@@ -10,7 +10,6 @@ const (
 
 // Manifest is the architecture of the shop.
 var Manifest = System{
-	Strict: true,
 	Parts: []Part{
 		Main("cmd/shop"),
 		Entry("api/web", Customer),
@@ -19,6 +18,13 @@ var Manifest = System{
 		Library("lib/money"),
 		Library("lib/contract"),
 	},
+}
+-- arch/config.go --
+package arch
+
+// Config is the check configuration of vulcan-lint.
+var Config = Settings{
+	Strict: true,
 }
 -- lib/money/money.go --
 // Package money holds amounts.

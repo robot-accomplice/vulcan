@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/robot-accomplice/vulcan/poc/golint/model"
 	"github.com/robot-accomplice/vulcan/poc/harness/record"
 )
 
@@ -23,7 +24,8 @@ var configBlockRE = regexp.MustCompile(`(?s)\bconfig\s*\{[^}]*\}`)
 
 // configChanges lists the changes to the arm's check configuration between the base and the
 // final workspace: a changed protected file, a changed config block of system.vulcan (strict,
-// strict_exempt, strict_interfaces, strict_shared, allow_*), and new in-source suppressions.
+// strict_exempt, strict_interfaces, strict_shared, allow_*), a changed kind of a part of the
+// base, and new in-source suppressions. An added part is not a change (parity review R2, item 1).
 func configChanges(arm, base, ws string) []string {
 	var out []string
 	for _, rel := range protected(base) {
@@ -40,8 +42,75 @@ func configChanges(arm, base, ws string) []string {
 			out = append(out, "system.vulcan: config block changed")
 		}
 	}
+	kinds := map[string]func(string) map[string]string{record.ArmL: goKinds, record.ArmV: vulcanKinds}[arm]
+	if kinds != nil {
+		before, after := kinds(base), kinds(ws)
+		for _, dir := range sortedKeys(before) {
+			if k, ok := after[dir]; ok && k != before[dir] {
+				out = append(out, dir+": kind changed from "+before[dir]+" to "+k)
+			}
+		}
+	}
 	if n := suppressions(ws) - suppressions(base); n > 0 {
 		out = append(out, "suppressions added in the source")
+	}
+	sort.Strings(out)
+	return out
+}
+
+// goKinds returns the kind of each part of arm L's manifest (arch), by directory: its
+// constructor and its party, such as "gateway for Database".
+func goKinds(root string) map[string]string {
+	m := model.Read(root)
+	out := map[string]string{}
+	for _, p := range m.Parts {
+		k := p.Kind
+		if p.For != "" {
+			k += " for " + p.For
+		}
+		out[p.Dir] = k
+	}
+	return out
+}
+
+// kindLineRE finds the kind lines of a component.vulcan: gateway for X, entry for Y.
+var kindLineRE = regexp.MustCompile(`(?m)^\s*(gateway|entry)\s+for\s+(\w+)`)
+
+// vulcanKinds returns the kind of each leaf of arm V, by the directory of its component.vulcan:
+// its gateway for and entry for lines, or "leaf".
+func vulcanKinds(root string) map[string]string {
+	out := map[string]string{}
+	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && (d.Name() == ".vulcan" || d.Name() == ".git") {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || d.Name() != "component.vulcan" {
+			return nil
+		}
+		b, _ := os.ReadFile(p)
+		var lines []string
+		for _, m := range kindLineRE.FindAllStringSubmatch(string(normal(b)), -1) {
+			lines = append(lines, m[1]+" for "+m[2])
+		}
+		sort.Strings(lines)
+		k := "leaf"
+		if len(lines) > 0 {
+			k = strings.Join(lines, ", ")
+		}
+		rel, _ := filepath.Rel(root, filepath.Dir(p))
+		out[filepath.ToSlash(rel)] = k
+		return nil
+	})
+	return out
+}
+
+func sortedKeys(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
 	}
 	sort.Strings(out)
 	return out

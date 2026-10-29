@@ -11,7 +11,6 @@ const (
 
 // Manifest is the architecture of the shop.
 var Manifest = System{
-	StrictExempt: []string{"lib/money"}, // want "VL0902"
 	Parts: []Part{
 		Main("cmd/shop"),
 		Entry("api/web", Customer),
@@ -25,6 +24,13 @@ var Manifest = System{
 		Leaf("api/orders/inner"),  // want "VL0002"
 		Leaf("cmd/tool"),          // want "VL0003"
 	},
+}
+-- arch/config.go --
+package arch
+
+// Config is the check configuration of vulcan-lint.
+var Config = Settings{
+	StrictExempt: []string{"lib/money"}, // want "VL0902"
 }
 -- api/notmain/notmain.go --
 // Package notmain is not package main.

@@ -143,16 +143,16 @@ func main() {
 ''',
 }
 
-def arch(parts, consts='\tCustomer Person = "Customer" // buys goods\n', fields=''):
+def arch(parts, consts='\tCustomer Person = "Customer" // buys goods\n'):
     return ('package arch\n\n// The persons and the external systems.\nconst (\n' + consts + ')\n\n'
-            '// Manifest is the architecture of the shop.\nvar Manifest = System{\n' + fields +
+            '// Manifest is the architecture of the shop.\nvar Manifest = System{\n' +
             '\tParts: []Part{\n' + ''.join('\t\t' + p + ',\n' for p in parts) + '\t},\n}\n')
 
 PARTS = ['Main("cmd/shop")', 'Entry("api/web", Customer)', 'Leaf("api/orders")', 'Leaf("api/billing")',
          'Library("lib/money")', 'Library("lib/contract")']
 
 def strict(extra=''):
-    return arch(PARTS, fields='\tStrict: true,\n' + extra)
+    return {"arch/config.go": 'package arch\n\n// Config is the check configuration of vulcan-lint.\nvar Config = Settings{\n\tStrict: true,\n' + extra + '}\n'}
 
 def billing(decls='', imports='"shop/lib/money"', pay='Pay(amt money.Money) (money.Receipt, error)', body='return money.Receipt{Amount: amt}, nil', extra=''):
     imp = 'import ' + imports + '\n' if not imports.startswith('(') else 'import ' + imports + '\n'
@@ -282,7 +282,7 @@ CASES = {
         {"arch/arch.go": arch(PARTS + ['Library("lib/util")']),
          "lib/util/util.go": '// Package util imports a leaf.\npackage util\n\nimport @VL0204@"shop/api/billing"\n\n// Pay makes a payer.\nvar Pay = billing.NewPayer\n'}),
 "N07": ("Strict: a leaf imports unsafe (K0124).",
-        {"arch/arch.go": strict(),
+        {**strict(),
          "api/billing/billing.go": billing('var size = unsafe.Sizeof(0)\n\nvar _ = size\n\n', '(\n\t@VL0124@"unsafe"\n\n\t"shop/lib/money"\n)')}),
 
 # A3 ports
@@ -312,10 +312,10 @@ CASES = {
                    'func (c checkedCheckout) Pay(amt money.Money) (money.Receipt, error) {\n\tcontract.Requires(amt < @VL0120@MaxAmount)\n\treturn c.Checkout.Pay(amt)\n}\n'),
          "api/orders/orders.go": orders(decls='// MaxAmount is the largest payment.\nconst MaxAmount = 1000\n\n',
              ctor='func NewService(checkout Checkout) *Service { return &Service{checkout: checkedCheckout{checkout}} }')}),
-"N05": ("Strict: a port method takes a function (K0123).", {"arch/arch.go": strict(), **N05}),
-"N06": ("Strict: a port method returns io.ReadCloser (K0123).", {"arch/arch.go": strict(), **N06}),
+"N05": ("Strict: a port method takes a function (K0123).", {**strict(), **N05}),
+"N06": ("Strict: a port method returns io.ReadCloser (K0123).", {**strict(), **N06}),
 "N06b": ("Strict: the same with StrictInterfaces: io.ReadCloser: accepted.",
-         {"arch/arch.go": strict('\tStrictInterfaces: []string{"io.ReadCloser"},\n'), **unmark(N06)}),
+         {**strict('\tStrictInterfaces: []string{"io.ReadCloser"},\n'), **unmark(N06)}),
 "P18": ("A constructor with a parameter that is not a settings struct (K0604).",
         {"api/billing/billing.go": billing().replace("func NewPayer() *Payer", "func @VL0604@NewPayer(n int) *Payer"),
          "cmd/shop/main.go": main("billing.NewPayer(1)")}),
@@ -346,10 +346,10 @@ CASES = {
         {"lib/money/money.go": MONEY.replace("package money\n\n%s", 'package money\n\nimport "os"\n\n// Load opens a rate file.\nfunc Load() error {\n\t_, err := os.@VL0203@Open("rates.txt")\n\treturn err\n}\n')}),
 "N04": ("A library queries through a *sql.DB that it receives: accepted.",
         {"lib/money/money.go": MONEY.replace("package money\n\n%s", 'package money\n\nimport "database/sql"\n\n// Count counts the receipts.\nfunc Count(db *sql.DB) (int, error) {\n\tvar n int\n\terr := db.QueryRow("select count(*) from receipts").Scan(&n)\n\treturn n, err\n}\n')}),
-"N08": ("Strict: an entry leaf calls http.Get (K0125).", {"arch/arch.go": strict(), "api/web/web.go": N08_WEB}),
-"N10": ("Strict: a leaf calls os.Setenv (K0211).", {"arch/arch.go": strict(), "api/billing/billing.go": N10_BILLING}),
+"N08": ("Strict: an entry leaf calls http.Get (K0125).", {**strict(), "api/web/web.go": N08_WEB}),
+"N10": ("Strict: a leaf calls os.Setenv (K0211).", {**strict(), "api/billing/billing.go": N10_BILLING}),
 "N11": ("Strict: N05, N08, and N10 in leaves listed in StrictExempt: accepted.",
-        {"arch/arch.go": strict('\tStrictExempt: []string{"api/orders", "api/web", "api/billing"},\n'),
+        {**strict('\tStrictExempt: []string{"api/orders", "api/web", "api/billing"},\n'),
          **unmark(N05), "api/web/web.go": unmark({0: N08_WEB})[0],
          "api/billing/billing.go": unmark({0: N10_BILLING})[0].replace("Pay(amt money.Money) (money.Receipt, error)", FUNC5)}),
 "N12": ("Ordinary mode: N05, N08, and N10 are accepted.",
@@ -357,7 +357,8 @@ CASES = {
          "api/billing/billing.go": unmark({0: N10_BILLING})[0].replace("Pay(amt money.Money) (money.Receipt, error)", FUNC5)}),
 "N13": ("Strict: the base system, a serving entry leaf, and a dialing gateway are accepted.",
         {"arch/arch.go": arch(['Main("cmd/shop")', 'Entry("api/web", Customer)', 'Leaf("api/orders")', 'Gateway("api/billing", Bank)', 'Library("lib/money")', 'Library("lib/contract")'],
-                              consts='\tCustomer Person   = "Customer" // buys goods\n\tBank     External = "Bank"     // cards\n', fields='\tStrict: true,\n'),
+                              consts='\tCustomer Person   = "Customer" // buys goods\n\tBank     External = "Bank"     // cards\n'),
+         **strict(),
          "api/billing/billing.go": billing('func ping() { _, _ = http.Get("http://127.0.0.1:1") }\n\nvar _ = ping\n\n', '(\n\t"net/http"\n\n\t"shop/lib/money"\n)'),
          "api/web/web.go": web('func listen() {\n\tl, err := net.Listen("tcp", "127.0.0.1:0")\n\tif err == nil {\n\t\tl.Close()\n\t}\n}\n\nvar _ = listen\n\n', '(\n\t"context"\n\t"fmt"\n\t"net"\n)')}),
 
@@ -377,9 +378,9 @@ CASES = {
          {"lib/money/money.go": MONEY % MONEY_VARS,
           "api/billing/billing.go": billing('func use() money.Money {\n\tc := money.Default\n\tc.Fee = 5\n\tmoney.Fees["ch"] = 3\n\treturn c.Fee + money.Limit + money.Rates[1]\n}\n\nvar _ = use\n\n')}),
 "N09": ("Strict: a library var holds a channel (K0210).",
-        {"arch/arch.go": strict(), "lib/money/money.go": MONEY % '// Events carries events.\nvar @VL0210@Events = make(chan int)\n'}),
+        {**strict(), "lib/money/money.go": MONEY % '// Events carries events.\nvar @VL0210@Events = make(chan int)\n'}),
 "N09b": ("Strict: a library var of an error type, and of a type in StrictShared, is accepted.",
-         {"arch/arch.go": strict('\tStrictShared: []string{"*regexp.Regexp"},\n'),
+         {**strict('\tStrictShared: []string{"*regexp.Regexp"},\n'),
           "lib/money/money.go": MONEY.replace("package money\n\n%s", 'package money\n\nimport (\n\t"errors"\n\t"regexp"\n)\n\n// ErrBad is an error.\nvar ErrBad = errors.New("bad")\n\n// Code matches a code.\nvar Code = regexp.MustCompile(`^[A-Z]+$`)\n')}),
 
 # A7 contracts

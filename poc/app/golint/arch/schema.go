@@ -1,7 +1,7 @@
 // Package arch is the manifest of the architecture: every package of the module, with its kind
 // (PRIMER.md, section 1). vulcan-lint reads it. The build type-checks it, so a name that is not
 // declared is a compile error. This file is the schema of the manifest, the same in every
-// project; arch.go is the manifest.
+// project; arch.go is the manifest, and config.go is the check configuration.
 package arch
 
 // Person is someone who uses the system.
@@ -41,7 +41,10 @@ func Main(dir string) Part { return Part{dir, "main", nil} }
 // System is the manifest.
 type System struct {
 	Parts []Part
+}
 
+// Settings is the check configuration of vulcan-lint.
+type Settings struct {
 	// Strict turns on strict mode (PRIMER.md, section 2).
 	Strict bool
 	// StrictExempt lists leaves that strict mode skips.

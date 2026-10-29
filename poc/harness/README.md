@@ -68,14 +68,14 @@ fixes to round 1 (plan-r2, section 6):
 | F4 | `-sandbox DISTRO`: each agent round runs in WSL in its own user, mount, and PID namespace (`unshare --map-root-user`, no root needed): its own `/tmp`; the user's home, `/mnt`, `/var/tmp`, and `/dev/shm` hidden; the run's directory at `/tmp/run`; the Linux tools (`-linux-tools`, default `.harness/tools-linux`: `bin/` with claude, vulcan, fakepay, vulcan-lint, and `go/`, a Go toolchain) read-only; Go modules from a read-only file proxy of the host's module cache. The provider's key reaches the namespace through `WSLENV`, never through a file | `runner/sandbox.go` |
 | F5 | `first_edit_turn`, `first_pass_turn` (the first passing check after the first edit), `tokens_in_at_first_pass` | `agentlog` |
 | F6 | The preamble ends: "When the check passes and the request is met, stop." | `runner.Preamble` |
-| F7 | `config_changes`: a changed file that the template's `PROTECTED` file lists, a changed `config` block of `system.vulcan`, or new in-source suppressions (`//nolint`, `//lint:ignore`, `//vulcan-lint:ignore`). Such a run is no clean success unless its task has `allow_config` | `runner/config.go` |
+| F7 | `config_changes`: a changed file that the template's `PROTECTED` file lists, a changed `config` block of `system.vulcan`, a changed kind of a part of the base (in L, its constructor and party in `arch`; in V, the `gateway for` and `entry for` lines of its `component.vulcan`; an added part is no change), or new in-source suppressions (`//nolint`, `//lint:ignore`, `//vulcan-lint:ignore`). Such a run is no clean success unless its task has `allow_config` | `runner/config.go` |
 | F8 | The provider's balance before a batch, every 10 runs, and at the end, in `balance.jsonl` | `provider`, `evaluate` |
 | F9 | `-review`: after each agent round, a reviewer session (read-only tools, `runner.ReviewPrompt`, the brief, `RULES.md`, the diff) gives a verdict; a rejection goes back to the agent in the same session (`--resume`), up to `-resubmits` times within the run's budget; a second review of the final change measures the reviewer's agreement | `runner/review.go` |
 | F10 | `harness analyze2`, and its dry run: `go test ./poc/harness/analysis2` reads each world of `synth2` over 200 seeds | `analysis2`, `synth2` |
 
 Arm L's linter, written in step 2 of plan-r2, must print a code `VL` and four digits in each
 diagnostic, as Vulcan prints K-codes, so that the check loop (O2) reads both arms alike; and arm
-L's template must list its configuration (the manifest, the linter's settings) in `PROTECTED`.
+L's template must list its check configuration (the linter's settings, `arch/config.go`) in `PROTECTED`.
 
 The sandbox needs two things that `harness tools -linux` does not fetch: Claude Code for Linux
 in `bin/claude`, and a Go toolchain in `go/`, of at least the version of `go.mod`.

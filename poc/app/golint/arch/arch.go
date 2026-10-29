@@ -10,7 +10,6 @@ const (
 
 // Manifest is the architecture of Stockroom.
 var Manifest = System{
-	Strict: true,
 	Parts: []Part{
 		Main("cmd/stockroom"),
 		Entry("api/web", Customer),

@@ -1,4 +1,4 @@
-# The check configuration: the manifest of the architecture (with the settings of vulcan-lint)
-# and the contract package. A change does not touch these files unless the request asks for it.
-arch/*.go
+# The check configuration of arm L.
+arch/config.go
+arch/schema.go
 lib/contract/*.go

@@ -2,14 +2,14 @@
 // the analyzers of vulcan-lint (README.md).
 //
 // The manifest is the Go package arch at the root of the module. It declares the persons and the
-// externals as typed constants, and one variable Manifest, a System literal that lists every
-// package of the module with its kind:
+// externals as typed constants, one variable Manifest, a System literal that lists every package
+// of the module with its kind, and, in config.go, one variable Config, a Settings literal that
+// holds the check configuration:
 //
 //	const Customer Person = "Customer"
 //	const Database External = "Database"
 //
 //	var Manifest = System{
-//		Strict: true,
 //		Parts: []Part{
 //			Main("cmd/shop"),
 //			Entry("api/web", Customer),
@@ -18,6 +18,8 @@
 //			Library("lib/shop"),
 //		},
 //	}
+//
+//	var Config = Settings{Strict: true} // in config.go
 //
 // The build type-checks the manifest; the analyzers read its syntax.
 package model
@@ -30,6 +32,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,6 +44,9 @@ import (
 
 // ManifestDir is the directory of the manifest package, relative to the module root.
 const ManifestDir = "arch"
+
+// ConfigFile is the file of the manifest package that declares the check configuration.
+const ConfigFile = "config.go"
 
 // ContractDir is the directory of the contract package, relative to the module root.
 const ContractDir = "lib/contract"
@@ -187,6 +193,12 @@ func Load(root string) *Manifest {
 	if m, ok := cache.Load(root); ok {
 		return m.(*Manifest)
 	}
+	v, _ := cache.LoadOrStore(root, Read(root))
+	return v.(*Manifest)
+}
+
+// Read reads the manifest of the module at root, with no cache.
+func Read(root string) *Manifest {
 	m := &Manifest{Root: root}
 	if b, err := os.ReadFile(filepath.Join(root, "go.mod")); err == nil {
 		m.Module = modfile.ModulePath(b)
@@ -194,8 +206,7 @@ func Load(root string) *Manifest {
 	fset := token.NewFileSet()
 	files := parseDir(fset, filepath.Join(root, ManifestDir))
 	Parse(m, fset, files)
-	v, _ := cache.LoadOrStore(root, m)
-	return v.(*Manifest)
+	return m
 }
 
 func parseDir(fset *token.FileSet, dir string) []*ast.File {
@@ -227,7 +238,7 @@ func Parse(m *Manifest, fset *token.FileSet, files []*ast.File) {
 	bad := func(n ast.Node, format string, args ...any) {
 		m.Problems = append(m.Problems, Problem{n.Pos(), fmt.Sprintf(format, args...)})
 	}
-	var lit *ast.CompositeLit
+	var lit, cfg *ast.CompositeLit
 	for _, f := range files {
 		for _, d := range f.Decls {
 			gd, ok := d.(*ast.GenDecl)
@@ -254,14 +265,21 @@ func Parse(m *Manifest, fset *token.FileSet, files []*ast.File) {
 					}
 				case token.VAR:
 					for i, n := range vs.Names {
-						if n.Name != "Manifest" {
-							continue
-						}
+						var v *ast.CompositeLit
 						if i < len(vs.Values) {
-							lit, _ = vs.Values[i].(*ast.CompositeLit)
+							v, _ = vs.Values[i].(*ast.CompositeLit)
 						}
-						if lit == nil {
-							bad(n, "Manifest is a System{...} literal")
+						switch n.Name {
+						case "Manifest":
+							if lit = v; lit == nil {
+								bad(n, "Manifest is a System{...} literal")
+							}
+						case "Config":
+							if cfg = v; cfg == nil {
+								bad(n, "Config is a Settings{...} literal")
+							} else if filepath.Base(fset.Position(n.Pos()).Filename) != ConfigFile {
+								bad(n, "Config is declared in %s/%s, which holds the check configuration", ManifestDir, ConfigFile)
+							}
 						}
 					}
 				}
@@ -277,7 +295,16 @@ func Parse(m *Manifest, fset *token.FileSet, files []*ast.File) {
 		}
 		return
 	}
-	for _, e := range lit.Elts {
+	fields(lit, "Parts", m, bad)
+	if cfg != nil {
+		fields(cfg, "Strict StrictExempt StrictInterfaces StrictShared Mutators", m, bad)
+	}
+}
+
+// fields reads the fields of the System or Settings literal x; allowed lists the field names of
+// its type.
+func fields(x *ast.CompositeLit, allowed string, m *Manifest, bad func(ast.Node, string, ...any)) {
+	for _, e := range x.Elts {
 		kv, ok := e.(*ast.KeyValueExpr)
 		var key *ast.Ident
 		if ok {
@@ -285,6 +312,16 @@ func Parse(m *Manifest, fset *token.FileSet, files []*ast.File) {
 		}
 		if key == nil {
 			bad(e, "each field of the manifest is written as Name: value")
+			continue
+		}
+		if !slices.Contains(strings.Fields(allowed), key.Name) {
+			if key.Name == "Parts" {
+				bad(key, "the parts are in var Manifest = System{...}, not in the check configuration")
+			} else if slices.Contains([]string{"Strict", "StrictExempt", "StrictInterfaces", "StrictShared", "Mutators"}, key.Name) {
+				bad(key, "%s is check configuration: it is in var Config = Settings{...} of %s/%s", key.Name, ManifestDir, ConfigFile)
+			} else {
+				bad(key, "the manifest has no field %s", key.Name)
+			}
 			continue
 		}
 		switch key.Name {
@@ -325,8 +362,6 @@ func Parse(m *Manifest, fset *token.FileSet, files []*ast.File) {
 					}
 				}
 			}
-		default:
-			bad(key, "the manifest has no field %s", key.Name)
 		}
 	}
 }

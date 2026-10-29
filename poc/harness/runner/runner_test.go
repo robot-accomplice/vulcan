@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,6 +77,51 @@ func TestConfigChangesAndStrays(t *testing.T) {
 	write(t, ws, "api/orders/stockroom.exe", "MZ\x00\x01")
 	if got := strayFiles(base, ws); strings.Join(got, "|") != "api/orders/stockroom.exe|scratch/notes.md" {
 		t.Fatalf("strays %v", got)
+	}
+}
+
+// TestConfigChangesKinds checks that a changed kind of a part of the base fails the run in arms L
+// and V, and that an added part does not (parity review R2, item 1).
+func TestConfigChangesKinds(t *testing.T) {
+	const manifest = "package arch\n\nconst Database External = \"Database\"\n\nvar Manifest = System{\n\tParts: []Part{\n%s\t},\n}\n"
+	parts := "\t\tMain(\"cmd/shop\"),\n\t\tLeaf(\"api/orders\"),\n\t\tGateway(\"api/store\", Database),\n"
+	lBase, lWS := t.TempDir(), t.TempDir()
+	for _, root := range []string{lBase, lWS} {
+		write(t, root, "PROTECTED", "arch/config.go\n")
+		write(t, root, "arch/config.go", "package arch\n\nvar Config = Settings{Strict: true}\n")
+		write(t, root, "arch/arch.go", fmt.Sprintf(manifest, parts))
+	}
+	write(t, lWS, "arch/arch.go", fmt.Sprintf(manifest, parts+"\t\tLeaf(\"api/reports\"),\n"))
+	if got := configChanges("L", lBase, lWS); len(got) != 0 {
+		t.Fatalf("L, an added part: %v", got)
+	}
+	write(t, lWS, "arch/arch.go", fmt.Sprintf(manifest, strings.Replace(parts, "Leaf(\"api/orders\")", "Gateway(\"api/orders\", Database)", 1)))
+	if got := configChanges("L", lBase, lWS); strings.Join(got, "|") != "api/orders: kind changed from leaf to gateway for Database" {
+		t.Fatalf("L, a changed kind: %v", got)
+	}
+	write(t, lWS, "arch/config.go", "package arch\n\nvar Config = Settings{Strict: false}\n")
+	if got := configChanges("L", lBase, lWS); len(got) != 2 || got[1] != "arch/config.go: changed" {
+		t.Fatalf("L, a changed configuration: %v", got)
+	}
+
+	vBase, vWS := t.TempDir(), t.TempDir()
+	for _, root := range []string{vBase, vWS} {
+		write(t, root, "system.vulcan", "system S {\n    config { strict: true }\n}\n")
+		write(t, root, "api/orders/component.vulcan", "component Orders {\n    // not a gateway for Bank\n}\n")
+		write(t, root, "api/web/component.vulcan", "component Web {\n    entry for Customer\n}\n")
+	}
+	write(t, vWS, "api/reports/component.vulcan", "component Reports {\n    gateway for Warehouse\n}\n")
+	if got := configChanges("V", vBase, vWS); len(got) != 0 {
+		t.Fatalf("V, an added part: %v", got)
+	}
+	write(t, vWS, "api/orders/component.vulcan", "component Orders {\n    gateway for Bank\n}\n")
+	write(t, vWS, "api/web/component.vulcan", "component Web {\n    entry for Customer\n    gateway for Bank\n}\n")
+	want := "api/orders: kind changed from leaf to gateway for Bank|api/web: kind changed from entry for Customer to entry for Customer, gateway for Bank"
+	if got := configChanges("V", vBase, vWS); strings.Join(got, "|") != want {
+		t.Fatalf("V, changed kinds: %v", got)
+	}
+	if got := configChanges("P", vBase, vWS); len(got) != 0 {
+		t.Fatalf("P has no kinds: %v", got)
 	}
 }
 
