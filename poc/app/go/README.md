@@ -27,6 +27,8 @@ Check (run this before you finish a change):
 go vet ./... && go test ./...
 ```
 
+Do not change the check configuration (none in this project) or add suppression comments unless the request asks for it.
+
 Build and run, with the test card processor in another terminal:
 
 ```bash

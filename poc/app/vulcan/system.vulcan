@@ -1,4 +1,5 @@
-// Stockroom is an order, inventory, and payment service (docs/poc/stockroom.md).
+// Stockroom is an order, inventory, purchasing, and payment service, with webhooks: an HTTP API
+// and a SQLite database (docs/poc/stockroom.md).
 system Stockroom {
     person   Customer        "Places, pays for, and cancels orders"
     external Database        "The SQLite file"
@@ -19,8 +20,8 @@ system Stockroom {
         Orders.Events:     Events.NewHub
         Purchasing.Stock:  Inventory.NewCatalog
         Purchasing.Events: Events.NewHub
-        // The five Store wires have the same settings, so they share one database (K0607 warns
-        // when they differ).
+        // The five Store wires have the same settings, so they share one database (K0607 rejects
+        // them when they differ).
         Orders.Store:      Store.Open{ Path: flag("db", default: "stockroom.db") }
         Inventory.Store:   Store.Open{ Path: flag("db", default: "stockroom.db") }
         Billing.Store:     Store.Open{ Path: flag("db", default: "stockroom.db") }

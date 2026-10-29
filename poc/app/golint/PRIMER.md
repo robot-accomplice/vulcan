@@ -1,14 +1,25 @@
 # Primer: the architecture and the contracts that `vulcan-lint` checks
 
 This project is plain Go with an enforced architecture and contracts. **Function bodies are plain
-Go.** `vulcan-lint ./...` checks the rules below; each diagnostic has a code (`VL0101`) and says
+Go**: write them exactly as you would without the linter. This primer lists only what the rules
+add. `vulcan-lint ./...` checks the rules below; each diagnostic has a code (`VL0101`) and says
 how to fix it. It honors no `//nolint` or other suppression comment, and rejects a file that the
 build ignores (a build tag).
 
-## 1. The manifest
+## 1. Project layout and the manifest
 
-`arch/arch.go` lists every package of the module with its kind. It is the architecture: change it
-only when the request asks for a change to the architecture. `arch/schema.go` declares the kinds.
+```
+go.mod                   a Go module
+arch/                    the manifest (arch.go), the check configuration (config.go), the kinds
+cmd/shop/main.go         main: wires the leaves
+api/orders/ports.go      the ports of the leaf orders
+api/orders/*.go          code of orders; tests in *_test.go
+lib/money/               a library: shared types and reusable code
+lib/contract/            the contract checks
+```
+
+`arch/arch.go` lists every package of the module with its kind. It is the architecture.
+`arch/config.go` holds the check configuration, and `arch/schema.go` declares the kinds.
 
 ```go
 const (
@@ -17,7 +28,6 @@ const (
 )
 
 var Manifest = System{
-    Strict: true,
     Parts: []Part{
         Main("cmd/shop"),              // wires the leaves
         Entry("api/web", Customer),    // a leaf that serves a person or an external
@@ -26,6 +36,8 @@ var Manifest = System{
         Library("lib/money"),          // shared types and code, in lib/
     },
 }
+
+var Config = Settings{Strict: true} // arch/config.go
 ```
 
 - Each package is one part: a leaf is one package, with no package inside it. A package is
@@ -34,11 +46,12 @@ var Manifest = System{
   imports no leaf. No code imports `arch`.
 - Only a **gateway** or an **entry** leaf uses the network: dial, listen, send an HTTP request,
   `sql.Open`, `exec.Command`, `http.DefaultClient`, building an `http.Client`. Main does not.
+  One gateway leaf for each external system. An entry is for a declared `Person` or `External`.
 - A **library** has no ports. A package-level `var` in it is set once, in its initializer or an
   `init` of the library; nothing assigns it later, also not a field or an element of it. It never
   chooses a file or a resource by name (`os.Open`, `os.ReadFile`); it uses a handle that its
   caller gives it.
-- No `//go:linkname`.
+- Import any Go package. No `//go:linkname`.
 
 ## 2. Leaves, ports, constructors, and main
 
@@ -67,6 +80,9 @@ func (c checkedCheckout) Pay(cu money.CustomerID, amt money.Money) (money.Receip
   `type checkedX struct{ X }`; each of its methods is the port contract (section 3), then
   `return c.X.Method(its parameters, in order)`. A port contract names only its parameters,
   results, old values, the standard library, and libraries; never a name of its own leaf.
+- Any type with the port's methods satisfies it, as a Go interface does. In code, call the port
+  through its field: `r, err := s.checkout.Pay(c, amt)`. It is an ordinary call; the wrapper
+  checks the port's contract at each call.
 - Port methods are exported. A type in a port signature is predeclared, from the standard
   library, or from a library; never a type of a leaf or of another module.
 - A **constructor** is an exported function that returns `T` or `(T, error)`, where `T` is an
@@ -90,18 +106,22 @@ func NewService(checkout Checkout, s Settings) *Service {
   (`store.Settings{Path: db}`), whose values are constants or flag values (a local variable, or
   `flags["db"]`); a secret field gets a flag, never a constant. A wire is an argument:
   `orders.NewService(cards, orders.Settings{Limit: 500})`.
+- One value shared by several leaves is one constructor call whose result main passes to each,
+  so one database is one `store.Open(...)`. In strict mode main calls each constructor once: a
+  second call is a second instance.
 - **Strict mode** (`Strict: true`, on in this project) adds, outside main: a port method takes
   and returns no function, channel, or interface type except `error` and `context.Context`; no
   `unsafe`, `syscall`, cgo, or `reflect` calls; an entry leaf only serves (listens), and only a
   gateway dials; a library `var` holds no pointer, slice, map, channel, function, or interface;
   no code changes process-wide state (`os.Setenv`, `http.HandleFunc`, `log.SetOutput`,
-  `flag.Parse`). Main may do these.
+  `flag.Parse`). Main may do these. `StrictExempt: []string{"api/web"}` keeps a leaf in ordinary
+  mode.
 
 ## 3. Contracts
 
 `stockroom/lib/contract` checks contracts when the code runs. A failed check panics with a
-`*contract.Failure` that names the function and the line; it undoes nothing, so check before you
-commit. The contract statements are **the first statements** of a function, before any other:
+`*contract.Failure` that names the function and the line. It undoes nothing: check before you
+commit (`defer tx.Rollback()`, checks, then `return tx.Commit()`). The contract statements are **the first statements** of a function, before any other:
 
 ```go
 func (a *Account) Withdraw(amt int) (left int, err error) {
@@ -125,7 +145,8 @@ func (a *Account) Withdraw(amt int) (left int, err error) {
 - A call whose constant arguments make a `Requires` false is rejected by the check.
 - An **invariant** is a method `func (x T) Invariant() bool { return cond }` of a struct type,
   with a value receiver and one pure `return`. It must hold for the zero value. Each method of
-  `T` with a pointer receiver starts with `defer contract.Keep(recv)`. Each value of `T` that
+  `T` with a pointer receiver starts with `defer contract.Keep(recv)`, which checks the invariant
+  when the method returns, so a method can pass through a broken state. Each value of `T` that
   the code builds with fields or by a conversion is checked where it is built:
   `contract.Valid(T{Lo: 1, Hi: 2})` or `contract.Valid(&T{...})`; an empty `T{}` needs none.
 - Only the methods of `T` write its fields or take a field's address (`&t.Lo`), also through a
@@ -133,60 +154,29 @@ func (a *Account) Withdraw(amt int) (left int, err error) {
 
 ## 4. Tests
 
-Tests are Go tests in the leaf's package. Build the value with its constructor and a fake: any
-type that has the port's methods. The wrapper checks the fake against the port's contract too.
+Tests are Go tests in `*_test.go`, in the leaf's package. A fake is any type that has the
+port's methods. Build the value with its constructor and the fakes:
 
-## 5. Codes
+```go
+type checkoutOK struct{}
 
-| Code | What is wrong | Fix |
-|---|---|---|
-| VL0002 | A package not in the manifest, or inside a leaf | Put the code in a listed package |
-| VL0003 | A part without its package; a library outside `lib/`; main not `package main` | Fix the part or the package |
-| VL0004 | Package name is not the directory; an `x_test` package | Rename; test in the same package |
-| VL0101 | A leaf imports a leaf | Declare a port; main passes the other leaf |
-| VL0104 | A port that no constructor takes, or a `nil` port in main | Take it; pass a provider |
-| VL0110 | Something else in `ports.go`; an unexported port or port method; the manifest imports | Keep `ports.go` to ports and wrappers |
-| VL0112 | A port signature uses a type of the leaf or of another module | Move the type to a library |
-| VL0116 | A port field written outside a constructor; a package-level var holds a port | Set ports in the constructor only |
-| VL0117 | `init` in a leaf | Use the constructor or a lifecycle method |
-| VL0118 | Code imports `arch` | Remove the import |
-| VL0120 | A port contract names a name of its own leaf | Use parameters, constants of libraries |
-| VL0121 | A directory listed twice in the manifest | One part per package |
-| VL0122 | `//go:linkname` | Call through a port or a library |
-| VL0123 | Strict: a port method carries a function, channel, or interface | Pass values |
-| VL0124 | Strict: `unsafe`, `syscall`, cgo, or a `reflect` call | Remove it |
-| VL0125 | Strict: an entry leaf dials | Dial in a gateway, through a port |
-| VL0201 | A library has a `ports.go` | Libraries have no ports |
-| VL0202 | A library var is assigned after startup | Set it once, in its initializer |
-| VL0203 | A library opens a file or a resource by name | Take a handle from the caller |
-| VL0204 | A library imports a leaf | Import only libraries |
-| VL0205 | Network use outside a gateway or an entry leaf | Move it to a gateway, reach it by a port |
-| VL0206 | A gateway or entry is for a name that is not declared | Use a declared Person or External |
-| VL0207 | Two gateways for one external | One gateway per external |
-| VL0210 | Strict: a library var holds a reference | Use a value type |
-| VL0211 | Strict: a call that changes process-wide state, outside main | Do it in main, or pass a value |
-| VL0501 | Constant arguments break the callee's `Requires` | Pass values that keep it |
-| VL0503 | A contract or invariant with effects, or not of its form | Comparisons, `len`, `cap`, conversions |
-| VL0506 | The zero value breaks the invariant | Make it hold for zero (`Lo <= Hi`) |
-| VL0507 | A field of a type with an invariant written outside its methods | Add a method, or `contract.Valid` |
-| VL0508 | The address of such a field, or a pointer method on it, outside its methods | Copy it to a local |
-| VL0509 | `contract.Old` of a value that holds a reference | Old of a value: `len(xs)`, a field |
-| VL0512 | A type assertion in a contract | Remove it |
-| VL0513 | `Invariant` on a non-struct, or with a pointer receiver | `func (x T) Invariant() bool` |
-| VL0603 | A settings literal in main lacks a field | Give every field |
-| VL0604 | A constructor's parameters or result are not of the form | Ports, then one settings struct |
-| VL0605 | A secret setting gets a constant | Pass a flag value |
-| VL0606 | A setting that is not a constant or a flag value; settings not a literal | Compute nothing in main |
-| VL0901 | The build ignores a file | Remove the build constraint |
-| VL0902 | The manifest cannot be read | Keep its literal form |
-| VL0903 | A contract call that is not among the first statements | Move it to the top |
-| VL0904 | A pointer method of a type with an invariant without `defer contract.Keep(recv)` | Add it first |
-| VL0905 | A value of a type with an invariant built without `contract.Valid` | Wrap the literal |
-| VL0906 | A wrapper method that does more than check, or a port stored unwrapped | Fix its form; store `checkedX{x}` |
-| VL0907 | Main calls something that is not a constructor, lifecycle method, or standard library | Main only wires |
-| VL0908 | Main builds a leaf value without its constructor | Call the constructor |
+func (checkoutOK) Pay(c money.CustomerID, a money.Money) (money.Receipt, error) {
+    return money.Receipt{Amount: a}, nil
+}
 
-## 6. Commands
+func TestPlace(t *testing.T) {
+    s := NewService(checkoutOK{}, Settings{Limit: 500})
+    if err := s.Place(o); err != nil {
+        t.Fatal(err)
+    }
+}
+```
 
-`go vet ./... && vulcan-lint ./... && go test ./...` is the check. `go build`, `go run`, and
-`go test` work as usual.
+A fake must meet the port's contract: the wrapper checks it at each call.
+
+## 5. Commands
+
+- `go vet ./... && vulcan-lint ./... && go test ./...` is the check. Each diagnostic of
+  `vulcan-lint` has a code (`VL0101`), a position, and the fix.
+- `go build`, `go run ./cmd/stockroom [--flag=value]`, `go test ./api/orders`, and
+  `go mod tidy` work as usual.

@@ -1,5 +1,5 @@
 // Package contract checks contracts when the code runs: what a function requires, what it
-// ensures, and the invariant of a type (PRIMER.md, section 4). A failed check panics with a
+// ensures, and the invariant of a type (PRIMER.md, section 3). A failed check panics with a
 // *Failure. vulcan-lint checks where and how the calls are written.
 package contract
 

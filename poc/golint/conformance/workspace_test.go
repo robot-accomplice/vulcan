@@ -19,8 +19,9 @@ func TestWorkspace(t *testing.T) {
 	}
 }
 
-// TestReadme checks that arm L's README is arm P's, but for the check command and one line that
-// points to the primer (plan-r2, section 2).
+// TestReadme checks that arm L's README is arm P's, but for the check command, one line that
+// points to the primer (plan-r2, section 2), the rows of arch and lib/contract, and the files of
+// the check configuration (parity review R2, items 4 and 5).
 func TestReadme(t *testing.T) {
 	p, err := os.ReadFile(filepath.Join(lintest.Workspace(), "..", "go", "README.md"))
 	if err != nil {
@@ -31,11 +32,20 @@ func TestReadme(t *testing.T) {
 		t.Fatal(err)
 	}
 	norm := func(b []byte) string { return strings.ReplaceAll(string(b), "\r\n", "\n") }
-	want := strings.Replace(norm(p), "go vet ./... && go test ./...\n```\n",
-		"go vet ./... && vulcan-lint ./... && go test ./...\n```\n\n"+
-			"`PRIMER.md` explains the architecture and the contracts that `vulcan-lint` checks, and each of its codes.\n", 1)
-	if want == norm(p) || norm(l) != want {
-		t.Errorf("poc/app/golint/README.md is not poc/app/go/README.md with the check command of arm L and the line of the primer")
+	want := norm(p)
+	for _, r := range [][2]string{
+		{"go vet ./... && go test ./...\n```\n", "go vet ./... && vulcan-lint ./... && go test ./...\n```\n"},
+		{"(none in this project)", "(`arch/config.go`, `arch/schema.go`, `lib/contract`, and the kinds of the existing parts in `arch/arch.go`)"},
+		{"unless the request asks for it.\n", "unless the request asks for it.\n\n`PRIMER.md` explains the architecture and the contracts that `vulcan-lint` checks.\n"},
+		{"| `lib/shop` | Shared value types and errors |\n", "| `lib/shop` | Shared value types and errors |\n| `lib/contract` | The contract checks |\n| `arch` | The manifest of the architecture |\n"},
+	} {
+		if !strings.Contains(want, r[0]) {
+			t.Fatalf("poc/app/go/README.md has no %q", r[0])
+		}
+		want = strings.Replace(want, r[0], r[1], 1)
+	}
+	if norm(l) != want {
+		t.Errorf("poc/app/golint/README.md is not poc/app/go/README.md with the check command, the check configuration, the layout rows, and the line of the primer of arm L")
 	}
 }
 

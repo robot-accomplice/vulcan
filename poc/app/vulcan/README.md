@@ -27,6 +27,8 @@ Check (run this before you finish a change):
 vulcan check && vulcan test --race=false
 ```
 
+Do not change the check configuration (the `config` block of `system.vulcan`, and the kinds of the existing leaves: `gateway for`, `entry for`) or add suppression comments unless the request asks for it.
+
 Build and run, with the test card processor in another terminal:
 
 ```bash

@@ -18,6 +18,8 @@ and a SQLite database. It is written in Go.
 | `api/payments` | The client of the card processor |
 | `api/webhooks` | The client that sends webhooks to the subscribers |
 | `lib/shop` | Shared value types and errors |
+| `lib/contract` | The contract checks |
+| `arch` | The manifest of the architecture |
 
 ## Check, build, and run
 
@@ -27,7 +29,9 @@ Check (run this before you finish a change):
 go vet ./... && vulcan-lint ./... && go test ./...
 ```
 
-`PRIMER.md` explains the architecture and the contracts that `vulcan-lint` checks, and each of its codes.
+Do not change the check configuration (`arch/config.go`, `arch/schema.go`, `lib/contract`, and the kinds of the existing parts in `arch/arch.go`) or add suppression comments unless the request asks for it.
+
+`PRIMER.md` explains the architecture and the contracts that `vulcan-lint` checks.
 
 Build and run, with the test card processor in another terminal:
 
