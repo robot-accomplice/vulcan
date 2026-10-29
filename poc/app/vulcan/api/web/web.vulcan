@@ -56,6 +56,20 @@ func Handler() http.Handler {
 	mux.HandleFunc("POST /orders/{id}/cancel", orderAction(Orders.Cancel))
 	mux.HandleFunc("POST /orders/{id}/refunds", refund)
 	mux.HandleFunc("GET /orders/{id}/payments", payments)
+	mux.HandleFunc("POST /suppliers", addSupplier)
+	mux.HandleFunc("GET /suppliers", listSuppliers)
+	mux.HandleFunc("GET /suppliers/{id}", getSupplier)
+	mux.HandleFunc("GET /suppliers/{id}/purchase-orders", listPurchases)
+	mux.HandleFunc("POST /purchase-orders", createPurchase)
+	mux.HandleFunc("GET /purchase-orders/{id}", getPurchase)
+	mux.HandleFunc("POST /purchase-orders/{id}/receive", receivePurchase)
+	mux.HandleFunc("POST /purchase-orders/{id}/cancel", cancelPurchase)
+	mux.HandleFunc("POST /webhooks", subscribe)
+	mux.HandleFunc("GET /webhooks", listSubscriptions)
+	mux.HandleFunc("GET /webhooks/{id}", getSubscription)
+	mux.HandleFunc("DELETE /webhooks/{id}", unsubscribe)
+	mux.HandleFunc("GET /webhooks/{id}/deliveries", deliveries)
+	mux.HandleFunc("POST /webhooks/{id}/retry", retry)
 	return mux
 }
 
@@ -93,6 +107,42 @@ type paymentJSON struct {
 	ProviderID string `json:"provider_id"`
 }
 
+type supplierJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type purchaseLineJSON struct {
+	SKU      string `json:"sku"`
+	Qty      int    `json:"qty"`
+	Received int    `json:"received"`
+	Cost     int64  `json:"cost_cents"`
+}
+
+type purchaseJSON struct {
+	ID       string             `json:"id"`
+	Supplier string             `json:"supplier_id"`
+	Status   string             `json:"status"`
+	Lines    []purchaseLineJSON `json:"lines"`
+	Total    int64              `json:"total_cents"`
+}
+
+type subscriptionJSON struct {
+	ID     string   `json:"id"`
+	URL    string   `json:"url"`
+	Events []string `json:"events"`
+	Secret string   `json:"secret,omitempty"`
+}
+
+type deliveryJSON struct {
+	EventID  string `json:"event_id"`
+	Type     string `json:"type"`
+	Subject  string `json:"subject"`
+	Status   string `json:"status"`
+	Attempts int    `json:"attempts"`
+	Response int    `json:"response_status"`
+}
+
 func itemJSON(it shop.Item) productJSON {
 	return productJSON{
 		SKU: string(it.Product.SKU), Name: it.Product.Name, Price: int64(it.Product.Price),
@@ -107,6 +157,35 @@ func toOrderJSON(o shop.Order) orderJSON {
 	}
 	for _, l := range o.Lines {
 		out.Lines = append(out.Lines, lineJSON{SKU: string(l.SKU), Qty: l.Qty, Price: int64(l.Price)})
+	}
+	return out
+}
+
+func toPurchaseJSON(po shop.PurchaseOrder) purchaseJSON {
+	out := purchaseJSON{ID: string(po.ID), Supplier: string(po.Supplier), Status: string(po.Status), Lines: []purchaseLineJSON{}, Total: int64(po.Total)}
+	for _, l := range po.Lines {
+		out.Lines = append(out.Lines, purchaseLineJSON{SKU: string(l.SKU), Qty: l.Qty, Received: l.Received, Cost: int64(l.Cost)})
+	}
+	return out
+}
+
+// toSubscriptionJSON leaves out the secret: only the response that creates a subscription
+// shows it.
+func toSubscriptionJSON(sub shop.Subscription) subscriptionJSON {
+	out := subscriptionJSON{ID: string(sub.ID), URL: sub.URL, Events: []string{}}
+	for _, t := range sub.Events {
+		out.Events = append(out.Events, string(t))
+	}
+	return out
+}
+
+func toDeliveriesJSON(list []shop.Delivery) []deliveryJSON {
+	out := []deliveryJSON{}
+	for _, d := range list {
+		out = append(out, deliveryJSON{
+			EventID: string(d.Event.ID), Type: string(d.Event.Type), Subject: d.Event.Subject,
+			Status: string(d.Status), Attempts: d.Attempts, Response: d.Response,
+		})
 	}
 	return out
 }
@@ -295,4 +374,192 @@ func payments(w http.ResponseWriter, r *http.Request) {
 		out = append(out, paymentJSON{Kind: p.Kind, Amount: int64(p.Amount), ProviderID: p.ProviderID})
 	}
 	reply(w, http.StatusOK, out)
+}
+
+func addSupplier(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Name string `json:"name"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	sup, err := Purchasing.AddSupplier(in.Name)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusCreated, supplierJSON{ID: string(sup.ID), Name: sup.Name})
+}
+
+func listSuppliers(w http.ResponseWriter, r *http.Request) {
+	list, err := Purchasing.Suppliers()
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := []supplierJSON{}
+	for _, sup := range list {
+		out = append(out, supplierJSON{ID: string(sup.ID), Name: sup.Name})
+	}
+	reply(w, http.StatusOK, out)
+}
+
+func getSupplier(w http.ResponseWriter, r *http.Request) {
+	sup, err := Purchasing.Supplier(shop.SupplierID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, supplierJSON{ID: string(sup.ID), Name: sup.Name})
+}
+
+func listPurchases(w http.ResponseWriter, r *http.Request) {
+	list, err := Purchasing.List(shop.SupplierID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := []purchaseJSON{}
+	for _, po := range list {
+		out = append(out, toPurchaseJSON(po))
+	}
+	reply(w, http.StatusOK, out)
+}
+
+func createPurchase(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Supplier string `json:"supplier_id"`
+		Lines    []struct {
+			SKU  string `json:"sku"`
+			Qty  int    `json:"qty"`
+			Cost int64  `json:"cost_cents"`
+		} `json:"lines"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	var wants []shop.PurchaseWant
+	for _, l := range in.Lines {
+		wants = append(wants, shop.PurchaseWant{SKU: shop.SKU(l.SKU), Qty: l.Qty, Cost: shop.Money(l.Cost)})
+	}
+	po, err := Purchasing.Create(shop.SupplierID(in.Supplier), wants)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusCreated, toPurchaseJSON(po))
+}
+
+func getPurchase(w http.ResponseWriter, r *http.Request) {
+	po, err := Purchasing.Get(shop.PurchaseID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toPurchaseJSON(po))
+}
+
+func receivePurchase(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Lines []struct {
+			SKU string `json:"sku"`
+			Qty int    `json:"qty"`
+		} `json:"lines"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	var arrivals []shop.Arrival
+	for _, l := range in.Lines {
+		arrivals = append(arrivals, shop.Arrival{SKU: shop.SKU(l.SKU), Qty: l.Qty})
+	}
+	po, err := Purchasing.Receive(shop.PurchaseID(r.PathValue("id")), arrivals)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toPurchaseJSON(po))
+}
+
+func cancelPurchase(w http.ResponseWriter, r *http.Request) {
+	po, err := Purchasing.Cancel(shop.PurchaseID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toPurchaseJSON(po))
+}
+
+func subscribe(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		URL    string   `json:"url"`
+		Events []string `json:"events"`
+	}
+	if err := decode(r, &in); err != nil {
+		fail(w, err)
+		return
+	}
+	var types []shop.EventType
+	for _, t := range in.Events {
+		types = append(types, shop.EventType(t))
+	}
+	sub, err := Events.Subscribe(in.URL, types)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := toSubscriptionJSON(sub)
+	out.Secret = sub.Secret
+	reply(w, http.StatusCreated, out)
+}
+
+func listSubscriptions(w http.ResponseWriter, r *http.Request) {
+	list, err := Events.Subscriptions()
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	out := []subscriptionJSON{}
+	for _, sub := range list {
+		out = append(out, toSubscriptionJSON(sub))
+	}
+	reply(w, http.StatusOK, out)
+}
+
+func getSubscription(w http.ResponseWriter, r *http.Request) {
+	sub, err := Events.Subscription(shop.SubscriptionID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toSubscriptionJSON(sub))
+}
+
+func unsubscribe(w http.ResponseWriter, r *http.Request) {
+	if err := Events.Unsubscribe(shop.SubscriptionID(r.PathValue("id"))); err != nil {
+		fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func deliveries(w http.ResponseWriter, r *http.Request) {
+	list, err := Events.Deliveries(shop.SubscriptionID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toDeliveriesJSON(list))
+}
+
+func retry(w http.ResponseWriter, r *http.Request) {
+	list, err := Events.Retry(shop.SubscriptionID(r.PathValue("id")))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	reply(w, http.StatusOK, toDeliveriesJSON(list))
 }

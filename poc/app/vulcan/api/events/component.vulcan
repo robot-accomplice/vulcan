@@ -1,0 +1,23 @@
+import "stockroom/lib/shop"
+
+// Events keeps the webhook subscriptions, records the events that the other parts raise, and
+// delivers each event to the subscriptions of its type.
+component Events {
+    // Store persists the subscriptions, the events, and the deliveries.
+    needs port Store {
+        func AddSubscription(sub shop.Subscription) (shop.SubscriptionID, error)
+        func Subscription(id shop.SubscriptionID) (shop.Subscription, error)
+        func Subscriptions() ([]shop.Subscription, error)
+        func DeleteSubscription(id shop.SubscriptionID) error
+        func AddEvent(e shop.Event) (shop.EventID, error)
+        func AddDelivery(d shop.Delivery) error
+        func SaveDelivery(d shop.Delivery) error
+        func Deliveries(id shop.SubscriptionID) ([]shop.Delivery, error)
+    }
+
+    // Sender sends one webhook, and returns the HTTP status of the answer.
+    needs port Sender {
+        func Send(url string, eventType string, signature string, body []byte) (int, error)
+            requires url != "" && signature != "" && len(body) > 0
+    }
+}

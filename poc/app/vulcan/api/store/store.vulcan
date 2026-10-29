@@ -57,6 +57,45 @@ create table if not exists payments (
 	amount      integer not null,
 	provider_id text not null
 );
+create table if not exists suppliers (
+	id   integer primary key autoincrement,
+	name text not null unique
+);
+create table if not exists purchase_orders (
+	id          integer primary key autoincrement,
+	supplier_id integer not null references suppliers(id),
+	status      text not null,
+	total       integer not null
+);
+create table if not exists purchase_lines (
+	purchase_id integer not null references purchase_orders(id),
+	pos         integer not null,
+	sku         text not null,
+	qty         integer not null,
+	received    integer not null,
+	cost        integer not null,
+	primary key (purchase_id, pos)
+);
+create table if not exists subscriptions (
+	id     integer primary key autoincrement,
+	url    text not null,
+	events text not null,
+	secret text not null
+);
+create table if not exists events (
+	id      integer primary key autoincrement,
+	type    text not null,
+	subject text not null
+);
+create table if not exists deliveries (
+	id              integer primary key autoincrement,
+	subscription_id integer not null references subscriptions(id),
+	event_id        integer not null references events(id),
+	status          text not null,
+	attempts        integer not null,
+	response        integer not null,
+	unique (subscription_id, event_id)
+);
 `
 
 // Open opens the database file, and creates its tables when they do not exist.
@@ -177,6 +216,17 @@ func (d *DB) Release(lines []shop.Line) error {
 func (d *DB) Ship(lines []shop.Line) error {
 	return d.changeStock(lines, func(st shop.Stock, qty int) (shop.Stock, error) {
 		return shop.Stock{OnHand: st.OnHand - qty, Reserved: st.Reserved - qty}, nil
+	})
+}
+
+// Restock adds the units of every arrival to the stock, or of none.
+func (d *DB) Restock(arrivals []shop.Arrival) error {
+	lines := make([]shop.Line, len(arrivals))
+	for i, a := range arrivals {
+		lines[i] = shop.Line{SKU: a.SKU, Qty: a.Qty}
+	}
+	return d.changeStock(lines, func(st shop.Stock, qty int) (shop.Stock, error) {
+		return shop.Stock{OnHand: st.OnHand + qty, Reserved: st.Reserved}, nil
 	})
 }
 

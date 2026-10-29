@@ -23,4 +23,26 @@ component Web {
         func Refund(id shop.OrderID, amount shop.Money) (shop.Order, error)
         func Payments(id shop.OrderID) ([]shop.Payment, error)
     }
+
+    // Purchasing keeps the suppliers and the purchase orders.
+    needs port Purchasing {
+        func AddSupplier(name string) (shop.Supplier, error)
+        func Supplier(id shop.SupplierID) (shop.Supplier, error)
+        func Suppliers() ([]shop.Supplier, error)
+        func Create(supplier shop.SupplierID, wants []shop.PurchaseWant) (shop.PurchaseOrder, error)
+        func Get(id shop.PurchaseID) (shop.PurchaseOrder, error)
+        func List(supplier shop.SupplierID) ([]shop.PurchaseOrder, error)
+        func Receive(id shop.PurchaseID, arrivals []shop.Arrival) (shop.PurchaseOrder, error)
+        func Cancel(id shop.PurchaseID) (shop.PurchaseOrder, error)
+    }
+
+    // Events keeps the webhook subscriptions and their deliveries.
+    needs port Events {
+        func Subscribe(url string, types []shop.EventType) (shop.Subscription, error)
+        func Subscription(id shop.SubscriptionID) (shop.Subscription, error)
+        func Subscriptions() ([]shop.Subscription, error)
+        func Unsubscribe(id shop.SubscriptionID) error
+        func Deliveries(id shop.SubscriptionID) ([]shop.Delivery, error)
+        func Retry(id shop.SubscriptionID) ([]shop.Delivery, error)
+    }
 }

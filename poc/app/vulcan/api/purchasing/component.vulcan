@@ -1,0 +1,28 @@
+import "stockroom/lib/shop"
+
+// Purchasing keeps the suppliers and the purchase orders: it orders stock from a supplier and
+// receives its deliveries.
+component Purchasing {
+    // Stock looks up products and adds received units to their stock.
+    needs port Stock {
+        func Product(sku shop.SKU) (shop.Item, error)
+        func Restock(arrivals []shop.Arrival) error
+            requires len(arrivals) > 0
+    }
+
+    // Store persists suppliers and purchase orders.
+    needs port Store {
+        func AddSupplier(name string) (shop.SupplierID, error)
+        func Supplier(id shop.SupplierID) (shop.Supplier, error)
+        func Suppliers() ([]shop.Supplier, error)
+        func CreatePurchase(po shop.PurchaseOrder) (shop.PurchaseID, error)
+        func Purchase(id shop.PurchaseID) (shop.PurchaseOrder, error)
+        func PurchasesOf(s shop.SupplierID) ([]shop.PurchaseOrder, error)
+        func SavePurchase(po shop.PurchaseOrder) error
+    }
+
+    // Events tells the subscribers what happened.
+    needs port Events {
+        func Publish(t shop.EventType, subject string)
+    }
+}

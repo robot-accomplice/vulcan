@@ -27,4 +27,9 @@ component Orders {
         func OrdersOf(c shop.CustomerID) ([]shop.Order, error)
         func SaveOrder(o shop.Order) error
     }
+
+    // Events tells the subscribers what happened.
+    needs port Events {
+        func Publish(t shop.EventType, subject string)
+    }
 }

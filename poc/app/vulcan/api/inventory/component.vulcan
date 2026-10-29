@@ -12,5 +12,6 @@ component Inventory {
         func Reserve(lines []shop.Line) error
         func Release(lines []shop.Line) error
         func Ship(lines []shop.Line) error
+        func Restock(arrivals []shop.Arrival) error
     }
 }

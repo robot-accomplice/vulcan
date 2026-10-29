@@ -1,0 +1,43 @@
+package webhooks
+
+import (
+	"bytes"
+	"io"
+	"net/http"
+	"time"
+)
+
+// Sender sends webhooks.
+type Sender struct {
+	http *http.Client
+}
+
+// NewSender returns a sender that waits at most 5 seconds for an answer, and follows no
+// redirect.
+func NewSender() *Sender {
+	return &Sender{http: &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}}
+}
+
+// Send posts one webhook, and returns the HTTP status of the answer, or 0 and the error when
+// there is no answer.
+func (s *Sender) Send(url string, eventType string, signature string, body []byte) (int, error) {
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Stockroom-Event", eventType)
+	req.Header.Set("Stockroom-Signature", signature)
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+	return resp.StatusCode, nil
+}

@@ -1,0 +1,4 @@
+// Webhooks is the client that sends webhooks to the subscribers.
+component Webhooks {
+    gateway for Subscribers
+}
