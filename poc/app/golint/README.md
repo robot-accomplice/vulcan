@@ -1,7 +1,7 @@
 # Stockroom
 
-Stockroom is an order, inventory, and payment service: an HTTP API and a SQLite database. It is
-written in Go.
+Stockroom is an order, inventory, purchasing, and payment service, with webhooks: an HTTP API
+and a SQLite database. It is written in Go.
 
 ## Layout
 
@@ -12,8 +12,11 @@ written in Go.
 | `api/inventory` | The catalog and the stock levels |
 | `api/orders` | The order life cycle: create, pay, ship, cancel, refund |
 | `api/billing` | Charges, refunds, and the ledger of each order |
+| `api/purchasing` | Suppliers and purchase orders: order stock from a supplier, receive its deliveries |
+| `api/events` | Webhook subscriptions, the events, and their deliveries |
 | `api/store` | Persistence in SQLite |
 | `api/payments` | The client of the card processor |
+| `api/webhooks` | The client that sends webhooks to the subscribers |
 | `lib/shop` | Shared value types and errors |
 
 ## Check, build, and run
