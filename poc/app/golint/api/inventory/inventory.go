@@ -68,3 +68,9 @@ func (c *Catalog) Release(lines []shop.Line) error {
 func (c *Catalog) Ship(lines []shop.Line) error {
 	return c.store.Ship(lines)
 }
+
+// Restock adds the units of every arrival to the stock, or of none.
+func (c *Catalog) Restock(arrivals []shop.Arrival) error {
+	contract.Requires(len(arrivals) > 0)
+	return c.store.Restock(arrivals)
+}

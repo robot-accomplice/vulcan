@@ -28,6 +28,11 @@ type Store interface {
 	SaveOrder(o shop.Order) error
 }
 
+// Events tells the subscribers what happened.
+type Events interface {
+	Publish(t shop.EventType, subject string)
+}
+
 // checkedStock checks the contract of Stock at each call.
 type checkedStock struct{ Stock }
 

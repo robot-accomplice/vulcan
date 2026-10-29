@@ -14,6 +14,7 @@ type Store interface {
 	Reserve(lines []shop.Line) error
 	Release(lines []shop.Line) error
 	Ship(lines []shop.Line) error
+	Restock(arrivals []shop.Arrival) error
 }
 
 // checkedStore checks the contract of Store at each call.

@@ -10,11 +10,14 @@ import (
 	"syscall"
 
 	"stockroom/api/billing"
+	"stockroom/api/events"
 	"stockroom/api/inventory"
 	"stockroom/api/orders"
 	"stockroom/api/payments"
+	"stockroom/api/purchasing"
 	"stockroom/api/store"
 	"stockroom/api/web"
+	"stockroom/api/webhooks"
 )
 
 // flags are the settings of the process. Each reads --name=value from the command line, else
@@ -65,9 +68,10 @@ func main() {
 	os.Exit(run())
 }
 
-// run wires the service and serves it. The customer calls web; web uses inventory and orders;
-// orders uses inventory, billing, and store; billing uses payments (the card processor) and
-// store; store keeps everything in the SQLite file.
+// run wires the service and serves it. The customer calls web; web uses inventory, orders,
+// purchasing, and events; orders uses inventory, billing, events, and store; purchasing uses
+// inventory, events, and store; billing uses payments (the card processor) and store; events
+// uses webhooks (the subscribers) and store; store keeps everything in the SQLite file.
 func run() int {
 	f, problems := readFlags(os.Args[1:])
 	if len(problems) > 0 {
@@ -87,8 +91,11 @@ func run() int {
 	}
 	catalog := inventory.NewCatalog(db)
 	ledger := billing.NewLedger(card, db)
-	service := orders.NewService(catalog, ledger, db)
-	api := web.New(catalog, service)
+	sender := webhooks.NewSender()
+	hub := events.NewHub(db, sender)
+	service := orders.NewService(catalog, ledger, db, hub)
+	buying := purchasing.NewService(catalog, db, hub)
+	api := web.New(catalog, service, buying, hub)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

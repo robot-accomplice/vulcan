@@ -1,0 +1,166 @@
+// Package events keeps the webhook subscriptions, records the events that the other parts
+// raise, and delivers each event to the subscriptions of its type.
+package events
+
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"log"
+	"net/url"
+	"slices"
+	"sync"
+
+	"stockroom/lib/shop"
+)
+
+// Hub keeps the subscriptions and delivers the events. One lock serializes the deliveries, so
+// that one delivery is never sent twice at once.
+type Hub struct {
+	mu     sync.Mutex
+	store  Store
+	sender Sender
+}
+
+// NewHub returns the hub.
+func NewHub(store Store, sender Sender) *Hub {
+	return &Hub{store: store, sender: checkedSender{sender}}
+}
+
+// Subscribe adds a subscription to the events of the given types, with a new secret.
+func (h *Hub) Subscribe(target string, types []shop.EventType) (shop.Subscription, error) {
+	u, err := url.Parse(target)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || len(target) > 2000 {
+		return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "url must be an http or https URL of at most 2000 characters")
+	}
+	if len(types) == 0 {
+		return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "a subscription has at least one event type")
+	}
+	for i, t := range types {
+		if !slices.Contains(shop.EventTypes[:], t) {
+			return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "unknown event type %q", t)
+		}
+		if slices.Contains(types[:i], t) {
+			return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "event type %s is listed twice", t)
+		}
+	}
+	sub := shop.Subscription{URL: target, Events: types, Secret: rand.Text()}
+	id, err := h.store.AddSubscription(sub)
+	if err != nil {
+		return shop.Subscription{}, err
+	}
+	sub.ID = id
+	return sub, nil
+}
+
+// Subscription returns a subscription.
+func (h *Hub) Subscription(id shop.SubscriptionID) (shop.Subscription, error) {
+	return h.store.Subscription(id)
+}
+
+// Subscriptions returns the subscriptions, by id.
+func (h *Hub) Subscriptions() ([]shop.Subscription, error) {
+	return h.store.Subscriptions()
+}
+
+// Unsubscribe deletes a subscription and its deliveries.
+func (h *Hub) Unsubscribe(id shop.SubscriptionID) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.store.DeleteSubscription(id)
+}
+
+// Deliveries returns the deliveries of a subscription, in the order of their events.
+func (h *Hub) Deliveries(id shop.SubscriptionID) ([]shop.Delivery, error) {
+	if _, err := h.store.Subscription(id); err != nil {
+		return nil, err
+	}
+	return h.store.Deliveries(id)
+}
+
+// Publish records an event and delivers it to each subscription of its type. A failure is
+// logged; it never fails the action that raised the event.
+func (h *Hub) Publish(t shop.EventType, subject string) {
+	if err := h.publish(t, subject); err != nil {
+		log.Printf("publish %s of %s: %v", t, subject, err)
+	}
+}
+
+func (h *Hub) publish(t shop.EventType, subject string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	e := shop.Event{Type: t, Subject: subject}
+	id, err := h.store.AddEvent(e)
+	if err != nil {
+		return err
+	}
+	e.ID = id
+	subs, err := h.store.Subscriptions()
+	if err != nil {
+		return err
+	}
+	for _, sub := range subs {
+		if !slices.Contains(sub.Events, t) {
+			continue
+		}
+		d := h.deliver(sub, shop.Delivery{Subscription: sub.ID, Event: e})
+		if err := h.store.AddDelivery(d); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Retry sends each failed delivery of a subscription again, oldest first, and returns its
+// deliveries.
+func (h *Hub) Retry(id shop.SubscriptionID) ([]shop.Delivery, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	sub, err := h.store.Subscription(id)
+	if err != nil {
+		return nil, err
+	}
+	list, err := h.store.Deliveries(id)
+	if err != nil {
+		return nil, err
+	}
+	for i, d := range list {
+		if d.Status != shop.Failed {
+			continue
+		}
+		list[i] = h.deliver(sub, d)
+		if err := h.store.SaveDelivery(list[i]); err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
+}
+
+// eventJSON is the body of a webhook (docs/poc/stockroom.md).
+type eventJSON struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Subject string `json:"subject"`
+}
+
+// deliver makes one attempt to send the event of d to sub, and returns d with its outcome.
+func (h *Hub) deliver(sub shop.Subscription, d shop.Delivery) shop.Delivery {
+	body, _ := json.Marshal(eventJSON{ID: string(d.Event.ID), Type: string(d.Event.Type), Subject: d.Event.Subject}) // strings always encode
+	status, err := h.sender.Send(sub.URL, string(d.Event.Type), sign(sub.Secret, body), body)
+	d.Attempts++
+	d.Response = status
+	d.Status = shop.Failed
+	if err == nil && status/100 == 2 {
+		d.Status = shop.Delivered
+	}
+	return d
+}
+
+// sign returns the signature of a body: sha256= and the hex HMAC-SHA256 with the secret.
+func sign(secret string, body []byte) string {
+	m := hmac.New(sha256.New, []byte(secret))
+	m.Write(body)
+	return "sha256=" + hex.EncodeToString(m.Sum(nil))
+}
