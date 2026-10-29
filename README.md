@@ -99,6 +99,7 @@ each round's full record stays in `experiments/poc`.
 | Round | Agent | Runs | Result | Record |
 |---|---|---|---|---|
 | 1 (2026-10-28) | Claude Code with deepseek-v4-pro | 72 (12 tasks × 3 × 2 arms) | No signal; Vulcan arm worse on task success | [results-p5.md](experiments/poc/results-p5.md) |
+| 2 (2026-10-29) | none: stopped at step 3, before tasks | 0 | 3 of 28 rules enforced by Vulcan; the same 3 by its model as a Go linter | [labels-r2.md](experiments/poc/labels-r2.md) |
 
 **Round 1.** Arm V (Vulcan, strict mode) succeeded in 28 of 36 runs, arm G (Go, rules in prose)
 in 35 of 36: −19.4 points, 95% interval −38.9 to −2.8. Neither arm broke a rule in the product
@@ -108,6 +109,23 @@ budget about 26 turns, not the planned 60. The round says the tasks were not har
 this model, and that Vulcan cost runs under a tight budget. It does not yet say whether Vulcan
 adds value over Go. The next round must be built to answer that: its draft plan is
 [plan-r2.md](docs/poc/plan-r2.md).
+
+**Round 2.** The round has three arms:
+- P: plain Go;
+- L: Vulcan's model as a Go linter and primer;
+- V: Vulcan.
+
+It stopped by its own rule before any agent ran. The plan needs at least 8 of the team rules
+enforced by both checks before tasks are written. A fresh session, with no Vulcan material,
+wrote 28 rules. A labeler seeded 2 violations of each rule in each arm. `vulcan check` rejected
+both seeded cases of 3 rules and no case of the other 25. `vulcan-lint` rejected exactly the
+same cases. So on these rules the language decided nothing that the Go linter did not, as the
+desk test predicted.
+
+Few of the rules a team would write for this service are ones that either check decides: 3 of
+14 boundary and effect rules, and none of the value or behavior rules.
+
+This is one rule writer's sample, with no second labeler.
 
 ## Repository layout
 

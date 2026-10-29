@@ -1,7 +1,9 @@
 # Round 2: Vulcan's objectives against plain Go
 
-Status: draft for the owner's review, 2026-10-28 (second draft). Nothing here runs before the
-owner accepts it. The first draft was replaced after the [desk test](desk-test-r2.md).
+Status: accepted by the owner, 2026-10-28 (second draft); stopped at step 3, 2026-10-29. Set S
+held 3 rules, against the 8 that section 4 requires, so no tasks were written and no runs made
+([labels-r2.md](../../experiments/poc/labels-r2.md)). The first draft was replaced after the
+[desk test](desk-test-r2.md).
 
 ## 0. Why this draft
 
