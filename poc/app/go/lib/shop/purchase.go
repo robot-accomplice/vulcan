@@ -31,6 +31,13 @@ type PurchaseLine struct {
 	Cost     Money
 }
 
+// PurchaseWant is one line of a new purchase order, as the buyer asks for it.
+type PurchaseWant struct {
+	SKU  SKU
+	Qty  int
+	Cost Money
+}
+
 // Arrival is the units of one product that arrive in a delivery from a supplier.
 type Arrival struct {
 	SKU SKU

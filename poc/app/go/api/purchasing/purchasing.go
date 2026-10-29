@@ -69,33 +69,33 @@ func (s *Service) Suppliers() ([]shop.Supplier, error) {
 }
 
 // Create creates an open purchase order. It changes no stock.
-func (s *Service) Create(supplier shop.SupplierID, lines []shop.PurchaseLine) (shop.PurchaseOrder, error) {
-	if len(lines) == 0 {
+func (s *Service) Create(supplier shop.SupplierID, wants []shop.PurchaseWant) (shop.PurchaseOrder, error) {
+	if len(wants) == 0 {
 		return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "a purchase order has at least one line")
 	}
 	seen := map[shop.SKU]bool{}
-	var out []shop.PurchaseLine
-	for _, l := range lines {
+	var lines []shop.PurchaseLine
+	for _, w := range wants {
 		switch {
-		case l.Qty <= 0 || l.Qty > shop.MaxQty:
+		case w.Qty <= 0 || w.Qty > shop.MaxQty:
 			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0 and at most %d", shop.MaxQty)
-		case l.Cost <= 0 || l.Cost > shop.MaxPrice:
+		case w.Cost <= 0 || w.Cost > shop.MaxPrice:
 			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "cost_cents must be more than 0 and at most %d", shop.MaxPrice)
-		case seen[l.SKU]:
-			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "sku %s is on two lines", l.SKU)
+		case seen[w.SKU]:
+			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "sku %s is on two lines", w.SKU)
 		}
-		seen[l.SKU] = true
-		out = append(out, shop.PurchaseLine{SKU: l.SKU, Qty: l.Qty, Cost: l.Cost})
+		seen[w.SKU] = true
+		lines = append(lines, shop.PurchaseLine{SKU: w.SKU, Qty: w.Qty, Cost: w.Cost})
 	}
 	if _, err := s.store.Supplier(supplier); err != nil {
 		return shop.PurchaseOrder{}, err
 	}
-	for _, l := range out {
+	for _, l := range lines {
 		if _, err := s.stock.Product(l.SKU); err != nil {
 			return shop.PurchaseOrder{}, err
 		}
 	}
-	po := shop.PurchaseOrder{Supplier: supplier, Status: shop.PurchaseOpen, Lines: out, Total: shop.PurchaseTotal(out)}
+	po := shop.PurchaseOrder{Supplier: supplier, Status: shop.PurchaseOpen, Lines: lines, Total: shop.PurchaseTotal(lines)}
 	id, err := s.store.CreatePurchase(po)
 	if err != nil {
 		return shop.PurchaseOrder{}, err

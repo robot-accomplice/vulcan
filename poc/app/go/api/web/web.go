@@ -39,7 +39,7 @@ type Purchasing interface {
 	AddSupplier(name string) (shop.Supplier, error)
 	Supplier(id shop.SupplierID) (shop.Supplier, error)
 	Suppliers() ([]shop.Supplier, error)
-	Create(supplier shop.SupplierID, lines []shop.PurchaseLine) (shop.PurchaseOrder, error)
+	Create(supplier shop.SupplierID, wants []shop.PurchaseWant) (shop.PurchaseOrder, error)
 	Get(id shop.PurchaseID) (shop.PurchaseOrder, error)
 	List(supplier shop.SupplierID) ([]shop.PurchaseOrder, error)
 	Receive(id shop.PurchaseID, arrivals []shop.Arrival) (shop.PurchaseOrder, error)
@@ -496,11 +496,11 @@ func (a *API) createPurchase(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	var lines []shop.PurchaseLine
+	var wants []shop.PurchaseWant
 	for _, l := range in.Lines {
-		lines = append(lines, shop.PurchaseLine{SKU: shop.SKU(l.SKU), Qty: l.Qty, Cost: shop.Money(l.Cost)})
+		wants = append(wants, shop.PurchaseWant{SKU: shop.SKU(l.SKU), Qty: l.Qty, Cost: shop.Money(l.Cost)})
 	}
-	po, err := a.purchasing.Create(shop.SupplierID(in.Supplier), lines)
+	po, err := a.purchasing.Create(shop.SupplierID(in.Supplier), wants)
 	if err != nil {
 		fail(w, err)
 		return
