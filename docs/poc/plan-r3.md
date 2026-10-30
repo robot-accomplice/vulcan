@@ -39,6 +39,10 @@ section 4.
 - The `transitions` rule kind and the fix of holes H6 and H7 (section 9) come from
   [hypotheses-r3.md](hypotheses-r3.md), whose author read round 2's class counts and the
   diagnostic's summary. So round 2's rule set is not a clean test of them either.
+- The shape kinds (section 9) widen what the defaults can state, and so lean toward a higher count
+  of enforced rules on T1. They were chosen by the owner after the builder reported that 39 wanted
+  rules were out of reach for that reason. They come from the blind wishlist and from no rule set
+  or result of a blind test, and they apply the same in L and V.
 
 ## 1. Questions
 
@@ -190,3 +194,4 @@ says yes, QN reads this repository's applications only.
 | 3 | Add a `transitions` rule kind (theory T10) before the freeze. It is a coverage feature in both arms, not a claim for the language. The wishlist's author is not told of it | Section 2 |
 | 4 | A second session repeats the verdicts of [hypotheses-r3.md](hypotheses-r3.md) blind, before any feature from that document is built | That document, section 9 |
 | 5 | A first look at theory T8, on round 1's 72 final workspaces. It is exploratory, and no stop rule reads it | That document, section 9 |
+| 6 | Add rule kinds for the 39 wanted rules that step 2 lists under "shape", in both checkers, with no wanted rule reworded. Flow kinds stay out, and those 33 rules stay listed as not stated. Added 2026-10-30: section 2 lets the wishlist decide the kinds, but the first brief for step 2 named four, so this corrects that brief. The gate of section 5 does not change | Section 2; [NOT-STATED.md](../../experiments/poc/r3/defaults/NOT-STATED.md) |
