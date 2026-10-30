@@ -727,6 +727,43 @@ sees the claims and the code, not this document's verdicts, priors, or ranks, an
 round 2. Each disagreement is recorded here, with both reasons. The owner decides what a disagreement
 changes. A disagreement is not settled by the first author's reading or by the second's.
 
+**Result of the second reading (2026-10-30).** Record: [second-reading](../../experiments/poc/r3/second-reading/VERDICTS.md),
+with its probes. The two readings agree on 27 of 32 ids (Cohen's kappa 0.69). The summary table above
+stays the first reading.
+
+| | First reading | Second reading |
+|---|---|---|
+| Linter-equal | 20 | 22 |
+| Linter-partial | 9 | 6 |
+| Language-only | 3 (T8, N1, N5) | 4 (T5, T8, N1, N5) |
+
+| Id | First | Second | The first reading's reason | The second reading's reason |
+|---|---|---|---|---|
+| T5 | Linter-partial | Language-only | L gets the same proofs through a subset: value types in proved functions, and checked arithmetic on marked types. The loss is in form | Without a ban, Go's meaning does not give the proofs. A no-overflow assumption is unsound, `checked.Add` costs 2.00 to 2.67 a site, and value semantics needs a ban on pointer and slice parameters |
+| T6 | Linter-partial | Linter-equal | Ghost state has no home in Go, except in comments that the Go compiler does not check | Structured comments are allowed by the test, and Gobra keeps ghost code there. Form is 1.00 to 1.27 |
+| T9 | Linter-equal | Linter-partial | `Secret[T]` is a Go generic type, and taint tools follow it | Reach is equal, but a derived value needs a conversion and a re-wrap, at 1.33 to 1.67 |
+| T11 | Linter-partial | Linter-equal | Fields, maps, and closures are holes unless banned, and Go has no move | A flow check rejects the same programs, and both forms need the same rules for fields and `any`. Its probe covers local variables only |
+| T24 | Linter-partial | Linter-equal | Go does not infer a hole's type from context | A probe on `go/types` answered with the expected type, the names in scope, and the ports |
+
+Moves toward the language: T5, T9. Moves toward the linter: T6, T11, T24. All the V forms of features
+that V lacks are the second reader's guesses, so its ratios for those sites are estimates. The owner
+has not yet decided what these disagreements change.
+
+Three points from that reading that the first did not raise:
+
+- **T5's measure can favor V by its definition.** Under trapping, a program that traps counts as
+  proved, so "proved" means partial correctness. L with a no-overflow obligation proves a stronger
+  fact, and rejects more programs. A probe of 4 properties shows the effect: trap proved 4, Go with
+  the obligation proved 1.
+- **The test does not say how to count a ban that V also needs.** This decides T7 and T20.
+- **The test assumes a gate in L.** `go build` works with no linter, and `vulcan build` refuses. With
+  no gate in CI, every Linter-equal verdict has a named loss in soundness.
+
+**How blind it was.** A scan of the tool calls of the session's main transcript shows no read of the
+repository, of `vulcan-poc`, or of the wishlist's folder. It did list the names of five files in an
+earlier notes folder, among them `desk-test-r2.md`, and read none of them. Its theory list came from
+this document, so it inherited this document's choice of theories.
+
 **A first look at T8.** Rank 3's gate needs calibration runs that do not exist yet. Round 1's 72 final
 workspaces do exist, so the rewriter can run on them first. This look is exploratory. Its app is
 smaller, its arms are G and V, its turn budget was cut by a fault, and it has too few runs for the

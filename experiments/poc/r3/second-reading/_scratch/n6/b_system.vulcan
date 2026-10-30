@@ -1,0 +1,34 @@
+// Stockroom is an order, inventory, purchasing, and payment service, with webhooks: an HTTP API
+// and a SQLite database (docs/poc/stockroom.md).
+system Stockroom {
+    person   Customer        "Places, pays for, and cancels orders"
+    external Database        "The SQLite file"
+    external PaymentProvider "The card processor"
+    external Subscribers     "The systems that receive webhooks"
+
+    config { strict: true }
+
+    container Api {
+        Web{ Addr: flag("addr", default: ":8080") }, Inventory, Orders, Billing, Purchasing, Events, Store, Payments, Webhooks, Returns
+
+        Web.Catalog:       Inventory.NewCatalog
+        Web.Orders:        Orders.NewService
+        Web.Purchasing:    Purchasing.NewService
+        Web.Events:        Events.NewHub
+        Orders.Stock:      Inventory.NewCatalog
+        Orders.Billing:    Billing.NewLedger
+        Orders.Events:     Events.NewHub
+        Purchasing.Stock:  Inventory.NewCatalog
+        Purchasing.Events: Events.NewHub
+        // The five Store wires have the same settings, so they share one database (K0607 rejects
+        // them when they differ).
+        Orders.Store:      Store.Open{ Path: flag("db", default: "stockroom.db") }
+        Inventory.Store:   Store.Open{ Path: flag("db", default: "stockroom.db") }
+        Billing.Store:     Store.Open{ Path: flag("db", default: "stockroom.db") }
+        Purchasing.Store:  Store.Open{ Path: flag("db", default: "stockroom.db") }
+        Events.Store:      Store.Open{ Path: flag("db", default: "stockroom.db") }
+        Billing.Card:      Payments.NewClient{ URL: flag("payments-url"), Key: flag("payments-key") }
+        Events.Sender:     Webhooks.NewSender
+        Orders.Returns:    Returns.NewDesk
+    }
+}
