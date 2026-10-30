@@ -24,7 +24,9 @@ too (`-test` is on by default), and rejects a project file that the build ignore
 | `cmd/vulcan-lint` | The command |
 | `model` | Reads the manifest, places a package in it, and the helpers of the analyzers |
 | `layout`, `imports`, `ports`, `wiring`, `effects`, `libstate`, `contracts`, `invariants` | A1 to A8 |
-| `conformance` | The port of the conformance cases (`gen_cases.py` writes `testdata/`), and checks of the workspace |
+| `rulecheck` | A9: the team's rules file, `rules.vulcan` ([rules-file.md](../../docs/poc/rules-file.md)). The rule kinds are in `internal/rules`, which `vulcan check` calls too |
+| `scaffold` | What `vulcan-lint init` writes in a module that lacks it |
+| `conformance` | The port of the conformance cases (`gen_cases.py` writes `testdata/`; `gen_rule_cases.py` writes the cases of the rules file, in both arms), and checks of the workspace |
 | `internal/lintest` | Builds the test modules |
 | [`../app/golint`](../app/golint) | Arm L's workspace: Stockroom-lite with the manifest, ports, contracts, `PROTECTED`, and `PRIMER.md` |
 
@@ -75,6 +77,7 @@ Vulcan's syntax, or a hole that Go closes.
 | | VL0118 | K0118 | Code imports the manifest (Vulcan: the generated-code runtime) |
 | | VL0122 | K0122 | `//go:linkname` in a leaf or a library |
 | | VL0124 | K0124 | Strict: `unsafe`, `syscall`, or cgo in a leaf or a library |
+| | VL0126 | K0126 | A function with no body, or an assembly file or an object file, in a leaf or a library (hole H6) |
 | | VL0204 | K0204 | A library imports a leaf |
 | A3 `ports` | VL0104 | K0104 | A port that no constructor takes |
 | | VL0110 | K0110 | Anything but ports and wrappers in `ports.go`; an unexported port or port method |
@@ -112,6 +115,12 @@ Vulcan's syntax, or a hole that Go closes.
 | | VL0513 | K0513 | `Invariant` on a non-struct type, or with a pointer receiver |
 | | VL0904 | — | A pointer method of an invariant type without `defer contract.Keep(recv)` first; a `Keep` on anything else |
 | | VL0905 | — | A non-empty literal or a conversion of an invariant type that is not the argument of `contract.Valid` |
+| A9 `rules` | VL0801 | K0801 | A fault in `rules.vulcan`, or a rule that needs a lock with no lock |
+| | VL0802 | K0802 | A rule of kind `forbid-call` |
+| | VL0803 | K0803 | A rule of kind `only-in` |
+| | VL0804 | K0804 | A rule of kind `depends`, by kind, part, or package |
+| | VL0805 | K0805 | A rule of kind `transitions` |
+| | VL0806 | K0806 | A rule of kind `depends` with `map locked`: a dependency that `rules.lock` does not hold |
 
 The K-codes that the desk test labels "Same (artifact)" or that Go's compiler or `go vet` already
 decide have no VL code: K0001, K0005, K0006, K0008, K0009, K0105, K0107, K0108, K0111, K0113,
@@ -134,6 +143,7 @@ real command. All pass.
 | A6 | A15, A15b, A15c, A15d, A15e, N09, N09b |
 | A7 | C02, C06, C07, C17, H4, H4b, L4, M2 |
 | A8 | C09, C10, C11, L3, M1a, M1b, M1c |
+| A2, A5, A9 | `R01` to `R65`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
 
 Two cases map to another code in Go: P11 (a leaf that `system.vulcan` does not list, K0003) is
 VL0002, because Go has no component file, so an unlisted package is the same mistake as P10; A02
