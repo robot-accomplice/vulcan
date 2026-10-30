@@ -163,10 +163,14 @@ func usedImports(p *project.Project, pkg *project.Package, texts []string) []str
 	for _, imp := range pkg.Comp.Imports {
 		name := importName(p, imp)
 		if regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\.`).MatchString(all) {
+			// The directive places the import at its line in component.vulcan, for a rule that
+			// reads imports.
+			pos := pkg.CompSrc.Pos(imp.Pos)
+			line := fmt.Sprintf("/*line %s:%d:%d*/", LineFile(p, pkg.CompSrc.Rel), pos.Line, pos.Col)
 			if imp.Name != "" {
-				out = append(out, fmt.Sprintf("%s %q", imp.Name, imp.Path))
+				out = append(out, fmt.Sprintf("%s%s %q", line, imp.Name, imp.Path))
 			} else {
-				out = append(out, fmt.Sprintf("%q", imp.Path))
+				out = append(out, fmt.Sprintf("%s%q", line, imp.Path))
 			}
 		}
 	}

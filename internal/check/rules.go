@@ -4,13 +4,16 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/robot-accomplice/vulcan/internal/diag"
 	"github.com/robot-accomplice/vulcan/internal/gen"
 	"github.com/robot-accomplice/vulcan/internal/project"
+	"github.com/robot-accomplice/vulcan/internal/rules"
 )
 
 // RuntimeRT is the generated-code-only runtime package (K0118).
@@ -28,11 +31,13 @@ func (c *Checker) Rules() {
 		if !pkg.IsLeaf {
 			libVars = packageVars(gp.Types)
 		}
+		c.foreignCode(pkg)
 		for _, f := range gp.Syntax {
 			if c.Generated(f) {
 				continue
 			}
 			c.imports(pkg, f)
+			c.bodyless(gp, f)
 			if pkg.IsLeaf {
 				c.leafRules(pkg, gp.TypesInfo, f, ports)
 			}
@@ -51,6 +56,26 @@ func (c *Checker) Rules() {
 	}
 	c.componentImports()
 	c.contractsDeferred()
+}
+
+// bodyless applies hole H6: a function with no body has its code outside Go (K0126). The go
+// command accepts one only with an assembly file or an object file in the package.
+func (c *Checker) bodyless(gp *packages.Package, f *ast.File) {
+	for _, e := range gp.Errors {
+		if e.Kind == packages.ParseError {
+			return // the parser's recovery leaves a function with no body
+		}
+	}
+	for _, name := range rules.Bodyless(f) {
+		c.D.Errorf(c.Pos(name.Pos()), "K0126", "%s", rules.HoleH6Message(name.Name))
+	}
+}
+
+// foreignCode applies hole H6 to the files of a package: an assembly file or an object file (K0126).
+func (c *Checker) foreignCode(pkg *project.Package) {
+	for _, name := range rules.AsmFiles(filepath.Join(c.P.Root, filepath.FromSlash(pkg.Dir))) {
+		c.D.Errorf(diag.Pos{File: pkg.Dir + "/" + name, Line: 1, Col: 1}, "K0126", "%s", rules.HoleH6FileMessage(name))
+	}
 }
 
 // portVars returns the package-level port variables of a leaf.

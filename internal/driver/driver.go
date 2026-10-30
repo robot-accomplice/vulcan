@@ -19,6 +19,7 @@ import (
 	"github.com/robot-accomplice/vulcan/internal/link"
 	"github.com/robot-accomplice/vulcan/internal/lower"
 	"github.com/robot-accomplice/vulcan/internal/project"
+	"github.com/robot-accomplice/vulcan/internal/rules"
 )
 
 // FindRoot walks up from dir to the directory that holds system.vulcan.
@@ -42,6 +43,7 @@ type Result struct {
 	P     *project.Project
 	Diags *diag.List
 	OK    bool
+	Edges []rules.Edge // the current wires and the imports of libraries
 }
 
 // Check runs every stage up to and including the Go build of main. With tests, it also
@@ -89,6 +91,7 @@ func Check(root string, tests bool) (*Result, error) {
 	c.Contracts()
 	c.Strict()
 	plan := c.Wiring()
+	r.Edges = c.ApplyRules(plan)
 	if !p.Diags.HasErrors() {
 		if err := link.Write(p, plan); err != nil {
 			return nil, err

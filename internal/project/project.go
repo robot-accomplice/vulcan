@@ -195,8 +195,8 @@ func (p *Project) scan() error {
 		}
 		if dir == "." {
 			for _, n := range names {
-				if n != "system.vulcan" {
-					p.Diags.Errorf(diag.Pos{File: n}, "K0002", "a code file outside a leaf or a library: the root holds only system.vulcan")
+				if n != "system.vulcan" && n != "rules.vulcan" {
+					p.Diags.Errorf(diag.Pos{File: n}, "K0002", "a code file outside a leaf or a library: the root holds only system.vulcan and rules.vulcan")
 				}
 			}
 			continue

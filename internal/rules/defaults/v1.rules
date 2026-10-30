@@ -1,0 +1,210 @@
+# The rules of this project. The team owns this file: edit a rule to tune it, set level off
+# to turn it off, or delete it. What the check enforces is what this file says.
+# The draft of defaults v1. It is not frozen (plan-r3, section 4).
+
+# A plain leaf does not import `net/http`, `net`, `database/sql`, or `os/exec`, even for a type.
+rule ARCH-01
+  kind depends
+  level error
+  from leaf
+  packages net/http net database/sql os/exec
+  reason Inner code must not know the web or the database.
+  source Robert C. Martin, The Clean Architecture (https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html); Alistair Cockburn, Hexagonal Architecture (https://alistair.cockburn.us/hexagonal-architecture/)
+
+# A library does not import `net/http` or `database/sql`.
+rule ARCH-02
+  kind depends
+  level error
+  from library
+  packages net/http database/sql
+  reason A shared library that knows transport or storage spreads that knowledge to each leaf.
+  source Robert C. Martin, The Clean Architecture (https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Code in a leaf uses another leaf only through a port, a topic, or a library.
+rule ARCH-07
+  kind depends
+  level error
+  from leaf gateway entry
+  deny leaf gateway entry
+  via import
+  reason Declared boundaries are the base of each other architecture rule.
+  source Vulcan Language Specification, Draft 0 (input/spec.md); Alistair Cockburn, Hexagonal Architecture (https://alistair.cockburn.us/hexagonal-architecture/)
+
+# Only a gateway leaf or an entry leaf reaches a network function.
+rule ARCH-10
+  kind only-in
+  level error
+  effect network
+  in gateway entry
+  reason A reviewer finds all traffic in known places.
+  source Vulcan Language Specification, Draft 0 (input/spec.md); Alistair Cockburn, Hexagonal Architecture (https://alistair.cockburn.us/hexagonal-architecture/)
+
+# An entry leaf reaches only serve functions, and only a gateway leaf reaches a dial function.
+rule ARCH-11
+  kind only-in
+  level error
+  effect dial
+  in gateway
+  reason A leaf that both serves and dials hides an outbound path from the diagram.
+  source Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Leaf code and library code do not call a global mutator such as `os.Setenv`, `http.Handle`, `slog.SetDefault`, or `flag.Parse`.
+rule ARCH-19
+  kind forbid-call
+  level error
+  funcs os.Setenv os.Unsetenv os.Clearenv os.Chdir net/http.Handle net/http.HandleFunc expvar.Publish expvar.NewInt expvar.NewFloat expvar.NewMap expvar.NewString flag.Parse flag.Set flag.String flag.Int flag.Int64 flag.Uint flag.Uint64 flag.Bool flag.Float64 flag.Duration flag.StringVar flag.IntVar flag.Int64Var flag.UintVar flag.Uint64Var flag.BoolVar flag.Float64Var flag.DurationVar flag.Var flag.Func flag.BoolFunc flag.TextVar log.SetOutput log.SetFlags log.SetPrefix log/slog.SetDefault log/slog.SetLogLoggerLevel runtime/debug.SetGCPercent runtime/debug.SetMemoryLimit runtime/debug.SetMaxThreads runtime/debug.SetMaxStack
+  in leaf gateway entry library
+  reason Process-wide settings couple leaves that have no declared link.
+  source Vulcan Language Specification, Draft 0 (input/spec.md); Google Go Style Guide, Best Practices (https://google.github.io/styleguide/go/best-practices)
+
+# Leaf code and library code do not call `os.Exit`, `log.Fatal`, or `log.Panic` functions.
+rule ERR-08
+  kind forbid-call
+  level error
+  funcs os.Exit log.Fatal log.Fatalf log.Fatalln log.Panic log.Panicf log.Panicln (*log.Logger).Fatal* (*log.Logger).Panic*
+  in leaf gateway entry library
+  reason Only `main` may end the process, and `main` is generated here.
+  source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Code uses the context forms of calls that can block: `http.NewRequestWithContext`, `QueryContext`, `ExecContext`, `BeginTx`, `DialContext`, `exec.CommandContext`.
+rule CTX-06
+  kind forbid-call
+  level error
+  funcs net/http.NewRequest net/http.Get net/http.Head net/http.Post net/http.PostForm (*net/http.Client).Get (*net/http.Client).Head (*net/http.Client).Post (*net/http.Client).PostForm (*database/sql.DB).Query (*database/sql.DB).QueryRow (*database/sql.DB).Exec (*database/sql.DB).Begin (*database/sql.DB).Prepare (*database/sql.DB).Ping (*database/sql.Tx).Query (*database/sql.Tx).QueryRow (*database/sql.Tx).Exec (*database/sql.Tx).Prepare (*database/sql.Stmt).Query (*database/sql.Stmt).QueryRow (*database/sql.Stmt).Exec net.Dial net.DialTimeout (*net.Dialer).Dial crypto/tls.Dial (*crypto/tls.Dialer).Dial os/exec.Command
+  in leaf gateway entry library
+  reason A call without a context cannot stop when its caller stops.
+  source golangci-lint, Linters (https://golangci-lint.run/docs/linters/); Go documentation, Canceling in-progress database operations (https://go.dev/doc/database/cancel-operations); Go standard library, package database/sql (https://pkg.go.dev/database/sql)
+
+# An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`.
+rule HTTP-01
+  kind forbid-call
+  level error
+  funcs net/http.ListenAndServe net/http.ListenAndServeTLS net/http.Serve
+  in entry
+  reason The package-level functions run with no timeouts, so a slow client can hold resources.
+  source Cloudflare Blog, The complete guide to Go net/http timeouts (https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts/); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md); Go standard library, package net/http (https://pkg.go.dev/net/http)
+
+# A gateway uses an `http.Client` with a non-zero `Timeout`, and does not call `http.Get`, `http.Post`, `http.Head`, `http.PostForm`, or `http.DefaultClient`.
+rule HTTP-02
+  kind forbid-call
+  level error
+  funcs net/http.Get net/http.Post net/http.Head net/http.PostForm net/http.DefaultClient
+  in gateway
+  reason `DefaultClient` has no timeout, so a stuck peer holds a goroutine.
+  source Cloudflare Blog, The complete guide to Go net/http timeouts (https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts/); Go standard library, package net/http (https://pkg.go.dev/net/http)
+
+# An entry leaf registers routes on its own `http.ServeMux`, not on `http.DefaultServeMux`.
+rule HTTP-07
+  kind forbid-call
+  level error
+  funcs net/http.Handle net/http.HandleFunc net/http.DefaultServeMux
+  in entry
+  reason Any imported package can add a route to the default mux.
+  source Go standard library, package net/http (https://pkg.go.dev/net/http); Vulcan Language Specification, Draft 0 (input/spec.md); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md)
+
+# Security code does not use MD5, SHA-1, DES, or RC4.
+rule SEC-10
+  kind depends
+  level error
+  from leaf gateway entry library
+  packages crypto/md5 crypto/sha1 crypto/des crypto/rc4
+  reason These algorithms are broken.
+  source gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md); OWASP Cryptographic Storage Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)
+
+# Leaf code and library code do not import `unsafe` or `syscall`, do not use cgo, and do not call `reflect.Value.Call` or `reflect.Value.Method`.
+rule SEC-30.imports
+  kind depends
+  level error
+  from leaf gateway entry library
+  packages unsafe syscall C
+  reason These paths escape each static check.
+  source Vulcan Language Specification, Draft 0 (input/spec.md); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md)
+
+# Leaf code and library code do not import `unsafe` or `syscall`, do not use cgo, and do not call `reflect.Value.Call` or `reflect.Value.Method`.
+rule SEC-30.calls
+  kind forbid-call
+  level error
+  funcs (reflect.Value).Call (reflect.Value).CallSlice (reflect.Value).Method (reflect.Value).MethodByName
+  in leaf gateway entry library
+  reason These paths escape each static check.
+  source Vulcan Language Specification, Draft 0 (input/spec.md); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md)
+
+# An entry leaf or a gateway does not decode outside data with `encoding/gob`.
+rule SEC-31
+  kind forbid-call
+  level error
+  funcs encoding/gob.NewDecoder
+  in entry gateway
+  reason Native serial formats do not suit untrusted data.
+  source OWASP Deserialization Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html)
+
+# A plain leaf or a library does not call `time.Now` for a business decision, and takes time through a port.
+rule DATA-15
+  kind forbid-call
+  level error
+  funcs time.Now time.Since time.Until
+  in leaf library
+  files code
+  reason A test must control the clock.
+  source Martin Fowler, Eradicating Non-Determinism in Tests (https://martinfowler.com/articles/nonDeterminism.html); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Leaf code and library code log through `log/slog`, not through `log` or `fmt.Print` functions.
+rule OBS-01
+  kind forbid-call
+  level error
+  funcs log.* (*log.Logger).* fmt.Print fmt.Printf fmt.Println
+  in leaf gateway entry library
+  reason Structured records are machine-readable and resist log injection.
+  source Go standard library, package log/slog (https://pkg.go.dev/log/slog); OWASP Logging Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html); golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# A production build exposes no debug or profiling route, and each old API version has an owner and an end date.
+rule API-04
+  kind depends
+  level error
+  from leaf gateway entry library
+  packages net/http/pprof expvar
+  reason Forgotten endpoints are an attack surface.
+  source OWASP API9:2023 Improper Inventory Management (https://api-security.owasp.org/editions/2023/en/0xa9-improper-inventory-management); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md)
+
+# A test does not call `time.Sleep`.
+rule TEST-05
+  kind forbid-call
+  level error
+  funcs time.Sleep
+  files test
+  reason A sleep wastes time or fails on a slow host.
+  source Martin Fowler, Eradicating Non-Determinism in Tests (https://martinfowler.com/articles/nonDeterminism.html); Go standard library, package testing/synctest (https://pkg.go.dev/testing/synctest)
+
+rule DEP-LIBRARY
+  kind depends
+  level error
+  from library
+  deny leaf gateway entry
+  via import
+  reason A library depends on no leaf.
+  source docs/poc/plan-r3.md, section 3
+
+rule DEP-GATEWAY
+  kind depends
+  level error
+  from gateway
+  deny leaf gateway entry
+  via wire
+  reason A gateway calls no other leaf.
+  source docs/poc/plan-r3.md, section 3
+
+rule DEP-ENTRY
+  kind depends
+  level error
+  from leaf gateway entry library
+  deny entry
+  via wire
+  reason No part calls an entry leaf.
+  source docs/poc/plan-r3.md, section 3
+
+rule DEP-LOCK
+  kind depends
+  level off
+  map locked
+  reason A new dependency fails until rules.lock changes; off by the owner's decision 1 of plan-r3, section 8.
+  source docs/poc/plan-r3.md, section 3

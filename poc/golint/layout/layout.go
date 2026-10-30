@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/robot-accomplice/vulcan/internal/rules"
 	"github.com/robot-accomplice/vulcan/poc/golint/model"
 )
 
@@ -78,8 +79,8 @@ func firstFile(pass *analysis.Pass) *ast.File {
 func ignored(pass *analysis.Pass, u *model.Unit, first *ast.File) {
 	for _, name := range pass.IgnoredFiles {
 		rel, err := filepath.Rel(u.M.Root, name)
-		if err != nil || strings.HasPrefix(rel, "..") {
-			continue
+		if err != nil || strings.HasPrefix(rel, "..") || rules.IsForeign(name) {
+			continue // VL0126 rejects a file that is not Go
 		}
 		model.Report(pass, first.Package, "VL0901", "the build ignores %s (a build constraint or a file name for another system); every file of a package is built, so remove the constraint", filepath.ToSlash(rel))
 	}

@@ -2,18 +2,21 @@
 package imports
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/robot-accomplice/vulcan/internal/rules"
 	"github.com/robot-accomplice/vulcan/poc/golint/model"
 )
 
 // Analyzer is A2.
 var Analyzer = &analysis.Analyzer{
 	Name: "imports",
-	Doc:  "check the imports of each part: a leaf or a library imports no leaf, no code imports the manifest, no //go:linkname, and in strict mode no unsafe, syscall, or cgo (VL0101, VL0118, VL0122, VL0124, VL0204)",
+	Doc:  "check the imports of each part: a leaf or a library imports no leaf, no code imports the manifest, no //go:linkname, no function without a body or assembly file in a leaf or a library, and in strict mode no unsafe, syscall, or cgo (VL0101, VL0118, VL0122, VL0124, VL0126, VL0204)",
 	Run:  run,
 }
 
@@ -23,7 +26,15 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 	m, self := u.M, u.Part
+	if self.Kind != model.Main {
+		foreignCode(pass, u)
+	}
 	for _, f := range pass.Files {
+		if self.Kind != model.Main {
+			for _, name := range rules.Bodyless(f) {
+				model.Report(pass, name.Pos(), "VL0126", "%s", rules.HoleH6Message(name.Name))
+			}
+		}
 		for _, imp := range f.Imports {
 			p, _ := strconv.Unquote(imp.Path.Value)
 			pos := imp.Path.Pos()
@@ -59,6 +70,22 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 	return nil, nil
+}
+
+// foreignCode applies hole H6 to the files of a package: an assembly file or an object file. It
+// reads the directory, as V does, so that a file for another system counts too.
+func foreignCode(pass *analysis.Pass, u *model.Unit) {
+	dir := filepath.Join(u.M.Root, filepath.FromSlash(u.Dir))
+	for _, name := range rules.AsmFiles(dir) {
+		file := filepath.Join(dir, name)
+		b, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		tf := pass.Fset.AddFile(file, -1, len(b)+1)
+		tf.SetLinesForContent(b)
+		model.Report(pass, tf.Pos(0), "VL0126", "%s", rules.HoleH6FileMessage(name))
+	}
 }
 
 func kindName(p *model.Part) string {

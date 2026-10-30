@@ -27,6 +27,11 @@ Usage:
 	vulcan test [--json] [-v] [-run re] [Leaf|library ...]
 	                                      check with tests, then run the tests of each leaf and library
 	vulcan mod tidy                       add each module that the code imports to go.mod and go.sum
+	vulcan init [--rules SOURCE] [dir]    create a project and write its rules file, from defaults v1 or SOURCE
+	vulcan rules diff [dir]               show how the rules differ from their origin
+	vulcan rules upgrade [--rules SOURCE] [--accept HASH] [dir]
+	                                      show the difference from a newer ruleset; with --accept, apply it
+	vulcan rules lock [dir]               write the current dependencies to rules.lock
 	vulcan guide                          print the primer: what Vulcan adds to Go
 
 The project root is the directory that holds system.vulcan; dir defaults to the current one.
@@ -58,6 +63,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "guide":
 		fmt.Fprint(stdout, vulcanroot.Guide)
 		return 0
+	case "init":
+		return driver.RulesTool().Init(rest, stdout, stderr)
+	case "rules":
+		return driver.RulesTool().Rules(rest, stdout, stderr)
 	}
 	if deferred[cmd] {
 		fmt.Fprintf(stderr, "vulcan %s is not in this release of Vulcan (the PoC subset of release 1)\n", cmd)

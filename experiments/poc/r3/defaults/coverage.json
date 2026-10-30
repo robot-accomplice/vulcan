@@ -1,0 +1,1312 @@
+{
+ "rules": [
+  {
+   "id": "ARCH-01",
+   "status": "stated",
+   "entries": [
+    "ARCH-01"
+   ],
+   "reason": null
+  },
+  {
+   "id": "ARCH-02",
+   "status": "stated",
+   "entries": [
+    "ARCH-02"
+   ],
+   "reason": null
+  },
+  {
+   "id": "ARCH-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ARCH-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "model",
+   "note": "K0123 and VL0123, in strict mode."
+  },
+  {
+   "id": "ARCH-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "declaration",
+   "note": "`init` writes `strict: true` in the project that it creates. That is a template, not a rule, and a team can change it."
+  },
+  {
+   "id": "ARCH-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ARCH-07",
+   "status": "stated",
+   "entries": [
+    "ARCH-07"
+   ],
+   "reason": null
+  },
+  {
+   "id": "ARCH-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "model",
+   "note": "K0111. In L, constructor injection cannot build a cycle."
+  },
+  {
+   "id": "ARCH-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "model",
+   "note": "K0112 and VL0112."
+  },
+  {
+   "id": "ARCH-10",
+   "status": "stated",
+   "entries": [
+    "ARCH-10"
+   ],
+   "reason": null
+  },
+  {
+   "id": "ARCH-11",
+   "status": "stated",
+   "entries": [
+    "ARCH-11"
+   ],
+   "reason": null
+  },
+  {
+   "id": "ARCH-12",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "model",
+   "note": "K0207 and VL0207."
+  },
+  {
+   "id": "ARCH-13",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "ARCH-14",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "ARCH-15",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "ARCH-16",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "ARCH-17",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "ARCH-18",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "model",
+   "note": "K0210 and VL0210, in strict mode."
+  },
+  {
+   "id": "ARCH-19",
+   "status": "stated",
+   "entries": [
+    "ARCH-19"
+   ],
+   "reason": null
+  },
+  {
+   "id": "ARCH-20",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "ARCH-21",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ARCH-22",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "ARCH-23",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "declaration"
+  },
+  {
+   "id": "ARCH-24",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "declaration"
+  },
+  {
+   "id": "ARCH-25",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "ERR-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ERR-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "ERR-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ERR-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ERR-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "ERR-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "ERR-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "ERR-08",
+   "status": "stated",
+   "entries": [
+    "ERR-08"
+   ],
+   "reason": null
+  },
+  {
+   "id": "ERR-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ERR-10",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "ERR-11",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "ERR-12",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "ERR-13",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "ERR-14",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "ERR-15",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "CTX-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CTX-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CTX-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CTX-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "CTX-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "CTX-06",
+   "status": "stated",
+   "entries": [
+    "CTX-06"
+   ],
+   "reason": null
+  },
+  {
+   "id": "CTX-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CTX-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CTX-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "HTTP-01",
+   "status": "partly",
+   "entries": [
+    "HTTP-01"
+   ],
+   "reason": "shape",
+   "not_stated_part": "The ban on the package-level functions is stated. That the four timeouts of `http.Server` are set is a value of a field, which no kind reads."
+  },
+  {
+   "id": "HTTP-02",
+   "status": "partly",
+   "entries": [
+    "HTTP-02"
+   ],
+   "reason": "shape",
+   "not_stated_part": "The ban on the package-level functions and on `http.DefaultClient` is stated. That a client has a non-zero `Timeout` is a value of a field, which no kind reads."
+  },
+  {
+   "id": "HTTP-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "HTTP-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "HTTP-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "HTTP-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "HTTP-07",
+   "status": "stated",
+   "entries": [
+    "HTTP-07"
+   ],
+   "reason": null
+  },
+  {
+   "id": "HTTP-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "HTTP-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "HTTP-10",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "HTTP-11",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "HTTP-12",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "HTTP-13",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "HTTP-14",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "HTTP-15",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "HTTP-16",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "HTTP-17",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "HTTP-18",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "HTTP-19",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "HTTP-20",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "HTTP-21",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "SEC-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "SEC-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "SEC-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "SEC-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "SEC-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "SEC-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "SEC-10",
+   "status": "stated",
+   "entries": [
+    "SEC-10"
+   ],
+   "reason": null
+  },
+  {
+   "id": "SEC-11",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-12",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-13",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "SEC-14",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "SEC-15",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-16",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "SEC-17",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "SEC-18",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "SEC-19",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-20",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-21",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-22",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-23",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-24",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-25",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "SEC-26",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-27",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "SEC-28",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "SEC-29",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "SEC-30",
+   "status": "stated",
+   "entries": [
+    "SEC-30.imports",
+    "SEC-30.calls"
+   ],
+   "reason": null
+  },
+  {
+   "id": "SEC-31",
+   "status": "stated",
+   "entries": [
+    "SEC-31"
+   ],
+   "reason": null
+  },
+  {
+   "id": "SEC-32",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "SEC-33",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "SEC-34",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "DATA-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "DATA-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "DATA-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "DATA-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "DATA-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "DATA-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "DATA-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "DATA-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "DATA-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "DATA-10",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "DATA-11",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "DATA-12",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "DATA-13",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "DATA-14",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "DATA-15",
+   "status": "stated",
+   "entries": [
+    "DATA-15"
+   ],
+   "reason": null
+  },
+  {
+   "id": "PAY-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "PAY-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "PAY-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "PAY-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "PAY-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "PAY-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "PAY-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "PAY-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-10",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-11",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-12",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-13",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-14",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-15",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-16",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts",
+   "note": "The kind `transitions` states this once a team names its status field and its table. A default cannot name them."
+  },
+  {
+   "id": "PAY-17",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "PAY-18",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts",
+   "note": "Which containers hold money is a project fact, and the config key is a declaration."
+  },
+  {
+   "id": "PAY-19",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "PAY-20",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "PAY-21",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "project-facts"
+  },
+  {
+   "id": "MSG-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "MSG-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "MSG-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "MSG-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "MSG-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "MSG-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "MSG-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "deferred"
+  },
+  {
+   "id": "RES-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "RES-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "RES-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "RES-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "RES-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "RES-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "RES-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "CONC-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "CONC-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "CONC-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CONC-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "CONC-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "CONC-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "CONC-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "OBS-01",
+   "status": "stated",
+   "entries": [
+    "OBS-01"
+   ],
+   "reason": null
+  },
+  {
+   "id": "OBS-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "OBS-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "OBS-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "OBS-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "OBS-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "OBS-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "API-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "API-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "API-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "API-04",
+   "status": "partly",
+   "entries": [
+    "API-04"
+   ],
+   "reason": "outside-source",
+   "not_stated_part": "The ban on the debug and profiling packages is stated, in every build. An owner and an end date for each old API version are not in the source."
+  },
+  {
+   "id": "API-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "API-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "API-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "CON-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CON-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CON-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CON-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "CODE-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "CODE-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CODE-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CODE-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CODE-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CODE-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CODE-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "flow"
+  },
+  {
+   "id": "CODE-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CODE-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "CODE-10",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "CODE-11",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "TEST-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "TEST-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "TEST-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "TEST-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "TEST-05",
+   "status": "stated",
+   "entries": [
+    "TEST-05"
+   ],
+   "reason": null
+  },
+  {
+   "id": "TEST-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "TEST-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "TEST-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "TEST-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  },
+  {
+   "id": "TEST-10",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "meaning"
+  },
+  {
+   "id": "TEST-11",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-01",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-02",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-03",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-04",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-05",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-06",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-07",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "shape"
+  },
+  {
+   "id": "BLD-08",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "outside-source"
+  },
+  {
+   "id": "BLD-09",
+   "status": "not-stated",
+   "entries": [],
+   "reason": "run-time"
+  }
+ ]
+}
