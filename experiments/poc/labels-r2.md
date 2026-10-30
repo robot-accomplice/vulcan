@@ -53,6 +53,44 @@ Limits of this result:
   continued with changed rules: rules chosen after seeing the labels would no longer be a fair
   sample.
 
+## Diagnostic: could the model express the other 25 rules? (2026-10-30)
+
+The seeded cases went into the unchanged applications. So a check could enforce only what the
+applications already declared, and a team that adopts the model would declare its rules. To see
+whether that gap explains the result, a fresh read-only session sorted each of the 25 rules in N
+into three groups, for each arm:
+
+1. **Declarable**: a check-time declaration, which the current checkers implement, would reject
+   both seeded shapes.
+2. **Run time only**: a contract.
+3. **Outside the model.**
+
+The session tested the uncertain cases on scratch copies, and changed nothing.
+
+| Group | L (A / B / C / D) | V (A / B / C / D) |
+|---|---|---|
+| 1. Declarable | 0 / 4 / 0 / 0 = 4 | 0 / 4 / 0 / 0 = 4 |
+| 2. Run time only | 0 / 1 / 3 / 1 = 5 | 0 / 1 / 3 / 1 = 5 |
+| 3. Outside the model | 6 / 0 / 4 / 6 = 16 | 6 / 0 / 4 / 6 = 16 |
+
+- **The declarable rules are the same in both arms:** R11, R12, R13, and R14. All four depend on
+  one mechanism, the strict mode list of banned functions. That list is meant for functions that
+  change shared state, so its error message does not fit these rules, but the rejections are
+  real. With the list, both applications pass unchanged and all 18 seed runs of the four rules
+  are rejected. Without it, every seed passes.
+- **Even with all four encoded, S would hold 7 rules, below the 8 of section 4.** Encoding the
+  rules cannot carry round 2 past its stop rule.
+- **Class A is outside the model in both arms.** Neither checker can state which part may be
+  wired to which. Each class A seed adds a port and a wire, and both checks accept it.
+- **V's contracts are no stronger than L's in this release.** V's checker allows no call in a
+  contract except `len`, `cap`, and conversions. The spec describes more, so 4 rules are marked
+  "spec only" in V.
+- **16 of the 50 judgments have low confidence:** 8 rules, each in both arms. Where a contract
+  would catch only one of the two seeds, the rule went to group 3.
+
+The record is `C:\Users\jonat\vulcan-poc\r2\diagnostic.md` (SHA-256
+`39f5139cdad731e8635991966dd712996c8e759b7225d1596eb6d181e0379dd9`).
+
 ## How it was made
 
 | Step | Session | Input | Output |
