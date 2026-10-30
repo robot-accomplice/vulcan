@@ -89,6 +89,7 @@ package money
 
 func holeB() int
 -- lib/money/money.go --
+// Package money holds amounts.
 package money
 
 // Money is an amount in cents.

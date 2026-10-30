@@ -146,7 +146,7 @@ REASONS = {
     "run-time": "Only a test, a probe, or the deployment shows a breach, when the code runs.",
     "project-facts": "It needs the facts of one project. A ruleset written before a project exists cannot name them.",
     "outside-source": "It is about CI, the repository, or a process, which a check of the source does not read.",
-    "declaration": "It is about a declaration of the system (a config key or an external). No kind reads declarations.",
+    "declaration": "It is about a config key or the text of an external in the system file. Amendment 6 adds kinds for the shape rules only, so no kind states these.",
     "deferred": "It is about topics, remote ports, or transports, which release 1 defers.",
     "whole-program": "It needs a view of the whole module. L's analyzers read one package at a time.",
 }

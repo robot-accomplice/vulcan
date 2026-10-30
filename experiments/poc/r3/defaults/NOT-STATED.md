@@ -33,7 +33,7 @@ Stated forms that hold a finite list, or are wider than the words, for the same 
 | run-time | 16 | Only a test, a probe, or the deployment shows a breach, when the code runs. |
 | project-facts | 21 | It needs the facts of one project. A ruleset written before a project exists cannot name them. |
 | outside-source | 14 | It is about CI, the repository, or a process, which a check of the source does not read. |
-| declaration | 3 | It is about a declaration of the system (a config key or an external). No kind reads declarations. |
+| declaration | 3 | It is about a config key or the text of an external in the system file. Amendment 6 adds kinds for the shape rules only, so no kind states these. |
 | deferred | 8 | It is about topics, remote ports, or transports, which release 1 defers. |
 
 ## Stated in part, by the reason for the rest
