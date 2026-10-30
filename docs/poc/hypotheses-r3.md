@@ -202,7 +202,9 @@ Section 5 defines the stages that the tests name: **form**, **holes**, **labels*
 - **Cost.** Compiler: T4, T8's lowering, and a restricted body mode. This breaks "bodies are plain
   Go" for code in that mode. Agents: new meaning to learn (N5), and some programs to rewrite.
 - **Test.** *Measure:* the paired difference in the share of clauses proved, L against V, on one
-  corpus and one solver. Also form on those clauses. *Refuted if* the interval lies within ±10 points.
+  corpus and one solver, with both arms scored on proofs of the same fact: the clause holds and no
+  overflow occurs (section 9). The count in trap mode is reported beside it, and no verdict reads it.
+  Also form on those clauses. *Refuted if* the interval lies within ±10 points.
   *Size:* 44 clauses detects a 20-point gap with 80% power (paired; assumes 25% and 5% discordant).
   Clauses of one function are not independent, so use 60 or more, and analyze by function as well.
 - **Prior (prediction).** 25%. L can adopt most of the same subset. The vericoding benchmark (appendix
@@ -588,7 +590,9 @@ language.
 **Test.**
 
 1. *No agents.* A fresh writer states contracts in neutral form on Stockroom-lite's two new services.
-   With the existing 29 clauses, this makes at least 60. Report the share proved per arm, paired.
+   With the existing 29 clauses, this makes at least 60. Report the share proved per arm, paired,
+   on the same fact: the clause holds and no overflow occurs. Report the trap-mode count beside it,
+   where a program that traps counts as proved. The stop rule below reads the same-fact share only.
 2. *Labels.* A fresh rule set. Report class C and D rules that each arm rejects at check time.
 3. *Runs,* only if step 1 or 2 shows a gain, and the owner decides to spend. Measure success, turns,
    tokens, solver time, weakened contracts (N4), and proof failures (N2).
@@ -747,14 +751,18 @@ stays the first reading.
 
 Moves toward the language: T5, T9. Moves toward the linter: T6, T11, T24. All the V forms of features
 that V lacks are the second reader's guesses, so its ratios for those sites are estimates. The owner
-has not yet decided what these disagreements change.
+decided on 2026-10-30 that they change neither the shortlist nor its ranks.
 
 Three points from that reading that the first did not raise:
 
 - **T5's measure can favor V by its definition.** Under trapping, a program that traps counts as
   proved, so "proved" means partial correctness. L with a no-overflow obligation proves a stronger
   fact, and rejects more programs. A probe of 4 properties shows the effect: trap proved 4, Go with
-  the obligation proved 1.
+  the obligation proved 1. The owner decided on 2026-10-30 to score V and L on proofs of the same
+  fact, and to report the trap-mode count beside it (section 3, T5; section 6, rank 1). This change
+  was made before any verifier or corpus exists. It removes a gain for V that came only from the
+  definition, and it does not decide T5: a stricter meaning can still help a same-fact proof if V's
+  bodies give the prover fewer cases.
 - **The test does not say how to count a ban that V also needs.** This decides T7 and T20.
 - **The test assumes a gate in L.** `go build` works with no linter, and `vulcan build` refuses. With
   no gate in CI, every Linter-equal verdict has a named loss in soundness.
