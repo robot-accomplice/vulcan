@@ -127,6 +127,20 @@ Few of the rules a team would write for this service are ones that either check 
 
 This is one rule writer's sample, with no second labeler.
 
+A diagnostic then asked whether the 25 rules that neither check enforced could be declared in the
+model. In both arms the answers were the same:
+- 4 rules could be declared, all through one mechanism;
+- 5 could be checked only at run time;
+- 16 are outside the model, including every boundary rule.
+
+So set S could hold at most 7 rules, and round 2 cannot meet its own stop rule.
+
+**Conclusion of rounds 1 and 2 (accepted by the owner, 2026-10-30):**
+- On this application and these rules, Vulcan's checks enforced nothing that the same model
+  could not enforce as a Go linter.
+- Either form enforced only a small share of the rules that a team wrote for the service.
+- No measured result yet shows that Vulcan, as a language, adds value over Go with a linter.
+
 ## Repository layout
 
 | Path | Contents |

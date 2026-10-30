@@ -28,6 +28,21 @@ manifest.
 | `runs-pilot-kimi-moonshot-overloaded.sealed` | `dd045bca7b4f4b2119f0cf6f2c3e405f429d255eec60ebefe81617728d1024d6` |
 | `material.sealed` (the hidden material) | `d89b3e08473e9fe28229052308a6022d31f6138e1c5da43a6a99d11347cb2bcd` |
 
+Round 2 (stopped at step 3, no runs) is in `D:\vulcan-poc-archive\2026-10-30`, and in the same
+folder on Proton Drive. `r2.sealed` holds the store `C:\Users\jonat\vulcan-poc\r2`:
+- the rules, tests, detectors and seeded cases;
+- the rule writer's folder;
+- the validator's output, with each item's logs and source workspace;
+- the diagnostic.
+
+The validator's built binaries and `prepared/` are left out. The seal was opened again and
+matched its manifest. The Proton copy was checked with `SHA256SUMS`.
+
+| Sealed file | SHA-256 |
+|---|---|
+| `r2.sealed` (round 2: material, validation, diagnostic; 5,277 files) | `c13e390608671fc238b183818d642bbf24bf688666caf6931e58caf9d4396234` |
+| `r2.manifest.txt` | `43fdbc82cccd38a38a31fc93f98cf34aee95d2fa990aebe9e8e86c8afbe364e6` |
+
 To open one: `VULCAN_SEAL_KEY=… harness open -in runs-main.sealed -dir DIR`, then
 `harness manifest -dir DIR` and compare with `runs-main.manifest.txt`.
 
