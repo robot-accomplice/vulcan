@@ -58,8 +58,8 @@ func codes(t *testing.T, path, prefix string) []string {
 			continue
 		}
 		for _, line := range strings.Split(string(f.Data), "\n") {
-			if fs := strings.Fields(line); len(fs) == 3 && fs[0] == "error" {
-				out = append(out, strings.TrimPrefix(fs[2], prefix))
+			if fs := strings.Fields(line); len(fs) == 3 && (fs[0] == "error" || fs[0] == "warn") {
+				out = append(out, fs[0]+" "+strings.TrimPrefix(fs[2], prefix))
 			}
 		}
 	}

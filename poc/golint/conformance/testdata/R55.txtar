@@ -95,6 +95,7 @@ func main() {
 	}
 }
 -- lib/money/money.go --
+// Package money holds amounts.
 package money
 
 // Money is an amount in cents.

@@ -20,6 +20,24 @@ rule ARCH-02
   reason A shared library that knows transport or storage spreads that knowledge to each leaf.
   source Robert C. Martin, The Clean Architecture (https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html); Vulcan Language Specification, Draft 0 (input/spec.md)
 
+# A port signature does not carry `*http.Request`, `http.ResponseWriter`, `*http.Response`, `*sql.DB`, `*sql.Tx`, `*sql.Rows`, or `net.Conn`.
+rule ARCH-03
+  kind declaration
+  level error
+  at port-signature
+  deny-types *net/http.Request net/http.ResponseWriter *net/http.Response *database/sql.DB *database/sql.Tx *database/sql.Rows net.Conn
+  reason Only simple data crosses a boundary, so a consumer stays free of provider details.
+  source Robert C. Martin, The Clean Architecture (https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html); Microsoft Azure Architecture Center, Anti-Corruption Layer pattern (https://learn.microsoft.com/en-us/azure/architecture/patterns/anti-corruption-layer)
+
+# Each entry in `strict_exempt`, `strict_interfaces`, `strict_shared`, `allow_network`, and `allow_acquiring` has a comment that gives the reason.
+rule ARCH-06
+  kind declaration
+  level error
+  at config-entry
+  require comment
+  reason A reviewer must see why a guard is off.
+  source Vulcan Language Specification, Draft 0 (input/spec.md); golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
 # Code in a leaf uses another leaf only through a port, a topic, or a library.
 rule ARCH-07
   kind depends
@@ -57,6 +75,44 @@ rule ARCH-19
   reason Process-wide settings couple leaves that have no declared link.
   source Vulcan Language Specification, Draft 0 (input/spec.md); Google Go Style Guide, Best Practices (https://google.github.io/styleguide/go/best-practices)
 
+# A library name is not `util`, `common`, `misc`, `helpers`, `shared`, or `base`.
+rule ARCH-21
+  kind declaration
+  level error
+  at library
+  deny-names util common misc helpers shared base
+  reason Such a name tells the reader nothing, and the package collects unrelated code and dependencies.
+  source Go Blog, Package names (https://go.dev/blog/package-names)
+
+# Code does not drop an `error` result.
+rule ERR-01
+  kind code-form
+  level error
+  form dropped-error
+  deferred-ok (*database/sql.Tx).Rollback (*database/sql.Rows).Close (*database/sql.Stmt).Close (*database/sql.Conn).Close (*os.File).Close (io.Closer).Close
+  in leaf gateway entry library
+  reason A dropped error hides a failure.
+  source Go Wiki, Go Code Review Comments (https://go.dev/wiki/CodeReviewComments); golangci-lint, Linters (https://golangci-lint.run/docs/linters/); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Each `_ = f()` that discards an error has a comment that gives the reason.
+rule ERR-03
+  kind code-form
+  level error
+  form discard-error
+  unless-comment yes
+  in leaf gateway entry library
+  reason A deliberate discard must be visible and defended.
+  source Go Wiki, Go Code Review Comments (https://go.dev/wiki/CodeReviewComments); Vulcan Language Specification, Draft 0 (input/spec.md); gosec README (https://github.com/securego/gosec)
+
+# Code compares errors with `errors.Is` or `errors.As`, not with `==`, a type assertion, or the error text.
+rule ERR-04
+  kind code-form
+  level error
+  form error-compare
+  in leaf gateway entry library
+  reason A direct comparison fails on a wrapped error, and the text is not an API.
+  source Go Blog, Working with Errors in Go 1.13 (https://go.dev/blog/go1.13-errors); golangci-lint, Linters (https://golangci-lint.run/docs/linters/); Google Go Style Guide, Best Practices (https://google.github.io/styleguide/go/best-practices)
+
 # Leaf code and library code do not call `os.Exit`, `log.Fatal`, or `log.Panic` functions.
 rule ERR-08
   kind forbid-call
@@ -65,6 +121,56 @@ rule ERR-08
   in leaf gateway entry library
   reason Only `main` may end the process, and `main` is generated here.
   source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Each type assertion uses the two-value form.
+rule ERR-09
+  kind code-form
+  level error
+  form one-value-assertion
+  in leaf gateway entry library
+  reason A failed one-value assertion panics.
+  source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md); golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# Error strings start with a lower-case letter and do not end with punctuation.
+rule ERR-13
+  kind call-form
+  level error
+  funcs errors.New fmt.Errorf
+  require-text ^[a-z] [^.:!?\n]$
+  in leaf gateway entry library
+  reason Callers append context to errors.
+  source Go Wiki, Go Code Review Comments (https://go.dev/wiki/CodeReviewComments); Staticcheck, Checks (https://staticcheck.dev/docs/checks/)
+
+# A function that takes a `context.Context` takes it as the first parameter, named `ctx`.
+rule CTX-01
+  kind declaration
+  level error
+  at param
+  types context.Context
+  require first name=ctx
+  in leaf gateway entry library
+  reason One form makes context flow easy to read and to check.
+  source Go standard library, package context (https://pkg.go.dev/context)
+
+# A struct does not have a `context.Context` field.
+rule CTX-02
+  kind declaration
+  level error
+  at field
+  deny-types context.Context
+  in leaf gateway entry library
+  reason A stored context hides its lifetime.
+  source Go standard library, package context (https://pkg.go.dev/context); Go Wiki, Go Code Review Comments (https://go.dev/wiki/CodeReviewComments)
+
+# Code does not pass a nil `context.Context`.
+rule CTX-03
+  kind call-form
+  level error
+  param-type context.Context
+  require not-nil
+  in leaf gateway entry library
+  reason A callee may dereference it.
+  source Go standard library, package context (https://pkg.go.dev/context); Staticcheck, Checks (https://staticcheck.dev/docs/checks/)
 
 # Code uses the context forms of calls that can block: `http.NewRequestWithContext`, `QueryContext`, `ExecContext`, `BeginTx`, `DialContext`, `exec.CommandContext`.
 rule CTX-06
@@ -75,11 +181,41 @@ rule CTX-06
   reason A call without a context cannot stop when its caller stops.
   source golangci-lint, Linters (https://golangci-lint.run/docs/linters/); Go documentation, Canceling in-progress database operations (https://go.dev/doc/database/cancel-operations); Go standard library, package database/sql (https://pkg.go.dev/database/sql)
 
+# Context values use an unexported key type and hold only request-scoped data, not optional parameters.
+rule CTX-07
+  kind call-form
+  level error
+  funcs context.WithValue
+  arg 1
+  require unexported-type
+  in leaf gateway entry library
+  reason A hidden parameter breaks the visible signature.
+  source Go standard library, package context (https://pkg.go.dev/context); Staticcheck, Checks (https://staticcheck.dev/docs/checks/)
+
+# A port method whose provider reaches a network or acquiring function takes `context.Context` as its first parameter.
+rule CTX-08
+  kind declaration
+  level error
+  at wired-port
+  to gateway
+  reason A deadline cannot pass through a port that has no context.
+  source Go standard library, package context (https://pkg.go.dev/context); Google SRE Book, Addressing Cascading Failures (https://sre.google/sre-book/addressing-cascading-failures/)
+
 # An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`.
 rule HTTP-01
   kind forbid-call
   level error
   funcs net/http.ListenAndServe net/http.ListenAndServeTLS net/http.Serve
+  in entry
+  reason The package-level functions run with no timeouts, so a slow client can hold resources.
+  source Cloudflare Blog, The complete guide to Go net/http timeouts (https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts/); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md); Go standard library, package net/http (https://pkg.go.dev/net/http)
+
+# An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`.
+rule HTTP-01.timeouts
+  kind literal
+  level error
+  type net/http.Server
+  require ReadHeaderTimeout ReadTimeout WriteTimeout IdleTimeout
   in entry
   reason The package-level functions run with no timeouts, so a slow client can hold resources.
   source Cloudflare Blog, The complete guide to Go net/http timeouts (https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts/); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md); Go standard library, package net/http (https://pkg.go.dev/net/http)
@@ -93,6 +229,16 @@ rule HTTP-02
   reason `DefaultClient` has no timeout, so a stuck peer holds a goroutine.
   source Cloudflare Blog, The complete guide to Go net/http timeouts (https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts/); Go standard library, package net/http (https://pkg.go.dev/net/http)
 
+# A gateway uses an `http.Client` with a non-zero `Timeout`, and does not call `http.Get`, `http.Post`, `http.Head`, `http.PostForm`, or `http.DefaultClient`.
+rule HTTP-02.timeout
+  kind literal
+  level error
+  type net/http.Client
+  require Timeout
+  in gateway
+  reason `DefaultClient` has no timeout, so a stuck peer holds a goroutine.
+  source Cloudflare Blog, The complete guide to Go net/http timeouts (https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts/); Go standard library, package net/http (https://pkg.go.dev/net/http)
+
 # An entry leaf registers routes on its own `http.ServeMux`, not on `http.DefaultServeMux`.
 rule HTTP-07
   kind forbid-call
@@ -101,6 +247,81 @@ rule HTTP-07
   in entry
   reason Any imported package can add a route to the default mux.
   source Go standard library, package net/http (https://pkg.go.dev/net/http); Vulcan Language Specification, Draft 0 (input/spec.md); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md)
+
+# A gateway does not follow a redirect automatically, unless it checks the target against an allow-list.
+rule HTTP-09
+  kind literal
+  level error
+  type net/http.Client
+  require CheckRedirect
+  in gateway
+  reason A redirect can move a permitted request to an internal target.
+  source OWASP API10:2023 Unsafe Consumption of APIs (https://api-security.owasp.org/editions/2023/en/0xaa-unsafe-consumption-of-apis); OWASP Server Side Request Forgery Prevention Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+
+# Code does not set `InsecureSkipVerify: true` or a `MinVersion` below TLS 1.2, except in test files.
+rule HTTP-11
+  kind literal
+  level error
+  type crypto/tls.Config
+  deny InsecureSkipVerify=true
+  below MinVersion=771
+  in leaf gateway entry library
+  files code
+  reason Without verification, TLS does not stop a man in the middle.
+  source Go standard library, package crypto/tls (https://pkg.go.dev/crypto/tls); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md); Stripe documentation, Integration security guide (https://docs.stripe.com/security/guide)
+
+# Each entry route accepts only the methods that it lists, and answers others with 405.
+rule HTTP-13
+  kind call-form
+  level error
+  funcs (*net/http.ServeMux).Handle (*net/http.ServeMux).HandleFunc
+  require constant
+  require-text ^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s
+  in entry
+  reason Unplanned methods widen the attack surface.
+  source OWASP REST Security Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html); OWASP API8:2023 Security Misconfiguration (https://api-security.owasp.org/editions/2023/en/0xa8-security-misconfiguration)
+
+# Each session cookie sets `Secure`, `HttpOnly`, and `SameSite` with the value `Strict` or `Lax`.
+rule HTTP-17
+  kind literal
+  level error
+  type net/http.Cookie
+  require Secure=true HttpOnly=true SameSite=2,3
+  in entry
+  reason These attributes limit theft and cross-site use.
+  source OWASP Session Management Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+
+# Source files, declaration files, and test fixtures hold no real secret, key, or password.
+rule SEC-01
+  kind literal
+  level error
+  deny-text (sk_live_|sk_test_|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|-----BEGIN[A-Z\s]*PRIVATE\sKEY)
+  names *password* *Password* *secret* *Secret* *apiKey* *ApiKey* *APIKey* *token* *Token*
+  in leaf gateway entry library
+  reason Anyone who reads the repository gets the secret, and history keeps it.
+  source gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md); Stripe documentation, Best practices for managing secret API keys (https://docs.stripe.com/keys-best-practices); OWASP Secrets Management Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html); OWASP Cryptographic Storage Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)
+
+# A settings field that holds a credential has the tag `vulcan:"secret"`.
+rule SEC-02
+  kind declaration
+  level error
+  at settings-field
+  names *Key *Token *Password *Secret *Credential *Credentials
+  require vulcan=secret
+  in leaf gateway entry
+  reason The tag makes a literal value a compile error.
+  source Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# A SQL statement is a constant string, and each value goes in as a parameter.
+rule SEC-07
+  kind call-form
+  level error
+  funcs (*database/sql.DB).Query (*database/sql.DB).QueryRow (*database/sql.DB).Exec (*database/sql.DB).Prepare (*database/sql.DB).QueryContext (*database/sql.DB).QueryRowContext (*database/sql.DB).ExecContext (*database/sql.DB).PrepareContext (*database/sql.Tx).Query (*database/sql.Tx).QueryRow (*database/sql.Tx).Exec (*database/sql.Tx).Prepare (*database/sql.Tx).QueryContext (*database/sql.Tx).QueryRowContext (*database/sql.Tx).ExecContext (*database/sql.Tx).PrepareContext (*database/sql.Conn).QueryContext (*database/sql.Conn).QueryRowContext (*database/sql.Conn).ExecContext (*database/sql.Conn).PrepareContext
+  require constant
+  unless-comment yes
+  in leaf gateway entry library
+  reason A built statement is a SQL injection risk.
+  source Go documentation, Avoiding SQL injection risk (https://go.dev/doc/database/sql-injection); OWASP SQL Injection Prevention Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md)
 
 # Security code does not use MD5, SHA-1, DES, or RC4.
 rule SEC-10
@@ -138,6 +359,27 @@ rule SEC-31
   reason Native serial formats do not suit untrusted data.
   source OWASP Deserialization Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html)
 
+# SQL text does not hold `BEGIN`, `COMMIT`, or `ROLLBACK`.
+rule DATA-03
+  kind call-form
+  level error
+  funcs (*database/sql.DB).Query (*database/sql.DB).QueryRow (*database/sql.DB).Exec (*database/sql.DB).Prepare (*database/sql.DB).QueryContext (*database/sql.DB).QueryRowContext (*database/sql.DB).ExecContext (*database/sql.DB).PrepareContext (*database/sql.Tx).Query (*database/sql.Tx).QueryRow (*database/sql.Tx).Exec (*database/sql.Tx).Prepare (*database/sql.Tx).QueryContext (*database/sql.Tx).QueryRowContext (*database/sql.Tx).ExecContext (*database/sql.Tx).PrepareContext (*database/sql.Conn).QueryContext (*database/sql.Conn).QueryRowContext (*database/sql.Conn).ExecContext (*database/sql.Conn).PrepareContext
+  deny-text (?i)\b(BEGIN|COMMIT|ROLLBACK)\b
+  in leaf gateway entry library
+  reason Manual statements can leave the database in an unpredictable state.
+  source Go documentation, Executing transactions (https://go.dev/doc/database/execute-transactions)
+
+# Code uses `time.Time` for instants and `time.Duration` for periods, not integers or strings.
+rule DATA-14
+  kind declaration
+  level error
+  at field param var
+  names *At *Time *Timeout *Deadline *Duration *Interval *TTL *Delay at time timeout deadline duration interval ttl delay
+  deny-types string int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 float32 float64
+  in leaf gateway entry library
+  reason A bare number has no unit, and a mistake compiles.
+  source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md); Google AIP-142, Time and duration (https://google.aip.dev/142); golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
 # A plain leaf or a library does not call `time.Now` for a business decision, and takes time through a port.
 rule DATA-15
   kind forbid-call
@@ -148,6 +390,36 @@ rule DATA-15
   reason A test must control the clock.
   source Martin Fowler, Eradicating Non-Determinism in Tests (https://martinfowler.com/articles/nonDeterminism.html); Vulcan Language Specification, Draft 0 (input/spec.md)
 
+# A money amount is an integer in the currency's smallest unit, or an exact decimal, and is never `float32` or `float64`.
+rule PAY-01
+  kind declaration
+  level error
+  at field param var
+  names *Amount* *amount* *Price* *price* *Total* *total* *Cost* *cost* *Charge* *charge* *Refund* *refund* *Fee* *fee* *Balance* *balance* *Money* *money* *Cents* *cents*
+  deny-types float32 float64
+  in leaf gateway entry library
+  reason Binary floats do not add up exactly.
+  source Stripe documentation, Supported currencies (https://docs.stripe.com/currencies); The Floating-Point Guide, Exact Types (https://floating-point-gui.de/formats/exact/); Martin Fowler, Money (PoEAA catalog) (https://martinfowler.com/eaaCatalog/money.html)
+
+# A retry loop has a limit on attempts, exponential backoff, and jitter.
+rule RES-02
+  kind code-form
+  level error
+  form retry-loop
+  in leaf gateway
+  reason Unlimited or synchronized retries deepen an overload.
+  source Google SRE Book, Addressing Cascading Failures (https://sre.google/sre-book/addressing-cascading-failures/); AWS Builders' Library, Timeouts, retries, and backoff with jitter (https://builder.aws.com/content/3EumjoZascWd1oZiEgL8ORlv3qE/timeouts-retries-and-backoff-with-jitter)
+
+# A channel is unbuffered or has size one, unless a comment defends a larger size.
+rule CONC-03
+  kind code-form
+  level warn
+  form channel-size
+  unless-comment yes
+  in leaf gateway entry library
+  reason A large buffer hides a capacity decision.
+  source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md)
+
 # Leaf code and library code log through `log/slog`, not through `log` or `fmt.Print` functions.
 rule OBS-01
   kind forbid-call
@@ -156,6 +428,16 @@ rule OBS-01
   in leaf gateway entry library
   reason Structured records are machine-readable and resist log injection.
   source Go standard library, package log/slog (https://pkg.go.dev/log/slog); OWASP Logging Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html); golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# A log message text is constant, and variable data goes in attributes.
+rule OBS-02
+  kind call-form
+  level error
+  funcs log/slog.Debug log/slog.Info log/slog.Warn log/slog.Error log/slog.DebugContext log/slog.InfoContext log/slog.WarnContext log/slog.ErrorContext log/slog.Log (*log/slog.Logger).Debug (*log/slog.Logger).Info (*log/slog.Logger).Warn (*log/slog.Logger).Error (*log/slog.Logger).DebugContext (*log/slog.Logger).InfoContext (*log/slog.Logger).WarnContext (*log/slog.Logger).ErrorContext (*log/slog.Logger).Log
+  require constant
+  in leaf gateway entry library
+  reason Untrusted text in a message can forge lines.
+  source OWASP Logging Cheat Sheet (https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html); gosec README (https://github.com/securego/gosec)
 
 # A production build exposes no debug or profiling route, and each old API version has an owner and an end date.
 rule API-04
@@ -166,6 +448,135 @@ rule API-04
   reason Forgotten endpoints are an attack surface.
   source OWASP API9:2023 Improper Inventory Management (https://api-security.owasp.org/editions/2023/en/0xa9-improper-inventory-management); gosec rule list (RULES.md) (https://raw.githubusercontent.com/securego/gosec/master/RULES.md)
 
+# A port method that changes state declares a `requires` for the limits of its arguments.
+rule CON-01
+  kind declaration
+  level error
+  at port-method
+  require requires
+  except-names Get* List* Find* Read* Is* Has* Count* Load* Lookup* Exists*
+  in leaf gateway entry
+  reason A boundary is the best place to state what a caller must meet.
+  source Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# A `return` in a function with `ensures` does not itself cause an effect, such as `return tx.Commit()`.
+rule CON-03
+  kind code-form
+  level warn
+  form return-effect
+  funcs (*database/sql.Tx).Commit (*database/sql.Tx).Exec (*database/sql.Tx).ExecContext (*database/sql.DB).Exec (*database/sql.DB).ExecContext (*net/http.Client).Do (*net/http.Client).Post (*net/http.Client).Get net/smtp.SendMail os.WriteFile os.Remove
+  unless-comment yes
+  in leaf gateway entry library
+  reason Go runs the effect first, and the check then fires too late.
+  source Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Each suppression of a check names the check and gives a reason.
+rule CODE-02
+  kind code-form
+  level error
+  form suppression
+  in leaf gateway entry library
+  reason An unexplained suppression hides a defect.
+  source golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# A function above a set complexity gets a warning.
+rule CODE-03
+  kind code-form
+  level warn
+  form function-complexity
+  limit 15
+  in leaf gateway entry library
+  reason Complex functions are hard to review.
+  source golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# A `switch` over a named constant set covers each value, or has a `default` with a reason.
+rule CODE-04
+  kind code-form
+  level error
+  form switch-exhaustive
+  in leaf gateway entry library
+  reason A new state must not fall through quietly.
+  source golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# A struct that code marshals has a field tag on each marshaled field.
+rule CODE-05.json
+  kind call-form
+  level error
+  funcs encoding/json.Marshal encoding/json.MarshalIndent (*encoding/json.Encoder).Encode
+  arg 0
+  require tagged=json
+  in leaf gateway entry library
+  reason A rename must not change the wire format.
+  source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md); golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# A struct that code marshals has a field tag on each marshaled field.
+rule CODE-05.xml
+  kind call-form
+  level error
+  funcs encoding/xml.Marshal encoding/xml.MarshalIndent (*encoding/xml.Encoder).Encode
+  arg 0
+  require tagged=xml
+  in leaf gateway entry library
+  reason A rename must not change the wire format.
+  source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md); golangci-lint, Linters (https://golangci-lint.run/docs/linters/)
+
+# An exported struct in a library does not embed another type.
+rule CODE-06
+  kind declaration
+  level error
+  at embedded
+  in library
+  reason Embedding leaks methods into the API.
+  source Uber Go Style Guide (https://github.com/uber-go/guide/blob/master/style.md)
+
+# Each port, topic, `external`, library, and exported name has a doc comment.
+rule CODE-08
+  kind declaration
+  level error
+  at doc
+  in leaf gateway entry library
+  files code
+  reason Diagrams and generated docs read these comments.
+  source Go Wiki, Go Code Review Comments (https://go.dev/wiki/CodeReviewComments); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Near-duplicate functions become one function, in the leaf or in a library.
+rule CODE-09
+  kind code-form
+  level error
+  form duplicate-function
+  limit 60
+  similarity 90
+  in leaf gateway entry library
+  files code
+  reason Duplicate code diverges, and models write much of it.
+  source Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Code does not use a deprecated function, and has no unused name.
+rule CODE-11.deprecated
+  kind code-form
+  level error
+  form deprecated-use
+  in leaf gateway entry library
+  reason Deprecated code loses support, and dead code misleads a reader.
+  source Staticcheck, Checks (https://staticcheck.dev/docs/checks/); golangci-lint, Linters (https://golangci-lint.run/docs/linters/); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# Code does not use a deprecated function, and has no unused name.
+rule CODE-11.unused
+  kind code-form
+  level error
+  form unused-name
+  in leaf gateway entry library
+  reason Deprecated code loses support, and dead code misleads a reader.
+  source Staticcheck, Checks (https://staticcheck.dev/docs/checks/); golangci-lint, Linters (https://golangci-lint.run/docs/linters/); Vulcan Language Specification, Draft 0 (input/spec.md)
+
+# A test body has no branch or loop, apart from a loop over a table of cases.
+rule TEST-04
+  kind code-form
+  level error
+  form test-logic
+  reason A test must be plainly correct on reading.
+  source Software Engineering at Google, Chapter 12, Unit Testing (https://abseil.io/resources/swe-book/html/ch12.html); Go Wiki, Table Driven Tests (https://go.dev/wiki/TableDrivenTests)
+
 # A test does not call `time.Sleep`.
 rule TEST-05
   kind forbid-call
@@ -174,6 +585,16 @@ rule TEST-05
   files test
   reason A sleep wastes time or fails on a slow host.
   source Martin Fowler, Eradicating Non-Determinism in Tests (https://martinfowler.com/articles/nonDeterminism.html); Go standard library, package testing/synctest (https://pkg.go.dev/testing/synctest)
+
+# Each deployment-specific value comes from a flag or from the environment, and leaf code holds no address or hostname literal.
+rule BLD-07
+  kind literal
+  level error
+  deny-text ^(https?://|\d+\.\d+\.\d+\.\d+|localhost|[a-z0-9.-]+\.(com|net|org|io|dev|local|internal)(:\d+)?$|[a-z0-9.-]*:\d+$)
+  in leaf gateway entry
+  files code
+  reason One build must run in each environment.
+  source The Twelve-Factor App, Config (https://12factor.net/config); The Twelve-Factor App, Backing services (https://12factor.net/backing-services); Vulcan Language Specification, Draft 0 (input/spec.md)
 
 rule DEP-LIBRARY
   kind depends

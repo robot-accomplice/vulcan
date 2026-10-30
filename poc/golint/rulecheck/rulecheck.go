@@ -4,12 +4,15 @@
 package rulecheck
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"golang.org/x/tools/go/analysis"
@@ -23,7 +26,7 @@ import (
 // Analyzer is A9.
 var Analyzer = &analysis.Analyzer{
 	Name: "rules",
-	Doc:  "apply the team's rules file, rules.vulcan: forbid-call, only-in, depends, and transitions (VL0801 to VL0806)",
+	Doc:  "apply the team's rules file, rules.vulcan: forbid-call, only-in, depends, transitions, declaration, call-form, literal, and code-form (VL0801 to VL0810)",
 	Run:  run,
 }
 
@@ -60,6 +63,9 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	if u.Manifest {
 		problems(pass, u, set)
+		for _, f := range set.CheckDecls(manifestDecls(pass)) {
+			emit(pass, f.At.(token.Pos), f)
+		}
 		return nil, nil
 	}
 	if u.Part == nil {
@@ -68,18 +74,197 @@ func run(pass *analysis.Pass) (any, error) {
 	parts := partsOf(u.M)
 	if u.Part.Kind == model.Main {
 		for _, f := range set.CheckWires(parts, Wires(u.M, pass.TypesInfo, plainFiles(pass))) {
-			model.Report(pass, f.At.(token.Pos), "VL"+f.Code, "%s", f.Msg)
+			emit(pass, f.At.(token.Pos), f)
 		}
 		return nil, nil
+	}
+	for _, f := range set.CheckDecls(libraryDecl(pass, u)) {
+		emit(pass, f.At.(token.Pos), f)
 	}
 	unit := &rules.Unit{
 		Part: parts[u.Part.Dir], Module: u.M.Module, Parts: parts, Fset: pass.Fset, Files: pass.Files, Info: pass.TypesInfo,
 		IsTest: func(f *ast.File) bool { return model.IsTest(pass, f) },
+		Ports:  portsOf(pass, u), TestsAbsent: testsAbsent(pass, u),
+		HasEnsures: func(fd *ast.FuncDecl) bool {
+			return len(model.PrologueOf(pass.TypesInfo, fd.Body, u.M.ContractPath()).Ensures) > 0
+		},
 	}
 	for _, f := range set.CheckUnit(unit) {
-		model.Report(pass, f.At.(token.Pos), "VL"+f.Code, "%s", f.Msg)
+		emit(pass, f.At.(token.Pos), f)
 	}
 	return nil, nil
+}
+
+var warned sync.Map
+
+// emit reports a finding. A go/analysis driver has no warning level, and a diagnostic fails the
+// check, so a rule with level warn prints its finding and leaves the check to pass.
+func emit(pass *analysis.Pass, at token.Pos, f rules.Finding) {
+	if !f.Warn {
+		model.Report(pass, at, "VL"+f.Code, "%s", f.Msg)
+		return
+	}
+	line := fmt.Sprintf("%s: warning VL%s %s", pass.Fset.Position(at), f.Code, f.Msg)
+	if _, dup := warned.LoadOrStore(line, true); !dup {
+		fmt.Fprintln(os.Stderr, line)
+	}
+}
+
+// testsAbsent reports a package whose test files this pass does not hold: the driver reads each
+// package without its tests too.
+func testsAbsent(pass *analysis.Pass, u *model.Unit) bool {
+	for _, f := range pass.Files {
+		if model.IsTest(pass, f) {
+			return false
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(u.M.Root, filepath.FromSlash(u.Dir)))
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), "_test.go") {
+			return true
+		}
+	}
+	return false
+}
+
+// portsOf gives the exported interfaces of ports.go, with the contracts of their wrappers.
+func portsOf(pass *analysis.Pass, u *model.Unit) []rules.Port {
+	if !u.Part.IsLeaf() {
+		return nil
+	}
+	info := pass.TypesInfo
+	requires := map[string]bool{}
+	var out []rules.Port
+	for _, f := range pass.Files {
+		if model.FileName(pass, f) != "ports.go" {
+			continue
+		}
+		for _, d := range f.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if !ok || fd.Recv == nil || len(fd.Recv.List) != 1 {
+				continue
+			}
+			if tn := model.NamedOf(info.TypeOf(fd.Recv.List[0].Type)); tn != nil && len(model.PrologueOf(info, fd.Body, u.M.ContractPath()).Requires) > 0 {
+				requires[strings.TrimPrefix(tn.Name(), "checked")+"."+fd.Name.Name] = true
+			}
+		}
+		for _, d := range f.Decls {
+			gd, ok := d.(*ast.GenDecl)
+			if !ok || gd.Tok != token.TYPE {
+				continue
+			}
+			for _, sp := range gd.Specs {
+				ts := sp.(*ast.TypeSpec)
+				it, ok := ts.Type.(*ast.InterfaceType)
+				if !ok || !ts.Name.IsExported() {
+					continue
+				}
+				obj := info.Defs[ts.Name]
+				if obj == nil {
+					continue
+				}
+				iface, ok := obj.Type().Underlying().(*types.Interface)
+				if !ok {
+					continue
+				}
+				p := rules.Port{Name: ts.Name.Name, Type: obj.Type(), At: ts.Name.Pos(), Doc: gd.Doc != nil || ts.Doc != nil}
+				for _, fd := range it.Methods.List {
+					for _, id := range fd.Names {
+						pm := rules.PortMethod{Name: id.Name, At: id.Pos(), Doc: fd.Doc != nil || fd.Comment != nil, Requires: requires[ts.Name.Name+"."+id.Name]}
+						for i := range iface.NumExplicitMethods() {
+							if m := iface.ExplicitMethod(i); m.Name() == id.Name {
+								pm.Sig = m.Type().(*types.Signature)
+							}
+						}
+						p.Methods = append(p.Methods, pm)
+					}
+				}
+				out = append(out, p)
+			}
+		}
+	}
+	return out
+}
+
+// libraryDecl gives the library that a pass reads, with whether it has a package comment.
+func libraryDecl(pass *analysis.Pass, u *model.Unit) []rules.Decl {
+	if u.Part.Kind != model.Library || rules.IsRuntimeLib(u.Dir) {
+		return nil
+	}
+	d := rules.Decl{What: "library", Name: path.Base(u.Dir), At: token.NoPos}
+	for _, f := range pass.Files {
+		if model.IsTest(pass, f) {
+			continue
+		}
+		if !d.At.(token.Pos).IsValid() {
+			d.At = f.Package
+		}
+		d.Commented = d.Commented || f.Doc != nil
+	}
+	return []rules.Decl{d}
+}
+
+// manifestDecls gives the externals and the entries of the check configuration.
+func manifestDecls(pass *analysis.Pass) []rules.Decl {
+	var out []rules.Decl
+	for _, f := range pass.Files {
+		for _, d := range f.Decls {
+			gd, ok := d.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, sp := range gd.Specs {
+				vs, ok := sp.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				if t, ok := vs.Type.(*ast.Ident); ok && gd.Tok == token.CONST && t.Name == "External" {
+					for _, id := range vs.Names {
+						out = append(out, rules.Decl{What: "external", Name: id.Name, Commented: gd.Doc != nil || vs.Doc != nil || vs.Comment != nil, At: id.Pos()})
+					}
+				}
+				if gd.Tok != token.VAR {
+					continue
+				}
+				for i, id := range vs.Names {
+					if id.Name != "Config" || i >= len(vs.Values) {
+						continue
+					}
+					lit, ok := vs.Values[i].(*ast.CompositeLit)
+					if !ok {
+						continue
+					}
+					for _, e := range lit.Elts {
+						kv, ok := e.(*ast.KeyValueExpr)
+						if !ok {
+							continue
+						}
+						list, ok := kv.Value.(*ast.CompositeLit)
+						if !ok {
+							continue
+						}
+						for _, x := range list.Elts {
+							line := pass.Fset.Position(x.Pos()).Line
+							commented := false
+							for _, cg := range f.Comments {
+								for _, c := range cg.List {
+									if l := pass.Fset.Position(c.End()).Line; l == line || l == line-1 {
+										commented = true
+									}
+								}
+							}
+							name := strings.Trim(types.ExprString(x), `"`)
+							out = append(out, rules.Decl{What: "config-entry", Name: name, Commented: commented, At: x.Pos()})
+						}
+					}
+				}
+			}
+		}
+	}
+	return out
 }
 
 func plainFiles(pass *analysis.Pass) []*ast.File {
@@ -164,11 +349,24 @@ func Wires(m *model.Manifest, info *types.Info, files []*ast.File) []rules.Edge 
 					continue // VL0104
 				}
 				if sup := provider(m, info, from, a, 0); sup != "" && sup != need.Dir {
-					out = append(out, rules.Edge{From: need.Dir, To: sup, Via: "wire", At: a.Pos()})
+					out = append(out, rules.Edge{From: need.Dir, To: sup, Via: "wire", At: a.Pos(), Methods: portMethods(params.At(i).Type())})
 				}
 			}
 			return true
 		})
+	}
+	return out
+}
+
+func portMethods(t types.Type) []rules.PortMethod {
+	iface, ok := t.Underlying().(*types.Interface)
+	if !ok {
+		return nil
+	}
+	var out []rules.PortMethod
+	for i := range iface.NumExplicitMethods() {
+		m := iface.ExplicitMethod(i)
+		out = append(out, rules.PortMethod{Name: m.Name(), Sig: m.Type().(*types.Signature)})
 	}
 	return out
 }

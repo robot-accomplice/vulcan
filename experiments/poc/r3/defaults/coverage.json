@@ -18,9 +18,11 @@
   },
   {
    "id": "ARCH-03",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ARCH-03"
+   ],
+   "reason": null
   },
   {
    "id": "ARCH-04",
@@ -38,9 +40,11 @@
   },
   {
    "id": "ARCH-06",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ARCH-06"
+   ],
+   "reason": null
   },
   {
    "id": "ARCH-07",
@@ -140,9 +144,11 @@
   },
   {
    "id": "ARCH-21",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ARCH-21"
+   ],
+   "reason": null
   },
   {
    "id": "ARCH-22",
@@ -170,9 +176,11 @@
   },
   {
    "id": "ERR-01",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ERR-01"
+   ],
+   "reason": null
   },
   {
    "id": "ERR-02",
@@ -182,15 +190,19 @@
   },
   {
    "id": "ERR-03",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ERR-03"
+   ],
+   "reason": null
   },
   {
    "id": "ERR-04",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ERR-04"
+   ],
+   "reason": null
   },
   {
    "id": "ERR-05",
@@ -220,9 +232,11 @@
   },
   {
    "id": "ERR-09",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ERR-09"
+   ],
+   "reason": null
   },
   {
    "id": "ERR-10",
@@ -244,9 +258,11 @@
   },
   {
    "id": "ERR-13",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "ERR-13"
+   ],
+   "reason": null
   },
   {
    "id": "ERR-14",
@@ -262,21 +278,27 @@
   },
   {
    "id": "CTX-01",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CTX-01"
+   ],
+   "reason": null
   },
   {
    "id": "CTX-02",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CTX-02"
+   ],
+   "reason": null
   },
   {
    "id": "CTX-03",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CTX-03"
+   ],
+   "reason": null
   },
   {
    "id": "CTX-04",
@@ -300,15 +322,21 @@
   },
   {
    "id": "CTX-07",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "CTX-07"
+   ],
+   "reason": "meaning",
+   "not_stated_part": "The unexported key type is stated. Whether a value holds only request-scoped data is for a person to judge."
   },
   {
    "id": "CTX-08",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "CTX-08"
+   ],
+   "reason": "whole-program",
+   "not_stated_part": "A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, and L's analyzers read one package at a time."
   },
   {
    "id": "CTX-09",
@@ -318,21 +346,21 @@
   },
   {
    "id": "HTTP-01",
-   "status": "partly",
+   "status": "stated",
    "entries": [
-    "HTTP-01"
+    "HTTP-01",
+    "HTTP-01.timeouts"
    ],
-   "reason": "shape",
-   "not_stated_part": "The ban on the package-level functions is stated. That the four timeouts of `http.Server` are set is a value of a field, which no kind reads."
+   "reason": null
   },
   {
    "id": "HTTP-02",
-   "status": "partly",
+   "status": "stated",
    "entries": [
-    "HTTP-02"
+    "HTTP-02",
+    "HTTP-02.timeout"
    ],
-   "reason": "shape",
-   "not_stated_part": "The ban on the package-level functions and on `http.DefaultClient` is stated. That a client has a non-zero `Timeout` is a value of a field, which no kind reads."
+   "reason": null
   },
   {
    "id": "HTTP-03",
@@ -374,9 +402,12 @@
   },
   {
    "id": "HTTP-09",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "HTTP-09"
+   ],
+   "reason": "meaning",
+   "not_stated_part": "That a client sets `CheckRedirect` is stated. Whether that function checks the target against an allow-list is for a person to judge."
   },
   {
    "id": "HTTP-10",
@@ -386,9 +417,11 @@
   },
   {
    "id": "HTTP-11",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "HTTP-11"
+   ],
+   "reason": null
   },
   {
    "id": "HTTP-12",
@@ -398,9 +431,11 @@
   },
   {
    "id": "HTTP-13",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "HTTP-13"
+   ],
+   "reason": null
   },
   {
    "id": "HTTP-14",
@@ -422,9 +457,11 @@
   },
   {
    "id": "HTTP-17",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "HTTP-17"
+   ],
+   "reason": null
   },
   {
    "id": "HTTP-18",
@@ -452,15 +489,21 @@
   },
   {
    "id": "SEC-01",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "SEC-01"
+   ],
+   "reason": "meaning",
+   "not_stated_part": "A string in the code that has the form of a key, or that a name marks as a secret, is stated. Declaration files and fixtures are not read, and only a person can say that a value is real."
   },
   {
    "id": "SEC-02",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "SEC-02"
+   ],
+   "reason": "meaning",
+   "not_stated_part": "A settings field whose name shows a credential is stated. A credential under another name is not found, as the wishlist's note says."
   },
   {
    "id": "SEC-03",
@@ -488,9 +531,11 @@
   },
   {
    "id": "SEC-07",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "SEC-07"
+   ],
+   "reason": null
   },
   {
    "id": "SEC-08",
@@ -675,9 +720,11 @@
   },
   {
    "id": "DATA-03",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "DATA-03"
+   ],
+   "reason": null
   },
   {
    "id": "DATA-04",
@@ -741,9 +788,12 @@
   },
   {
    "id": "DATA-14",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "DATA-14"
+   ],
+   "reason": "meaning",
+   "not_stated_part": "A value whose name shows a time or a period is stated. A value under another name is not found, as the wishlist's note says."
   },
   {
    "id": "DATA-15",
@@ -755,9 +805,12 @@
   },
   {
    "id": "PAY-01",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "PAY-01"
+   ],
+   "reason": "project-facts",
+   "not_stated_part": "A float whose name shows money is stated. The name of the project's money type would give a stronger check, as the wishlist's note says."
   },
   {
    "id": "PAY-02",
@@ -931,9 +984,12 @@
   },
   {
    "id": "RES-02",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "RES-02"
+   ],
+   "reason": "flow",
+   "not_stated_part": "A loop that calls `time.Sleep` is stated: it needs a condition, a growing wait, and a random value in its function. A retry in another form is not found, as the wishlist's note says, and that the wait grows or is random is read from the form only."
   },
   {
    "id": "RES-03",
@@ -979,9 +1035,11 @@
   },
   {
    "id": "CONC-03",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CONC-03"
+   ],
+   "reason": null
   },
   {
    "id": "CONC-04",
@@ -1017,9 +1075,11 @@
   },
   {
    "id": "OBS-02",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "OBS-02"
+   ],
+   "reason": null
   },
   {
    "id": "OBS-03",
@@ -1098,21 +1158,27 @@
   },
   {
    "id": "CON-01",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "CON-01"
+   ],
+   "reason": "meaning",
+   "not_stated_part": "That a clause exists is stated, on each port method that takes arguments and whose name does not show a read. Whether a method changes state, and whether a clause is enough, are for a person to judge."
   },
   {
    "id": "CON-02",
    "status": "not-stated",
    "entries": [],
-   "reason": "shape"
+   "reason": "meaning",
+   "note": "Moved from shape. Which rule must stop an effect is what the code means. A kind can read a clause, not its purpose."
   },
   {
    "id": "CON-03",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CON-03"
+   ],
+   "reason": null
   },
   {
    "id": "CON-04",
@@ -1128,33 +1194,44 @@
   },
   {
    "id": "CODE-02",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CODE-02"
+   ],
+   "reason": null
   },
   {
    "id": "CODE-03",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CODE-03"
+   ],
+   "reason": null
   },
   {
    "id": "CODE-04",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CODE-04"
+   ],
+   "reason": null
   },
   {
    "id": "CODE-05",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CODE-05.json",
+    "CODE-05.xml"
+   ],
+   "reason": null
   },
   {
    "id": "CODE-06",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CODE-06"
+   ],
+   "reason": null
   },
   {
    "id": "CODE-07",
@@ -1164,15 +1241,20 @@
   },
   {
    "id": "CODE-08",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "CODE-08"
+   ],
+   "reason": null
   },
   {
    "id": "CODE-09",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "CODE-09"
+   ],
+   "reason": "whole-program",
+   "not_stated_part": "Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, and L's analyzers read one package at a time."
   },
   {
    "id": "CODE-10",
@@ -1182,9 +1264,13 @@
   },
   {
    "id": "CODE-11",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "CODE-11.deprecated",
+    "CODE-11.unused"
+   ],
+   "reason": "whole-program",
+   "not_stated_part": "A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, and an unused method or field is not read."
   },
   {
    "id": "TEST-01",
@@ -1206,9 +1292,11 @@
   },
   {
    "id": "TEST-04",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "stated",
+   "entries": [
+    "TEST-04"
+   ],
+   "reason": null
   },
   {
    "id": "TEST-05",
@@ -1292,9 +1380,12 @@
   },
   {
    "id": "BLD-07",
-   "status": "not-stated",
-   "entries": [],
-   "reason": "shape"
+   "status": "partly",
+   "entries": [
+    "BLD-07"
+   ],
+   "reason": "meaning",
+   "not_stated_part": "An address or a host name in a string of a leaf is stated. Whether any other value is specific to a deployment is for a person to judge."
   },
   {
    "id": "BLD-08",

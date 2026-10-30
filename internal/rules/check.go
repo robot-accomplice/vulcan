@@ -32,9 +32,10 @@ func selected(words []string, p Part) bool {
 
 // Edge is one dependency between parts.
 type Edge struct {
-	From, To string // directories
-	Via      string // "wire" or "import"
-	At       any    // where to report it; the caller gives it, and gets it back
+	From, To string       // directories
+	Via      string       // "wire" or "import"
+	At       any          // where to report it; the caller gives it, and gets it back
+	Methods  []PortMethod // of the port, for a wire
 }
 
 // Finding is one thing that a rule rejects.
@@ -42,6 +43,7 @@ type Finding struct {
 	Code string // the digits: 0802 is K0802 in V and VL0802 in L
 	At   any    // a token.Pos, or the At of an Edge
 	Msg  string
+	Warn bool // the rule has level warn: it reports, and the check still passes
 }
 
 // Set is what a check reads: the rules that are on, and the lock.
@@ -62,7 +64,7 @@ func Load(root string) *Set {
 	s := &Set{}
 	s.File, s.Probs = ParseProject(b)
 	for _, r := range s.File.Rules {
-		if r.Level == Error {
+		if r.Level == Error || r.Level == Warn {
 			s.on = append(s.on, r)
 		}
 	}
@@ -119,7 +121,12 @@ type Unit struct {
 	// imports of component.vulcan, as L's ports.go has them.
 	PortFiles []*ast.File
 	Info      *types.Info
-	IsTest    func(*ast.File) bool
+	// Ports are the ports of the leaf. HasEnsures says whether a function has an ensures clause.
+	// TestsAbsent says that the package has tests, and this load left them out.
+	Ports       []Port
+	HasEnsures  func(*ast.FuncDecl) bool
+	TestsAbsent bool
+	IsTest      func(*ast.File) bool
 }
 
 func (u *Unit) fileIn(r *Rule, f *ast.File) bool {
@@ -137,20 +144,22 @@ func (r *Rule) tail() string {
 // CheckUnit applies the rules that read the code of one package. A rule does not read a main
 // package: in V, main is generated, so a rule that fired on L's main would have no equal in V.
 func (s *Set) CheckUnit(u *Unit) []Finding {
-	if s == nil || u.Part.Kind == "main" {
+	if s == nil || u.Part.Kind == "main" || IsRuntimeLib(u.Part.Dir) {
 		return nil
 	}
 	var out []Finding
 	seen := map[string]bool{}
+	var cur *Rule
 	add := func(code string, at token.Pos, format string, args ...any) {
 		msg := fmt.Sprintf(format, args...)
 		key := fmt.Sprint(code, at, msg)
 		if !seen[key] {
 			seen[key] = true
-			out = append(out, Finding{code, at, msg})
+			out = append(out, Finding{code, at, msg, cur.Level == Warn})
 		}
 	}
 	for _, r := range s.on {
+		cur = r
 		switch r.Kind {
 		case "forbid-call":
 			if (len(r.Params["in"]) == 0 || selected(r.Params["in"], u.Part)) && !selected(r.Params["except"], u.Part) {
@@ -164,6 +173,14 @@ func (s *Set) CheckUnit(u *Unit) []Finding {
 			u.imports(r, s.Lock, add)
 		case "transitions":
 			u.transitions(r, add)
+		case "declaration":
+			u.declaration(r, add)
+		case "call-form":
+			u.callForm(r, add)
+		case "literal":
+			u.literal(r, add)
+		case "code-form":
+			u.codeForm(r, add)
 		}
 	}
 	return out
@@ -324,13 +341,16 @@ func (s *Set) CheckWires(parts map[string]Part, wires []Edge) []Finding {
 	}
 	var out []Finding
 	for _, r := range s.on {
+		if r.Kind == "declaration" && slices.Contains(r.Params["at"], "wired-port") {
+			out = append(out, wiredPorts(r, parts, wires)...)
+		}
 		if r.Kind != "depends" {
 			continue
 		}
 		for _, e := range wires {
 			if len(r.Params["map"]) > 0 {
 				if s.Lock != nil && !s.Lock[e.key()] {
-					out = append(out, Finding{"0806", e.At, newDep(e) + ": " + r.tail()})
+					out = append(out, Finding{"0806", e.At, newDep(e) + ": " + r.tail(), r.Level == Warn})
 				}
 				continue
 			}
@@ -339,7 +359,7 @@ func (s *Set) CheckWires(parts map[string]Part, wires []Edge) []Finding {
 				continue
 			}
 			if selected(r.Params["from"], from) && !selected(r.Params["except"], from) && (len(r.Params["deny"])+len(r.Params["allow"]) > 0) && edgeDenied(r, to) {
-				out = append(out, Finding{"0804", e.At, fmt.Sprintf("a wire makes %s (%s) depend on %s (%s), which a rule forbids: %s", e.From, from.Kind, e.To, to.Kind, r.tail())})
+				out = append(out, Finding{"0804", e.At, fmt.Sprintf("a wire makes %s (%s) depend on %s (%s), which a rule forbids: %s", e.From, from.Kind, e.To, to.Kind, r.tail()), r.Level == Warn})
 			}
 		}
 	}

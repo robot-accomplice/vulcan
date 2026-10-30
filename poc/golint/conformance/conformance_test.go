@@ -57,6 +57,9 @@ func TestMain(m *testing.M) {
 // diagRE reads a line of the command's output: file:line:col: VL0101 message.
 var diagRE = regexp.MustCompile(`^(.+?):(\d+):(\d+): (VL\d{4}) `)
 
+// warnRE reads a finding of a rule with level warn, which fails no check.
+var warnRE = regexp.MustCompile(`^(.+?):(\d+):(\d+): warning (VL\d{4}) `)
+
 // Lint runs vulcan-lint ./... in dir and returns its diagnostics as "path:line:col CODE", with
 // paths relative to dir, and the whole output.
 func Lint(t *testing.T, dir string) ([]string, string) {
@@ -75,6 +78,11 @@ func Lint(t *testing.T, dir string) ([]string, string) {
 	seen := map[string]bool{}
 	for _, line := range strings.Split(out.String(), "\n") {
 		m := diagRE.FindStringSubmatch(strings.TrimSpace(line))
+		prefix := ""
+		if m == nil {
+			m = warnRE.FindStringSubmatch(strings.TrimSpace(line))
+			prefix = "warn "
+		}
 		if m == nil {
 			continue
 		}
@@ -82,7 +90,7 @@ func Lint(t *testing.T, dir string) ([]string, string) {
 		if err != nil {
 			rel = m[1]
 		}
-		d := filepath.ToSlash(rel) + ":" + m[2] + ":" + m[3] + " " + m[4]
+		d := prefix + filepath.ToSlash(rel) + ":" + m[2] + ":" + m[3] + " " + m[4]
 		if !seen[d] {
 			seen[d] = true
 			got = append(got, d)
@@ -121,6 +129,8 @@ func TestConformance(t *testing.T) {
 						accept = true
 					case len(fields) == 3 && fields[0] == "error":
 						want = append(want, fields[1]+" "+fields[2])
+					case len(fields) == 3 && fields[0] == "warn":
+						want = append(want, "warn "+fields[1]+" "+fields[2])
 					case len(fields) > 0:
 						t.Fatalf("bad want line %q", line)
 					}

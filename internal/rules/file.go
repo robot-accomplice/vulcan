@@ -23,6 +23,7 @@ const (
 // The levels of a rule.
 const (
 	Error = "error"
+	Warn  = "warn"
 	Off   = "off"
 )
 
@@ -72,6 +73,10 @@ var params = map[string][]string{
 	"only-in":     {"effect!", "in!", "files"},
 	"depends":     {"from", "except", "deny", "allow", "packages", "via", "map", "files"},
 	"transitions": {"type!", "field!", "allow!", "initial", "load"},
+	"declaration": {"at!", "names", "except-names", "types", "deny-types", "deny-names", "require", "to", "in", "except", "files"},
+	"call-form":   {"funcs", "param-type", "arg", "require", "deny-text", "require-text", "unless-comment", "in", "except", "files"},
+	"literal":     {"type", "require", "deny", "below", "deny-text", "names", "in", "except", "files"},
+	"code-form":   {"form!", "limit", "similarity", "funcs", "deferred-ok", "unless-comment", "in", "except", "files"},
 }
 
 // Kinds lists the rule kinds.
@@ -177,8 +182,8 @@ func (r *Rule) check(bad func(string, ...any)) {
 		bad("rule %s has the kind %q; the kinds are %s", r.ID, r.Kind, strings.Join(Kinds(), ", "))
 		return
 	}
-	if r.Level != Error && r.Level != Off {
-		bad("rule %s has the level %q; a level is error or off", r.ID, r.Level)
+	if r.Level != Error && r.Level != Warn && r.Level != Off {
+		bad("rule %s has the level %q; a level is error, warn, or off", r.ID, r.Level)
 	}
 	if r.Reason == "" {
 		bad("rule %s has no reason: a reason in one line", r.ID)
@@ -205,7 +210,7 @@ func (r *Rule) check(bad func(string, ...any)) {
 		}
 	}
 	for _, key := range []string{"in", "except", "from", "deny", "allow", "load"} {
-		if r.Kind == "transitions" && key == "allow" {
+		if r.Kind == "transitions" && key == "allow" || r.Kind == "literal" && key == "deny" {
 			continue
 		}
 		for _, v := range r.Params[key] {
@@ -225,6 +230,8 @@ func (r *Rule) check(bad func(string, ...any)) {
 		r.checkDepends(bad)
 	case "transitions":
 		r.checkTransitions(bad)
+	case "declaration", "call-form", "literal", "code-form":
+		r.checkShape(bad)
 	}
 }
 
