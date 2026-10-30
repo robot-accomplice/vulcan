@@ -6,9 +6,9 @@ This list is a result of plan-r3, section 4: it says what the four rule kinds ca
 
 | Status | Wanted rules |
 |---|---:|
-| Stated by the kinds | 15 |
-| Stated in part | 3 |
-| Not stated | 192 |
+| Stated by the kinds | 43 |
+| Stated in part | 13 |
+| Not stated | 154 |
 | Total | 210 |
 
 `defaults v1` also holds the 4 dependency rules of plan-r3, section 3 (`DEP-LIBRARY`, `DEP-GATEWAY`, `DEP-ENTRY`, and `DEP-LOCK`, which is off). The wishlist does not ask for them.
@@ -19,33 +19,132 @@ Two stated rules are wider than their wanted text, because a kind cannot see a p
 
 Four stated rules hold a finite list where the wanted text is open or says "such as": `ARCH-19` (Appendix D's global mutators), `CTX-06` (the forms without a context in the standard library), and `ARCH-10` and `ARCH-11` (Appendix D's network functions, with holes H3 and H7).
 
+Stated forms that hold a finite list, or are wider than the words, for the same reason: `ERR-13` reads `errors.New` and `fmt.Errorf` only. `HTTP-13` reads the patterns of `http.ServeMux`, where a method in the pattern gives 405 for the others. `HTTP-17` reads each cookie of an entry leaf, not only a session cookie. `ERR-01` allows a bare `defer` of a listed `Close` or `Rollback`, and it cannot tell a read handle from a write handle. `CON-03` lists its effects and adds each port call. `CODE-08` holds for each exported name, also a struct field and an interface method. `CODE-08` and `CON-01` name no topic, because release 1 has none.
+
+`HTTP-01` and `HTTP-02` were stated in part, with "shape" as the reason for the rest. The kind `literal` states the rest, so both are now stated. They were not among the 39.
+
 ## Not stated, by reason
 
 | Reason | Wanted rules | Meaning |
 |---|---:|---|
 | model | 5 | The model check enforces it, and no rule kind states it, so it is not in the rules file and a team cannot delete it there. |
-| shape | 39 | It is a shape of the code (a form of syntax, a type, a field value, a name, or a comment). No kind reads that shape. |
 | flow | 33 | It needs the flow of a value or the paths of a function. `transitions` follows one status field only, and no other kind follows flow. |
-| meaning | 53 | Only a person or a reviewing model can judge it. It depends on what the code means. |
+| meaning | 54 | Only a person or a reviewing model can judge it. It depends on what the code means. |
 | run-time | 16 | Only a test, a probe, or the deployment shows a breach, when the code runs. |
 | project-facts | 21 | It needs the facts of one project. A ruleset written before a project exists cannot name them. |
 | outside-source | 14 | It is about CI, the repository, or a process, which a check of the source does not read. |
 | declaration | 3 | It is about a declaration of the system (a config key or an external). No kind reads declarations. |
 | deferred | 8 | It is about topics, remote ports, or transports, which release 1 defers. |
 
+## Stated in part, by the reason for the rest
+
+| Reason | Wanted rules |
+|---|---:|
+| flow | 1 |
+| meaning | 7 |
+| project-facts | 1 |
+| outside-source | 1 |
+| whole-program | 3 |
+
+## The 39 wanted rules of amendment 6
+
+| Rule | Outcome | Entries |
+|---|---|---|
+| ARCH-03 | stated | `ARCH-03` |
+| ARCH-06 | stated | `ARCH-06` |
+| ARCH-21 | stated | `ARCH-21` |
+| ERR-01 | stated | `ERR-01` |
+| ERR-03 | stated | `ERR-03` |
+| ERR-04 | stated | `ERR-04` |
+| ERR-09 | stated | `ERR-09` |
+| ERR-13 | stated | `ERR-13` |
+| CTX-01 | stated | `CTX-01` |
+| CTX-02 | stated | `CTX-02` |
+| CTX-03 | stated | `CTX-03` |
+| CTX-07 | in part (meaning) | `CTX-07` |
+| CTX-08 | in part (whole-program) | `CTX-08` |
+| HTTP-09 | in part (meaning) | `HTTP-09` |
+| HTTP-11 | stated | `HTTP-11` |
+| HTTP-13 | stated | `HTTP-13` |
+| HTTP-17 | stated | `HTTP-17` |
+| SEC-01 | in part (meaning) | `SEC-01` |
+| SEC-02 | in part (meaning) | `SEC-02` |
+| SEC-07 | stated | `SEC-07` |
+| DATA-03 | stated | `DATA-03` |
+| DATA-14 | in part (meaning) | `DATA-14` |
+| PAY-01 | in part (project-facts) | `PAY-01` |
+| RES-02 | in part (flow) | `RES-02` |
+| CONC-03 | stated | `CONC-03` |
+| OBS-02 | stated | `OBS-02` |
+| CON-01 | in part (meaning) | `CON-01` |
+| CON-02 | not stated (meaning) |  |
+| CON-03 | stated | `CON-03` |
+| CODE-02 | stated | `CODE-02` |
+| CODE-03 | stated | `CODE-03` |
+| CODE-04 | stated | `CODE-04` |
+| CODE-05 | stated | `CODE-05.json`, `CODE-05.xml` |
+| CODE-06 | stated | `CODE-06` |
+| CODE-08 | stated | `CODE-08` |
+| CODE-09 | in part (whole-program) | `CODE-09` |
+| CODE-11 | in part (whole-program) | `CODE-11.deprecated`, `CODE-11.unused` |
+| TEST-04 | stated | `TEST-04` |
+| BLD-07 | in part (meaning) | `BLD-07` |
+
+Of the 39: 26 stated, 12 in part, 1 not stated.
+
 ## Stated in part
 
-**HTTP-01.** An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`.
+**CTX-07.** Context values use an unexported key type and hold only request-scoped data, not optional parameters.
 
-- Reason: shape. The ban on the package-level functions is stated. That the four timeouts of `http.Server` are set is a value of a field, which no kind reads.
+- Reason: meaning. The unexported key type is stated. Whether a value holds only request-scoped data is for a person to judge.
 
-**HTTP-02.** A gateway uses an `http.Client` with a non-zero `Timeout`, and does not call `http.Get`, `http.Post`, `http.Head`, `http.PostForm`, or `http.DefaultClient`.
+**CTX-08.** A port method whose provider reaches a network or acquiring function takes `context.Context` as its first parameter.
 
-- Reason: shape. The ban on the package-level functions and on `http.DefaultClient` is stated. That a client has a non-zero `Timeout` is a value of a field, which no kind reads.
+- Reason: whole-program. A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, and L's analyzers read one package at a time.
+
+**HTTP-09.** A gateway does not follow a redirect automatically, unless it checks the target against an allow-list.
+
+- Reason: meaning. That a client sets `CheckRedirect` is stated. Whether that function checks the target against an allow-list is for a person to judge.
+
+**SEC-01.** Source files, declaration files, and test fixtures hold no real secret, key, or password.
+
+- Reason: meaning. A string in the code that has the form of a key, or that a name marks as a secret, is stated. Declaration files and fixtures are not read, and only a person can say that a value is real.
+
+**SEC-02.** A settings field that holds a credential has the tag `vulcan:"secret"`.
+
+- Reason: meaning. A settings field whose name shows a credential is stated. A credential under another name is not found, as the wishlist's note says.
+
+**DATA-14.** Code uses `time.Time` for instants and `time.Duration` for periods, not integers or strings.
+
+- Reason: meaning. A value whose name shows a time or a period is stated. A value under another name is not found, as the wishlist's note says.
+
+**PAY-01.** A money amount is an integer in the currency's smallest unit, or an exact decimal, and is never `float32` or `float64`.
+
+- Reason: project-facts. A float whose name shows money is stated. The name of the project's money type would give a stronger check, as the wishlist's note says.
+
+**RES-02.** A retry loop has a limit on attempts, exponential backoff, and jitter.
+
+- Reason: flow. A loop that calls `time.Sleep` is stated: it needs a condition, a growing wait, and a random value in its function. A retry in another form is not found, as the wishlist's note says, and that the wait grows or is random is read from the form only.
 
 **API-04.** A production build exposes no debug or profiling route, and each old API version has an owner and an end date.
 
 - Reason: outside-source. The ban on the debug and profiling packages is stated, in every build. An owner and an end date for each old API version are not in the source.
+
+**CON-01.** A port method that changes state declares a `requires` for the limits of its arguments.
+
+- Reason: meaning. That a clause exists is stated, on each port method that takes arguments and whose name does not show a read. Whether a method changes state, and whether a clause is enough, are for a person to judge.
+
+**CODE-09.** Near-duplicate functions become one function, in the leaf or in a library.
+
+- Reason: whole-program. Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, and L's analyzers read one package at a time.
+
+**CODE-11.** Code does not use a deprecated function, and has no unused name.
+
+- Reason: whole-program. A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, and an unused method or field is not read.
+
+**BLD-07.** Each deployment-specific value comes from a flag or from the environment, and leaf code holds no address or hostname literal.
+
+- Reason: meaning. An address or a host name in a string of a leaf is stated. Whether any other value is specific to a deployment is for a person to judge.
 
 ## model
 
@@ -54,48 +153,6 @@ Four stated rules hold a finite list where the wanted text is open or says "such
 - **ARCH-09.** A type that crosses a boundary comes from a library or the standard library. *K0112 and VL0112.*
 - **ARCH-12.** Each container has one gateway leaf for each external system that it talks to. *K0207 and VL0207.*
 - **ARCH-18.** A package-level `var` in a library holds no pointer, slice, map, channel, function, or interface, except an `error`. *K0210 and VL0210, in strict mode.*
-
-## shape
-
-- **ARCH-03.** A port signature does not carry `*http.Request`, `http.ResponseWriter`, `*http.Response`, `*sql.DB`, `*sql.Tx`, `*sql.Rows`, or `net.Conn`.
-- **ARCH-06.** Each entry in `strict_exempt`, `strict_interfaces`, `strict_shared`, `allow_network`, and `allow_acquiring` has a comment that gives the reason.
-- **ARCH-21.** A library name is not `util`, `common`, `misc`, `helpers`, `shared`, or `base`.
-- **ERR-01.** Code does not drop an `error` result.
-- **ERR-03.** Each `_ = f()` that discards an error has a comment that gives the reason.
-- **ERR-04.** Code compares errors with `errors.Is` or `errors.As`, not with `==`, a type assertion, or the error text.
-- **ERR-09.** Each type assertion uses the two-value form.
-- **ERR-13.** Error strings start with a lower-case letter and do not end with punctuation.
-- **CTX-01.** A function that takes a `context.Context` takes it as the first parameter, named `ctx`.
-- **CTX-02.** A struct does not have a `context.Context` field.
-- **CTX-03.** Code does not pass a nil `context.Context`.
-- **CTX-07.** Context values use an unexported key type and hold only request-scoped data, not optional parameters.
-- **CTX-08.** A port method whose provider reaches a network or acquiring function takes `context.Context` as its first parameter.
-- **HTTP-09.** A gateway does not follow a redirect automatically, unless it checks the target against an allow-list.
-- **HTTP-11.** Code does not set `InsecureSkipVerify: true` or a `MinVersion` below TLS 1.2, except in test files.
-- **HTTP-13.** Each entry route accepts only the methods that it lists, and answers others with 405.
-- **HTTP-17.** Each session cookie sets `Secure`, `HttpOnly`, and `SameSite` with the value `Strict` or `Lax`.
-- **SEC-01.** Source files, declaration files, and test fixtures hold no real secret, key, or password.
-- **SEC-02.** A settings field that holds a credential has the tag `vulcan:"secret"`.
-- **SEC-07.** A SQL statement is a constant string, and each value goes in as a parameter.
-- **DATA-03.** SQL text does not hold `BEGIN`, `COMMIT`, or `ROLLBACK`.
-- **DATA-14.** Code uses `time.Time` for instants and `time.Duration` for periods, not integers or strings.
-- **PAY-01.** A money amount is an integer in the currency's smallest unit, or an exact decimal, and is never `float32` or `float64`.
-- **RES-02.** A retry loop has a limit on attempts, exponential backoff, and jitter.
-- **CONC-03.** A channel is unbuffered or has size one, unless a comment defends a larger size.
-- **OBS-02.** A log message text is constant, and variable data goes in attributes.
-- **CON-01.** A port method that changes state declares a `requires` for the limits of its arguments.
-- **CON-02.** A rule that must stop an effect is a `requires` or a check before the effect, not an `ensures` or an invariant.
-- **CON-03.** A `return` in a function with `ensures` does not itself cause an effect, such as `return tx.Commit()`.
-- **CODE-02.** Each suppression of a check names the check and gives a reason.
-- **CODE-03.** A function above a set complexity gets a warning.
-- **CODE-04.** A `switch` over a named constant set covers each value, or has a `default` with a reason.
-- **CODE-05.** A struct that code marshals has a field tag on each marshaled field.
-- **CODE-06.** An exported struct in a library does not embed another type.
-- **CODE-08.** Each port, topic, `external`, library, and exported name has a doc comment.
-- **CODE-09.** Near-duplicate functions become one function, in the leaf or in a library.
-- **CODE-11.** Code does not use a deprecated function, and has no unused name.
-- **TEST-04.** A test body has no branch or loop, apart from a loop over a table of cases.
-- **BLD-07.** Each deployment-specific value comes from a flag or from the environment, and leaf code holds no address or hostname literal.
 
 ## flow
 
@@ -183,6 +240,7 @@ Four stated rules hold a finite list where the wanted text is open or says "such
 - **API-05.** Non-production environments use no production data, unless they have the same controls.
 - **API-06.** A route's method matches its semantics: GET and HEAD are safe, and PUT and DELETE are idempotent.
 - **API-07.** Error responses use one documented format, by default RFC 9457 problem details.
+- **CON-02.** A rule that must stop an effect is a `requires` or a check before the effect, not an `ensures` or an invariant. *Moved from shape. Which rule must stop an effect is what the code means. A kind can read a clause, not its purpose.*
 - **TEST-01.** A change of behavior comes with a test in the same change, and the test fails when the code is broken.
 - **TEST-02.** A test names one behavior, and calls the leaf the way a real caller does.
 - **TEST-03.** A test checks the resulting state, and checks calls only where the call is the effect.

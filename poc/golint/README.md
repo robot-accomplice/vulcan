@@ -121,6 +121,10 @@ Vulcan's syntax, or a hole that Go closes.
 | | VL0804 | K0804 | A rule of kind `depends`, by kind, part, or package |
 | | VL0805 | K0805 | A rule of kind `transitions` |
 | | VL0806 | K0806 | A rule of kind `depends` with `map locked`: a dependency that `rules.lock` does not hold |
+| | VL0807 | K0807 | A rule of kind `declaration` |
+| | VL0808 | K0808 | A rule of kind `call-form` |
+| | VL0809 | K0809 | A rule of kind `literal` |
+| | VL0810 | K0810 | A rule of kind `code-form` |
 
 The K-codes that the desk test labels "Same (artifact)" or that Go's compiler or `go vet` already
 decide have no VL code: K0001, K0005, K0006, K0008, K0009, K0105, K0107, K0108, K0111, K0113,
@@ -143,7 +147,7 @@ real command. All pass.
 | A6 | A15, A15b, A15c, A15d, A15e, N09, N09b |
 | A7 | C02, C06, C07, C17, H4, H4b, L4, M2 |
 | A8 | C09, C10, C11, L3, M1a, M1b, M1c |
-| A2, A5, A9 | `R01` to `R65`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
+| A2, A5, A9 | `R01` to `R65`, `R70` to `R137`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
 
 Two cases map to another code in Go: P11 (a leaf that `system.vulcan` does not list, K0003) is
 VL0002, because Go has no component file, so an unlisted package is the same mistake as P10; A02
