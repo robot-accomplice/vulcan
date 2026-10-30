@@ -177,6 +177,8 @@ fixed in `agentlog`, and `harness restream` corrected the data), the usage of st
 partial (`usage_partial`), scratch files in the workspace were graded as code, and runs still
 shared `/tmp`. The [desk test](poc/desk-test-r2.md) then found every PoC check "Same in Go" (gate 0), and its hole H1 (code files named `vulcan_*` skipped every rule) is fixed. Round 2, [plan-r2.md](poc/plan-r2.md), was accepted and stopped at step 3 by its own rule: of 28 team rules written without Vulcan material, `vulcan check` and the Go linter `vulcan-lint` each enforce the same 3, against the 8 the plan requires ([labels-r2.md](../experiments/poc/labels-r2.md)). No tasks or runs were made. A diagnostic found that encoding the rules could raise the set to 7 at most, so the owner accepted the result as it stands (2026-10-30). Up to this point, Vulcan as a language shows no measured gain over the same model as a Go linter. The round's material is sealed in the archive ([archive.md](../experiments/poc/archive.md)).
 
+**Round 3 (accepted 2026-10-30):** [plan-r3.md](poc/plan-r3.md) builds a default ruleset, written at `init`, and measures it on rules written blind. [hypotheses-r3.md](poc/hypotheses-r3.md) lists 26 theories of what a language could do that a linter cannot, with a ranked shortlist. Their priors are predictions. Steps 1 to 7 of the plan go ahead, and the agent runs wait.
+
 1. **Go or no go.** Planned: milestones 0.5 and 4 of the development plan, by decision 6.
 2. **Names.** Done: decision 5, and the rename of the spec and the primer.
 3. **Optional review 10.** Reviews 8 and 9 changed much text. The trend is 55, then 29 findings,
