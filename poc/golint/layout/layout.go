@@ -38,6 +38,7 @@ func run(pass *analysis.Pass) (any, error) {
 	ignored(pass, u, first)
 	if u.Manifest {
 		manifest(pass, u)
+		unlisted(pass, u)
 		return nil, nil
 	}
 	m := u.M
@@ -84,6 +85,57 @@ func ignored(pass *analysis.Pass, u *model.Unit, first *ast.File) {
 		}
 		model.Report(pass, first.Package, "VL0901", "the build ignores %s (a build constraint or a file name for another system); every file of a package is built, so remove the constraint", filepath.ToSlash(rel))
 	}
+}
+
+// unlisted rejects a Go file in a directory that no part holds and that ./... does not list: under
+// testdata, vendor, a name that starts with _ or ., or a directory with its own go.mod. No analyzer
+// reads such a file, and the build can still use it. It is what V's K0002 says of a Go file.
+func unlisted(pass *analysis.Pass, u *model.Unit) {
+	root := u.M.Root
+	_ = filepath.WalkDir(root, func(full string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if d.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(d.Name(), ".go") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(full))
+		if err != nil {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." || !hidden(root, rel) {
+			return nil
+		}
+		b, err := os.ReadFile(full)
+		if err != nil {
+			return nil
+		}
+		tf := pass.Fset.AddFile(full, -1, len(b)+1)
+		tf.SetLinesForContent(b)
+		model.Report(pass, tf.Pos(0), "VL0002", "%s is a Go file in a directory that no part holds, and go ./... does not list it, so no rule reads it; move it into a part of the manifest (%s)", path.Join(rel, d.Name()), model.ManifestDir)
+		return nil
+	})
+}
+
+// hidden reports a directory that ./... does not list.
+func hidden(root, rel string) bool {
+	parts := strings.Split(rel, "/")
+	for i, p := range parts {
+		if p == "testdata" || p == "vendor" || strings.HasPrefix(p, "_") || strings.HasPrefix(p, ".") {
+			return true
+		}
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(strings.Join(parts[:i+1], "/")), "go.mod")); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // manifest checks the manifest itself, at its own positions.

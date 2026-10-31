@@ -64,7 +64,7 @@ Vulcan's syntax, or a hole that Go closes.
 
 | Analyzer | Code | K-code | What it rejects |
 |---|---|---|---|
-| A1 `layout` | VL0002 | K0002 | A package that the manifest does not list, or a package (or part) inside a leaf |
+| A1 `layout` | VL0002 | K0002 | A package that the manifest does not list, or a package (or part) inside a leaf; a Go file under `testdata`, `vendor`, a name that starts with `_` or `.`, or a nested module |
 | | VL0003 | K0003 | A part with no package; a library outside `lib/`, or another kind in it; `Main` not `package main`, or `package main` not `Main`; the manifest as a part |
 | | VL0004 | K0004 | A package name that is not its directory; an external test package |
 | | VL0110 | K0110 | The manifest imports a package (as `system.vulcan` importing a leaf) |
@@ -149,7 +149,7 @@ real command. All pass.
 | A6 | A15, A15b, A15c, A15d, A15e, N09, N09b |
 | A7 | C02, C06, C07, C17, H4, H4b, L4, M2 |
 | A8 | C09, C10, C11, L3, M1a, M1b, M1c |
-| A2, A5, A9 | `R01` to `R65`, `R70` to `R137`, `R140` to `R185`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
+| A2, A5, A9 | `R01` to `R65`, `R70` to `R137`, `R140` to `R185`, `R190` to `R217`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
 
 Two cases map to another code in Go: P11 (a leaf that `system.vulcan` does not list, K0003) is
 VL0002, because Go has no component file, so an unlisted package is the same mistake as P10; A02

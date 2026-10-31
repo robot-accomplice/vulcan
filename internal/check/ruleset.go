@@ -204,7 +204,7 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 	if set == nil {
 		return edges
 	}
-	set.Resolve(parts)
+	set.Resolve(parts, c.P.Module)
 	for _, p := range set.Probs {
 		c.D.Errorf(diag.Pos{File: rules.FileName, Line: p.Line, Col: 1}, "K0801", "%s", p.Msg)
 	}

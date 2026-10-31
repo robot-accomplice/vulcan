@@ -160,6 +160,54 @@ MOVED = {
     "CON-03": ("flow", IFACE),
 }
 
+# The main count uses the strict test, the sentence of rules-file.md as written: a rule that a limit
+# reaches is stated in part. So each stated rule that a limit reaches moves here too.
+VAR = "A value in a variable passes: the kind reads a constant."
+DEFINED = "A type defined from a listed type passes: it is another type."
+FINITE = "A name that the list does not hold passes."
+COMMENT = "Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge."
+MOVED.update({
+    "ERR-13": ("flow", VAR),
+    "HTTP-11": ("flow", VAR),
+    "ERR-04": ("flow", VAR),
+    "CTX-03": ("flow", VAR),
+    "ARCH-03": ("shape", DEFINED),
+    "ERR-01": ("shape", DEFINED),
+    "ARCH-19": ("shape", FINITE),
+    "CODE-02": ("shape", FINITE),
+    "ARCH-06": ("meaning", COMMENT),
+    "ERR-03": ("meaning", COMMENT),
+    "CONC-03": ("meaning", COMMENT),
+    "CODE-04": ("meaning", COMMENT),
+    "CODE-08": ("meaning", COMMENT),
+    "TEST-05": ("flow", "A call of `time.Sleep` in a test file is stated. A test that reaches it through a helper in a code file passes (case R214)."),
+    "TEST-04": ("flow", "A branch or a loop in the body of a test is stated. A branch in a helper of a test file passes (case R215)."),
+    "SEC-10": ("shape", "An import of the four packages is stated. `crypto.MD5` of package `crypto` passes (case R216)."),
+    "SEC-31": ("flow", "A call of `gob.NewDecoder` in an entry leaf or a gateway is stated. A decode through a library passes (case R217)."),
+})
+
+# The looser test: only a limit that the wanted text names changes a status. A limit of each kind
+# (constants only, no reading of a comment, a local interface, a defined type, a finite list of
+# standard names, a helper) does not. These stay in part by that test, because the wanted text names
+# what is not stated.
+LOOSE_IN_PART = {
+    "API-04": "It names an owner and an end date for each old API version.",
+    "CTX-07": "It names request-scoped data.",
+    "CTX-08": "It names each provider that reaches a network or an acquiring function.",
+    "HTTP-09": "It names the check against an allow-list.",
+    "HTTP-13": "It names each entry route.",
+    "HTTP-17": "It names each session cookie.",
+    "SEC-01": "It names declaration files and test fixtures.",
+    "SEC-02": "It names each field that holds a credential.",
+    "DATA-14": "It names instants and periods, under any name.",
+    "PAY-01": "It names each money amount, under any name.",
+    "RES-02": "It names a limit, backoff, and jitter of each retry loop.",
+    "CON-01": "It names a method that changes state.",
+    "CODE-09": "It names a function in a leaf or in a library, so another package too.",
+    "CODE-11": "It names each unused name.",
+    "BLD-07": "It names each deployment-specific value.",
+}
+
 # Each other wanted rule: why no kind states it.
 REASONS = {
     "model": "The model check enforces it, and no rule kind states it, so it is not in the rules file and a team cannot delete it there.",
@@ -283,6 +331,11 @@ def main():
             row["status"], row["reason"], row["not_stated_part"] = "partly", MOVED[i][0], MOVED[i][1]
         if i in NOTES:
             row["note"] = NOTES[i]
+        row["loose_status"] = row["status"]
+        if row["status"] == "partly":
+            row["loose_status"] = "partly" if i in LOOSE_IN_PART else "stated"
+            if i in LOOSE_IN_PART:
+                row["loose_because"] = LOOSE_IN_PART[i]
         coverage.append(row)
     for rid, kind, level, ps, reason, source in PLAN_RULES:
         blocks.append(block(rid, kind, level, ps, reason, source))
@@ -291,17 +344,22 @@ def main():
     (OUT / "coverage.json").write_text(json.dumps({"rules": coverage}, indent=1) + "\n", encoding="utf-8", newline="\n")
 
     n = lambda st: sum(1 for c in coverage if c["status"] == st)
+    nl = lambda st: sum(1 for c in coverage if c["loose_status"] == st)
     md = ["# What `defaults v1` cannot state", "",
           "Draft, not frozen. `gen_defaults.py` writes this file from the wishlist and `coverage.json`. The wanted text is the wishlist's.", "",
           "This list is a result of plan-r3, section 4: it says what the rule kinds cannot state.", "",
-          "| Status | Wanted rules |", "|---|---:|",
-          f"| Stated by the kinds | {n('stated')} |",
-          f"| Stated in part | {n('partly')} |",
-          f"| Not stated | {n('not-stated')} |",
-          f"| Total | {len(coverage)} |", "",
+          "**Strict test (the main count):** a rule that a limit reaches is stated in part.", "",
+          "**Looser test (beside it):** only a limit that the wanted text names changes a status.", "",
+          "| Status | Strict | Looser |", "|---|---:|---:|",
+          f"| Stated by the kinds | {n('stated')} | {nl('stated')} |",
+          f"| Stated in part | {n('partly')} | {nl('partly')} |",
+          f"| Not stated | {n('not-stated')} | {nl('not-stated')} |",
+          f"| Total | {len(coverage)} | {len(coverage)} |", "",
+          "The rest of this file reads the strict test, and each row of the list of 39 gives both. A wanted rule's text does not change under either test.", "",
+          "Each row of `coverage.json` holds `status` by the strict test and `loose_status` by the looser one.", "",
           "`defaults v1` also holds the 4 dependency rules of plan-r3, section 3 (`DEP-LIBRARY`, `DEP-GATEWAY`, `DEP-ENTRY`, and `DEP-LOCK`, which is off). The wishlist does not ask for them.", "",
           "A rule that the model already enforces and that a kind can state is in the file too: `ARCH-07`, `ARCH-10`, `ARCH-11`, `ARCH-19`, `HTTP-07` in part, and `SEC-30`. If a team deletes one of these, the rule stops firing, but its model check (K0101, K0205, K0125, K0211, K0124) stays. Plan-r3's \"no hidden layer\" holds for the rules file. It does not switch off the model. See `QN-base-apps.md`.", "",
-          "Two stated rules are wider than their wanted text, because a kind cannot see a purpose. `SEC-10` bans the broken algorithms in all code, not only in security code; its note in the wishlist expects a written exception for a checksum, which here is an edit of `from` or `except`. `DATA-15` bans `time.Now`, `time.Since`, and `time.Until` in all code of a plain leaf or a library, not only for a business decision.", "",
+          "Two rules are wider than their wanted text, because a kind cannot see a purpose. `SEC-10` bans the broken algorithms in all code, not only in security code; its note in the wishlist expects a written exception for a checksum, which here is an edit of `from` or `except`. `DATA-15` bans `time.Now`, `time.Since`, and `time.Until` in all code of a plain leaf or a library, not only for a business decision.", "",
           "Four rules hold a finite list where the wanted text is open or says \"such as\": `ARCH-19` (Appendix D's global mutators), `CTX-06` (the forms without a context in the standard library), and `ARCH-10` and `ARCH-11` (Appendix D's network functions, with holes H3 and H7 and the names of audit M13). A name that a list lacks is not found, in both arms.", "",
           "`CONC-03`, `CON-03`, and `CODE-03` are at level `warn`. A rule at `warn` does not count as enforced in T1 (plan-r3, sections 2 and 5).", "",
           "Stated forms that hold a finite list, or are wider than the words, for the same reason: `ERR-13` reads `errors.New` and `fmt.Errorf` only. `HTTP-13` reads the patterns of `http.ServeMux`, where a method in the pattern gives 405 for the others. `HTTP-17` reads each cookie of an entry leaf, not only a session cookie. `ERR-01` allows a bare `defer` of a listed `Close` or `Rollback`, and it cannot tell a read handle from a write handle. `CON-03` lists its effects and adds each port call. `CODE-08` holds for each exported name, also a struct field and an interface method. `CODE-08` and `CON-01` name no topic, because release 1 has none.", "",
@@ -320,17 +378,20 @@ def main():
         if count:
             md.append(f"| {reason} | {count} |")
     md += ["", "## The 39 wanted rules of amendment 6", "",
-           "| Rule | Outcome | Entries |", "|---|---|---|"]
+           "| Rule | Strict | Looser | Entries |", "|---|---|---|---|"]
     row_by = {c["id"]: c for c in coverage}
     for i in SHAPE39:
         c = row_by[i]
         what = {"stated": "stated", "partly": f"in part ({c['reason']})", "not-stated": f"not stated ({c['reason']})"}[c["status"]]
-        md.append(f"| {i} | {what} | {', '.join(f'`{e}`' for e in c['entries'])} |")
+        md.append(f"| {i} | {what} | {c['loose_status']} | {', '.join(f'`{e}`' for e in c['entries'])} |")
     n39 = lambda st: sum(1 for i in SHAPE39 if row_by[i]["status"] == st)
-    md += ["", f"Of the 39: {n39('stated')} stated, {n39('partly')} in part, {n39('not-stated')} not stated.", "", "## Stated in part", ""]
+    l39 = lambda st: sum(1 for i in SHAPE39 if row_by[i]["loose_status"] == st)
+    md += ["", f"Of the 39, by the strict test: {n39('stated')} stated, {n39('partly')} in part, {n39('not-stated')} not stated. By the looser test: {l39('stated')}, {l39('partly')}, {l39('not-stated')}.", "", "## Stated in part", ""]
     for c in coverage:
         if c["status"] == "partly":
-            md += [f"**{c['id']}.** {by_id[c['id']]['rule']}", "", f"- Reason: {c['reason']}. {c['not_stated_part']}", ""]
+            line = f"- Reason: {c['reason']}. {c['not_stated_part']}"
+            line += f" Looser test: in part. {c['loose_because']}" if "loose_because" in c else " Looser test: stated."
+            md += [f"**{c['id']}.** {by_id[c['id']]['rule']}", "", line, ""]
     for reason in REASONS:
         if not NOT_STATED[reason]:
             continue

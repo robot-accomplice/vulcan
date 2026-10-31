@@ -43,6 +43,7 @@ func TestCoverage(t *testing.T) {
 			Status  string   `json:"status"`
 			Entries []string `json:"entries"`
 			Reason  *string  `json:"reason"`
+			Loose   string   `json:"loose_status"`
 		} `json:"rules"`
 	}
 	root := filepath.Join("..", "..", "experiments", "poc", "r3")
@@ -65,6 +66,9 @@ func TestCoverage(t *testing.T) {
 		w := wish.Rules[i]
 		if c.ID != w.ID {
 			t.Errorf("row %d is %s, the wishlist has %s", i, c.ID, w.ID)
+		}
+		if c.Loose == "" || (c.Status == "not-stated") != (c.Loose == "not-stated") || (c.Status == "stated" && c.Loose != "stated") {
+			t.Errorf("%s: strict status %s, looser status %q: the looser test can only raise a rule from in part to stated", c.ID, c.Status, c.Loose)
 		}
 		switch c.Status {
 		case "stated", "partly":

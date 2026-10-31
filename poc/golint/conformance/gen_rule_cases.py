@@ -740,14 +740,115 @@ def arm_cases():
         out.append(("l", id_, desc, {"cmd/shop/main.go": main_text}, [("cmd/shop/main.go", s, "0909", o) for s, o in wants]))
     out.append(("l", "LW10", "H2: plain forms stay accepted", {"cmd/shop/main.go": PLAIN}, []))
     out.append(("l", "LW11", "H2: a helper cannot hide a new dependency from the lock", {"cmd/shop/main.go": LOCK_HELPER, "rules.vulcan": rules(LOCKED), "rules.lock": LOCK_NO_WIRE}, [("cmd/shop/main.go", "mk())", "0909", 0)]))
-    out.append(("l", "LT1", "H3: code under testdata", {"api/orders/testdata/sub/s.go": TESTDATA_S, "api/orders/extra.go": TESTDATA_USE, "rules.vulcan": rules(ERR08)}, [("api/orders/extra.go", '"shop/api', "0002", 0)]))
-    out.append(("l", "LT2", "H3: code under testdata at the root of the module", {"testdata/sub/s.go": TESTDATA_S, "api/orders/extra.go": TESTDATA_USE.replace("shop/api/orders/testdata", "shop/testdata")}, [("api/orders/extra.go", '"shop/testdata', "0002", 0)]))
+    out.append(("l", "LT1", "H3: code under testdata", {"api/orders/testdata/sub/s.go": TESTDATA_S, "api/orders/extra.go": TESTDATA_USE, "rules.vulcan": rules(ERR08)}, [("api/orders/extra.go", '"shop/api', "0002", 0), ("api/orders/testdata/sub/s.go", "package", "0002", 0)]))
+    out.append(("l", "LT2", "H3: code under testdata at the root of the module", {"testdata/sub/s.go": TESTDATA_S, "api/orders/extra.go": TESTDATA_USE.replace("shop/api/orders/testdata", "shop/testdata")}, [("api/orders/extra.go", '"shop/testdata', "0002", 0), ("testdata/sub/s.go", "package", "0002", 0)]))
     out.append(("v", "VT1", "H3: code under testdata", {"api/orders/testdata/sub/s.vulcan": TESTDATA_S, "api/orders/extra.vulcan": TESTDATA_USE, "rules.vulcan": rules(ERR08)}, [("api/orders/extra.vulcan", '"shop/api', "0008", 0)]))
     out.append(("l", "LN1", "L2: in L, the prefix vulcan_ is an ordinary name", {"api/orders/extra.go": "package orders\n\nfunc vulcan_x() {}\n", "rules.vulcan": rules(rule("X", "code-form", form="unused-name", **{"in": "api/orders"}))}, [("api/orders/extra.go", "vulcan_x", "0810", 0)]))
     out.append(("l", "ET1", "H4: a type error in a test, with each form on: the error, and no panic", {"api/orders/x_test.go": BROKEN_TEST, "rules.vulcan": ALLFORMS, **PORT_DOC["l"]}, "broken"))
     out.append(("v", "ET1", "H4: a type error in a test, with each form on: the error, and no panic", {"api/orders/x_test.vulcan": BROKEN_TEST, "rules.vulcan": ALLFORMS, **PORT_DOC["v"]}, [("api/orders/x_test.vulcan", "casess", "0008", 0)]))
     return out
 
+
+
+# The cases of the audit's rerun, parity-r3.md, section "Rerun".
+def clause(pkg, name, word, cond, body, lprologue, before=""):
+    """Two functions with one clause, in the form of each arm."""
+    def fn(n):
+        return f"func {n}(x string) int\n\t{word} {cond}\n{{\n{body}}}\n", f"func {n}(x string) int {{\n\t{lprologue}\n{body}}}\n"
+    va, la = fn("oneIt")
+    vb, lb = fn("twoIt")
+    return {"v": {f"api/{pkg}/f.vulcan": f"package {pkg}\n\n{before}{va}\n{vb}"},
+            "l": {f"api/{pkg}/f.go": f'package {pkg}\n\nimport "shop/lib/contract"\n\n{before}{la}\n{lb}'}}
+
+
+GUARDS = lambda n, last="\treturn 0\n": '\tif x == "x" { return 1 }\n' * n + last
+DUPRULE = rule("X", "code-form", form="duplicate-function", limit="60", similarity="90", **{"in": "api/orders"})
+ENS = lambda n: clause("orders", "x", "ensures", 'x != ""', GUARDS(n), 'defer contract.Ensures(func() bool { return x != "" })')
+REQ = lambda n: clause("orders", "x", "requires", 'x != ""', GUARDS(n), 'contract.Requires(x != "")')
+OLDF = lambda n: clause("orders", "x", "ensures", "x == old(x)", GUARDS(n), "o := contract.Old(x)\n\tdefer contract.Ensures(func() bool { return x == o })")
+FIRES = lambda: both_at("api/orders/f.vulcan", "api/orders/f.go", "twoIt", "0810")
+VALIDPAIR = lambda n: {
+    "v": {"lib/money/box.vulcan": "package money\n\n// Box holds a count.\ntype Box struct {\n\tA int\n}\ninvariant A >= 0\n",
+          "api/orders/f.vulcan": "package orders\n\nimport \"shop/lib/money\"\n\n" + "\n".join(f"func {m}(x string) money.Box {{\n" + '\tif x == "x" { return money.Box{A: 1} }\n' * n + "\treturn money.Box{A: 2}\n}\n" for m in ["oneIt", "twoIt"])},
+    "l": {"lib/money/box.go": "package money\n\n// Box holds a count.\ntype Box struct {\n\tA int\n}\n\n// Invariant holds for each Box.\nfunc (b Box) Invariant() bool { return b.A >= 0 }\n",
+          "api/orders/f.go": "package orders\n\nimport (\n\t\"shop/lib/contract\"\n\t\"shop/lib/money\"\n)\n\n" + "\n".join(f"func {m}(x string) money.Box {{\n" + '\tif x == "x" { return contract.Valid(money.Box{A: 1}) }\n' * n + "\treturn contract.Valid(money.Box{A: 2})\n}\n" for m in ["oneIt", "twoIt"])}}
+RULE0801 = both_at("rules.vulcan", "rules.vulcan", "rule X", "0801")
+HELPER_SLEEP = join(extra("orders", "func waitIt() { time.Sleep(1) }\n", "time"), code("api/orders/slow_test", 'package orders\n\nimport "testing"\n\nfunc TestSlow(t *testing.T) { waitIt() }\n'))
+HELPER_BRANCH = code("api/orders/logic_test", 'package orders\n\nimport "testing"\n\nfunc check(t *testing.T, ok bool) {\n\tif !ok {\n\t\tt.Fatal("x")\n\t}\n}\n\nfunc TestLogic(t *testing.T) { check(t, true) }\n')
+MD5 = extra("orders", "func hashIt() any { return crypto.MD5.New() }\n", "crypto")
+GOB_LIB = join(code("lib/money/dec", 'package money\n\nimport (\n\t"encoding/gob"\n\t"io"\n)\n\n// Read decodes a value.\nfunc Read(r io.Reader, v any) error { return gob.NewDecoder(r).Decode(v) }\n'),
+               extra("web", "func readIt(r io.Reader) error { return money.Read(r, nil) }\n", "io shop/lib/money"))
+AFTER_N3 = [
+    ("R198", "N3: a map whose key is a listed type and whose value is not", rules(rule("X", "declaration", at="field", names="*Timeout", deny_types="string")), extra("orders", "type t struct {\n\tPerRouteTimeout map[string]time.Duration\n}\n\nvar _ = t{}\n", "time"), NO),
+    ("R199", "N3: a second form of the same", rules(rule("X", "declaration", at="var", names="Deadline", deny_types="string")), extra("orders", "func dIt() any {\n\tDeadline := map[string]time.Time{}\n\treturn Deadline\n}\n", "time"), NO),
+    ("R200", "N3: a slice of a listed type is no parameter of that type", rules(CTXFIRST), CTX("func doIt(a int, more []context.Context) {}\n"), NO),
+    ("R201", "N3: a map of a listed type is no parameter of that type", rules(rule("X", "declaration", at="param", types="context.Context", require="name=ctx")), CTX("func doIt(m map[string]context.Context) {}\n"), NO),
+]
+
+CASES += [
+    # N2, by form: under and over the limit, at the same place in both arms
+    ("R190", "N2: ensures with returns, under the limit in both", rules(DUPRULE), ENS(8), NO),
+    ("R191", "N2: ensures with returns, over the limit in both", rules(DUPRULE), ENS(9), FIRES()),
+    ("R192", "N2: requires, under the limit in both", rules(DUPRULE), REQ(8), NO),
+    ("R193", "N2: requires, over the limit in both", rules(DUPRULE), REQ(9), FIRES()),
+    ("R194", "N2: old, under the limit in both", rules(DUPRULE), OLDF(8), NO),
+    ("R195", "N2: old, over the limit in both", rules(DUPRULE), OLDF(9), FIRES()),
+    ("R196", "N2: a check of a literal counts as the literal: under the limit in both", rules(DUPRULE), VALIDPAIR(2), NO),
+    ("R197", "N2: a check of a literal counts as the literal: over the limit in both", rules(DUPRULE), VALIDPAIR(4), FIRES()),
+    *AFTER_N3,
+    # N4
+    ("R202", "N4: a literal rule does not read the name in V's generated call", rules(rule("X", "literal", deny_text=r"\.local$")), ensured("orders", "local(a int) int", "a > 0", "\treturn a\n"), NO),
+    ("R203", "N4: a literal rule does not read the word in V's generated call", rules(rule("X", "literal", deny_text="^ensures$")), ensured("orders", "fIt(a int) int", "a > 0", "\treturn a\n"), NO),
+    ("R204", "N4: a text in a checked literal is a person's, and is read", rules(rule("X", "literal", deny_text="^secret$")), {
+        "v": {"lib/money/box.vulcan": 'package money\n\n// Box holds a word.\ntype Box struct {\n\tW string\n}\ninvariant W != "x"\n', "api/orders/f.vulcan": 'package orders\n\nimport "shop/lib/money"\n\nfunc fIt() money.Box { return money.Box{W: "secret"} }\n'},
+        "l": {"lib/money/box.go": 'package money\n\n// Box holds a word.\ntype Box struct {\n\tW string\n}\n\n// Invariant holds for each Box.\nfunc (b Box) Invariant() bool { return b.W != "x" }\n', "api/orders/f.go": 'package orders\n\nimport (\n\t"shop/lib/contract"\n\t"shop/lib/money"\n)\n\nfunc fIt() money.Box { return contract.Valid(money.Box{W: "secret"}) }\n'}},
+     both_at("api/orders/f.vulcan", "api/orders/f.go", '"secret"', "0809")),
+    # N5
+    ("R205", "N5: at var does not read L's contract.Old", rules(rule("X", "declaration", at="var", deny_types="int")), {
+        "v": {"api/orders/f.vulcan": "package orders\n\nfunc fIt(n int) int\n\tensures n == old(n)\n{\n\treturn n\n}\n"},
+        "l": {"api/orders/f.go": 'package orders\n\nimport "shop/lib/contract"\n\nfunc fIt(n int) int {\n\to := contract.Old(n)\n\tdefer contract.Ensures(func() bool { return n == o })\n\treturn n\n}\n'}}, NO),
+    # M7
+    ("R206", "M7: funcs names a function of the project that does not exist", rules(rule("X", "forbid-call", funcs="shop/lib/money.Nope")), NO, RULE0801),
+    ("R207", "M7: a literal rule names a type of the project that does not exist", rules(rule("X", "literal", type="shop/lib/money.Recept", require="Amount")), NO, RULE0801),
+    ("R208", "M7: deny-types names a type of the project that does not exist", rules(rule("X", "declaration", at="field", deny_types="shop/lib/money.Recept")), NO, RULE0801),
+    ("R209", "M7: a field that a type of the project does not have", rules(rule("X", "literal", type="shop/lib/money.Receipt", require="Amountt")), NO, both(RULE0801, e("api/billing/billing", "money.Receipt{Amount", "0809"))),
+    ("R210", "M7: a field of a standard type that a package uses", rules(rule("X", "literal", type="net/http.Server", require="ReadTimeoutt")), SERVER_OK, both(RULE0801, e("api/web/extra", "http.Server{", "0809"))),
+    ("R211", "M7: a name in a directory that is not a part", rules(rule("X", "forbid-call", funcs="shop/api/nope.F")), NO, RULE0801),
+    ("R212", "M7: a method of a type of the project that does not exist", rules(rule("X", "forbid-call", funcs="(*shop/api/billing.Payer).Payy")), NO, RULE0801),
+    ("R213", "M7: names that exist stay accepted", rules(rule("X", "forbid-call", funcs="shop/lib/money.Order (*shop/api/billing.Payer).Pay shop/lib/money.P*", **{"in": "gateway"})), NO, NO),
+    # The audit's four further form gaps, s18 to s21 and s25. The audit's scripts are not in the
+    # repository, so these forms come from its words. Each passes, so each rule is in part.
+    ("R214", "A limit, TEST-05: a test reaches time.Sleep through a helper in a code file", rules(rule("X", "forbid-call", funcs="time.Sleep", files="test")), HELPER_SLEEP, NO),
+    ("R215", "A limit, TEST-04: a branch in a helper of a test file", rules(rule("X", "code-form", form="test-logic")), HELPER_BRANCH, NO),
+    ("R216", "A limit, SEC-10: crypto.MD5 of package crypto", rules(rule("X", "depends", **{"from": "leaf gateway entry library"}, packages="crypto/md5 crypto/sha1 crypto/des crypto/rc4")), MD5, NO),
+    ("R217", "A limit, SEC-31: an entry leaf decodes through a library", rules(rule("X", "forbid-call", funcs="encoding/gob.NewDecoder", **{"in": "entry gateway"})), GOB_LIB, NO),
+]
+
+NESTED_GOMOD = "module shop\n\ngo 1.26.0\n\nrequire example.com/evil v0.0.0\n\nreplace example.com/evil => ./third\n"
+EVIL_S = 'package evil\n\nimport "os"\n\n// X stops.\nfunc X() { os.Exit(1) }\n'
+EVIL_NET = 'package evil\n\nimport "net"\n\n// X dials.\nfunc X() { _, _ = net.Dial("tcp", "x") }\n'
+EVIL_MOD = "module example.com/evil\n\ngo 1.26.0\n"
+EVIL_USE = 'package orders\n\nimport "example.com/evil"\n\nfunc stopIt() { evil.X() }\n'
+VENDOR_MOD = "module shop\n\ngo 1.26.0\n\nrequire example.com/evil v0.0.0\n"
+MODULES = "# example.com/evil v0.0.0\n## explicit\nexample.com/evil\n"
+PLAIN_S = 'package sub\n\nimport "os"\n\n// X stops.\nfunc X() { os.Exit(1) }\n'
+
+
+def rerun_arm_cases():
+    out = []
+    L, V = "l", "v"
+    out.append((L, "LT3", "N1, t9: a nested module with a replace", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("third/s.go", "package", "0002", 0)]))
+    out.append((V, "VT3", "N1, t9: a nested module with a replace", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("third/s.go", "package", "0002", 0)]))
+    out.append((L, "LT4", "N1, t10: a vendored package", {"go.mod": VENDOR_MOD, "vendor/modules.txt": MODULES, "vendor/example.com/evil/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("vendor/example.com/evil/s.go", "package", "0002", 0)]))
+    out.append((L, "LT5", "N1, t13: a nested module in a deeper directory", {"go.mod": NESTED_GOMOD.replace("./third", "./a/b/third"), "a/b/third/go.mod": EVIL_MOD, "a/b/third/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("a/b/third/s.go", "package", "0002", 0)]))
+    out.append((V, "VT5", "N1, t13: a nested module in a deeper directory", {"go.mod": NESTED_GOMOD.replace("./third", "./a/b/third"), "a/b/third/go.mod": EVIL_MOD, "a/b/third/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("a/b/third/s.go", "package", "0002", 0)]))
+    out.append((L, "LT6", "N1, t14: a nested module that dials", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_NET, "api/orders/extra.go": EVIL_USE}, [("third/s.go", "package", "0002", 0)]))
+    out.append((V, "VT6", "N1, t14: a nested module that dials", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_NET, "api/orders/extra.vulcan": EVIL_USE}, [("third/s.go", "package", "0002", 0)]))
+    out.append((L, "LT7", "N1: a Go file under testdata that nothing imports, which V ignores", {"api/orders/testdata/x.go": "package x\n"}, [("api/orders/testdata/x.go", "package", "0002", 0)]))
+    out.append((L, "LT8", "N1: a Go file under a directory that starts with _", {"_x/s.go": PLAIN_S, "api/orders/extra.go": 'package orders\n\nimport "shop/_x"\n\nvar _ = sub.X\n'}, [("_x/s.go", "package", "0002", 0), ("api/orders/extra.go", '"shop/_x"', "0002", 0)]))
+    out.append((L, "LT9", "N1: a Go file under a directory that starts with a dot", {".x/s.go": PLAIN_S}, [(".x/s.go", "package", "0002", 0)]))
+    out.append((L, "LW12", "N7: a helper that main never calls still adds an edge", {"cmd/shop/main.go": L_BASE["cmd/shop/main.go"].replace("func main() {", "func unused() *billing.Payer { return billing.NewPayer(store.Open()) }\n\nfunc main() {").replace("\tkeeper := store.Open()\n\tpayer := billing.NewPayer(keeper)\n", "\tpayer := unused()\n"), "rules.vulcan": rules(rule("D", "depends", **{"from": "leaf"}, deny="gateway", via="wire"))}, [("cmd/shop/main.go", "store.Open())", "0804", 0), ("cmd/shop/main.go", "(payer)", "0909", 1)]))
+    return out
 
 def pos(text, snippet, offset):
     if isinstance(snippet, tuple):
@@ -796,7 +897,7 @@ def main():
         lf.update(l_files)
         (V_DIR / f"{id_}.txtar").write_text(archive(desc, vf, wants["v"], "K", vf), encoding="utf-8", newline="\n")
         (L_DIR / f"{id_}.txtar").write_text(archive(desc, lf, wants["l"], "VL", {**L_FROM_BASE, **lf}), encoding="utf-8", newline="\n")
-    for arm, id_, desc, files, wants in arm_cases():
+    for arm, id_, desc, files, wants in arm_cases() + rerun_arm_cases():
         base = dict(V_BASE if arm == "v" else L_ALL)
         base.update(files)
         prefix = "K" if arm == "v" else "VL"

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // The kinds of a part. "leaf" is a plain leaf: not a gateway and not an entry.
@@ -52,6 +53,8 @@ type Set struct {
 	Lock  map[string]bool // "wire a -> b" and "import a -> b"
 	Probs []Problem
 	on    []*Rule
+
+	reported sync.Map // the messages of ResolveTypes that an arm has: a package reads each name once
 }
 
 // Load reads the rules of a project. A project with no rules file has no rules: nothing else
@@ -83,8 +86,18 @@ func Load(root string) *Set {
 
 // Resolve reports each name of the rules that the project does not have. A typing error in a
 // directory must not switch a rule off without a word.
-func (s *Set) Resolve(parts map[string]Part) {
+func (s *Set) Resolve(parts map[string]Part, module string) {
 	for _, r := range s.File.Rules {
+		for _, key := range nameKeys {
+			if key == "type" && r.Kind != "literal" {
+				continue
+			}
+			for _, name := range r.Params[key] {
+				if dir, _, _, ok := projectName(name, module); ok && parts[dir].Dir == "" && !IsRuntimeLib(dir) {
+					s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, and %s is not a part of the project", r.ID, key, name, dir)})
+				}
+			}
+		}
 		for _, key := range []string{"in", "except", "from", "deny", "load", "to"} {
 			if r.Kind == "literal" && key == "deny" {
 				continue

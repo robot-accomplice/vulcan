@@ -40,7 +40,7 @@ func load(m *model.Manifest) *rules.Set {
 	}
 	s := rules.Load(m.Root)
 	if s != nil {
-		s.Resolve(partsOf(m))
+		s.Resolve(partsOf(m), m.Module)
 	}
 	v, _ := cache.LoadOrStore(m.Root, s)
 	return v.(*rules.Set)

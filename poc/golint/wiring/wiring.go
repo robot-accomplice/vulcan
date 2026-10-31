@@ -19,7 +19,7 @@ import (
 // Analyzer is A4.
 var Analyzer = &analysis.Analyzer{
 	Name: "wiring",
-	Doc:  "check main: it calls only the constructors and the lifecycle methods of the leaves, and the standard library; it passes no nil port; each settings value is a literal with every field, of constants and flag values; a secret field gets no constant; in strict mode, it calls each constructor once and each wire is in a plain form (VL0104, VL0603, VL0605, VL0606, VL0607, VL0907, VL0908, VL0909)",
+	Doc:  "check main: it calls only the constructors and the lifecycle methods of the leaves, and the standard library; it passes no nil port; each settings value is a literal with every field, of constants and flag values; a secret field gets no constant; each wire is in a plain form, in every mode; in strict mode, it calls each constructor once (VL0104, VL0603, VL0605, VL0606, VL0607, VL0907, VL0908, VL0909)",
 	Run:  run,
 }
 

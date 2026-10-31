@@ -1,0 +1,140 @@
+M7: a method of a type of the project that does not exist
+-- want.txt --
+error rules.vulcan:4:1 K0801
+-- api/billing/billing.vulcan --
+package billing
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, Ledger.Save("x")
+}
+-- api/billing/component.vulcan --
+component Billing {
+    needs port Ledger {
+        func Save(id string) error
+    }
+}
+-- api/orders/component.vulcan --
+import "shop/lib/money"
+
+component Orders {
+    needs port Checkout {
+        func Pay(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/orders/orders.vulcan --
+package orders
+
+import "shop/lib/money"
+
+// Service places orders.
+type Service struct{}
+
+// NewService returns a Service.
+func NewService() *Service { return &Service{} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return Checkout.Pay(amt)
+}
+-- api/store/component.vulcan --
+component Store {
+    gateway for Database
+}
+-- api/store/store.vulcan --
+package store
+
+// Store keeps things.
+type Store struct{}
+
+// Open returns a Store.
+func Open() *Store { return &Store{} }
+
+// Save keeps one thing.
+func (s *Store) Save(id string) error { return nil }
+-- api/web/component.vulcan --
+import "shop/lib/money"
+
+component Web {
+    entry for Customer
+
+    needs port Orders {
+        func Place(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/web/web.vulcan --
+package web
+
+import (
+	"context"
+	"fmt"
+)
+
+func startup(ctx context.Context) error {
+	r, err := Orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- lib/money/library.vulcan --
+// money holds amounts.
+library money {
+}
+-- lib/money/money.vulcan --
+package money
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// The states of an order.
+const (
+	Pending   = "pending"
+	Paid      = "paid"
+	Shipped   = "shipped"
+	Cancelled = "cancelled"
+)
+
+// Order is an order.
+type Order struct {
+	ID     string
+	Status string
+}
+-- rules.vulcan --
+origin test
+hash sha256:0
+
+rule X
+  kind forbid-call
+  level error
+  funcs (*shop/api/billing.Payer).Payy
+  reason A reason.
+  source A source.
+-- system.vulcan --
+// Shop is the online store.
+system Shop {
+    person Customer "Buys goods"
+    external Database "The file"
+
+    container Api {
+        Web, Orders, Billing, Store
+
+        Web.Orders:      Orders.NewService
+        Orders.Checkout: Billing.NewPayer
+        Billing.Ledger:  Store.Open
+    }
+}

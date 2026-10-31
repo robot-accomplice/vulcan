@@ -176,7 +176,114 @@ func (r *Rule) checkDeclaration(bad func(string, ...any)) {
 	}
 }
 
-// ResolveTypes reports a table whose type or field the package of its directory does not have. A
+// nameKeys are the parameters that hold names of Go functions, values, and types.
+var nameKeys = []string{"funcs", "deferred-ok", "deny-types", "types", "param-type", "type"}
+
+// projectName splits a name of the project, such as (*shop/lib/money.Order).Total, into its
+// directory, its name in the package, and a member. ok is false for a name outside the project.
+func projectName(name, module string) (dir, base, member string, ok bool) {
+	name = strings.TrimSuffix(name, "*")
+	if rest, found := strings.CutPrefix(name, "("); found {
+		typ, m, has := strings.Cut(rest, ").")
+		if !has {
+			return "", "", "", false
+		}
+		name, member = typ, m
+	}
+	name = strings.TrimLeft(name, "*[]")
+	rest, found := strings.CutPrefix(name, module+"/")
+	if !found {
+		return "", "", "", false
+	}
+	i := strings.LastIndex(rest, "/")
+	j := strings.Index(rest[i+1:], ".")
+	if j < 0 {
+		return "", "", "", false
+	}
+	return rest[:i+1+j], rest[i+2+j:], member, true
+}
+
+// resolveNames reports each name of a rule, with the project's module path, that the package of its
+// directory does not declare, and each field of a literal rule that its type does not have. A prefix
+// (a name that ends in *) is checked up to the prefix only.
+func (s *Set) resolveNames(r *Rule, u *Unit) []Problem {
+	var out []Problem
+	once := func(msg string) {
+		if _, dup := s.reported.LoadOrStore(msg, true); !dup {
+			out = append(out, Problem{r.Line, msg})
+		}
+	}
+	for _, key := range nameKeys {
+		if key == "type" && r.Kind != "literal" {
+			continue
+		}
+		for _, name := range r.Params[key] {
+			dir, base, member, ok := projectName(name, u.Module)
+			if !ok || dir != u.Part.Dir || (strings.HasSuffix(name, "*") && member == "" && !strings.HasPrefix(name, "(")) {
+				continue
+			}
+			obj := u.Pkg.Scope().Lookup(base)
+			if obj == nil {
+				if !u.TestsAbsent {
+					once(fmt.Sprintf("rule %s: %s names %s, which package %s does not declare", r.ID, key, name, dir))
+				}
+				continue
+			}
+			if member == "" || strings.HasSuffix(member, "*") {
+				continue
+			}
+			if o, _, _ := types.LookupFieldOrMethod(types.NewPointer(obj.Type()), false, u.Pkg, member); o == nil {
+				once(fmt.Sprintf("rule %s: %s names %s, and type %s has no %s", r.ID, key, name, base, member))
+			}
+		}
+	}
+	if r.Kind == "literal" {
+		for _, t := range u.literalTypes(r) {
+			st, ok := t.Underlying().(*types.Struct)
+			if !ok {
+				continue
+			}
+			for _, key := range []string{"require", "deny", "below"} {
+				for _, v := range r.Params[key] {
+					field, _, _ := strings.Cut(v, "=")
+					found := false
+					for i := range st.NumFields() {
+						found = found || st.Field(i).Name() == field
+					}
+					if !found {
+						once(fmt.Sprintf("rule %s: %s names %s, and type %s has no such field", r.ID, key, field, fullTypeName(t)))
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// literalTypes gives the types of a literal rule that this package can see: each that it uses, and
+// each of its own. A field of a type that no package uses cannot be read, and changes nothing.
+func (u *Unit) literalTypes(r *Rule) []types.Type {
+	seen := map[string]types.Type{}
+	for _, obj := range u.Info.Uses {
+		if tn, ok := obj.(*types.TypeName); ok && slices.Contains(r.Params["type"], fullTypeName(tn.Type())) {
+			seen[fullTypeName(tn.Type())] = tn.Type()
+		}
+	}
+	for _, name := range r.Params["type"] {
+		if dir, base, _, ok := projectName(name, u.Module); ok && dir == u.Part.Dir {
+			if obj := u.Pkg.Scope().Lookup(base); obj != nil {
+				seen[name] = obj.Type()
+			}
+		}
+	}
+	var out []types.Type
+	for _, t := range seen {
+		out = append(out, t)
+	}
+	return out
+}
+
+// ResolveTypes reports a name of the project that the package does not declare, and a table whose type or field the package of its directory does not have. A
 // name outside the project is not checked.
 func (s *Set) ResolveTypes(u *Unit) []Problem {
 	if s == nil || u.Pkg == nil {
@@ -184,6 +291,7 @@ func (s *Set) ResolveTypes(u *Unit) []Problem {
 	}
 	var out []Problem
 	for _, r := range s.File.Rules {
+		out = append(out, s.resolveNames(r, u)...)
 		if r.Kind != "transitions" || len(r.Params["type"]) != 1 {
 			continue
 		}
@@ -539,7 +647,7 @@ func (u *Unit) declared(r *Rule, at string, add addFunc) {
 		if names := r.Params["names"]; len(names) > 0 && !glob(names, name) {
 			return
 		}
-		if len(wantTypes) > 0 && typeIn(t, wantTypes, map[types.Type]bool{}) == "" {
+		if len(wantTypes) > 0 && typeIs(t, wantTypes) == "" {
 			return
 		}
 		if s := typeIn(t, r.Params["deny-types"], map[types.Type]bool{}); s != "" {
@@ -613,7 +721,7 @@ func (u *Unit) declared(r *Rule, at string, add addFunc) {
 					}
 				}
 			case *ast.AssignStmt:
-				if at == "var" && x.Tok == token.DEFINE {
+				if at == "var" && x.Tok == token.DEFINE && !u.contractStmt(x) {
 					for _, l := range x.Lhs {
 						if id, ok := l.(*ast.Ident); ok {
 							if obj := u.Info.Defs[id]; obj != nil {
@@ -647,6 +755,33 @@ func (u *Unit) declared(r *Rule, at string, add addFunc) {
 	}
 }
 
+// typeIs names a listed type that t is itself: through an alias or an embedded interface, and not
+// through a container. A parameter of []context.Context is no context.
+func typeIs(t types.Type, list []string) string {
+	if t == nil {
+		return ""
+	}
+	t = types.Unalias(t)
+	if s := types.TypeString(t, nil); slices.Contains(list, s) {
+		return s
+	}
+	var iface *types.Interface
+	switch x := t.(type) {
+	case *types.Interface:
+		iface = x
+	case *types.Named:
+		iface, _ = x.Underlying().(*types.Interface)
+	}
+	if iface != nil {
+		for i := range iface.NumEmbeddeds() {
+			if s := typeIs(iface.EmbeddedType(i), list); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
 // typeIn names a listed type that t is, through an alias, a pointer, a slice, an array, a map, a
 // type argument, or an embedded interface; or "". A type defined from a listed type is another
 // type, and is not found.
@@ -667,10 +802,7 @@ func typeIn(t types.Type, list []string, seen map[types.Type]bool) string {
 	case *types.Array:
 		return typeIn(x.Elem(), list, seen)
 	case *types.Map:
-		if s := typeIn(x.Key(), list, seen); s != "" {
-			return s
-		}
-		return typeIn(x.Elem(), list, seen)
+		return typeIn(x.Elem(), list, seen) // a key names an entry: it holds no value of the type
 	case *types.Named:
 		if args := x.TypeArgs(); args != nil {
 			for i := range args.Len() {
@@ -735,7 +867,7 @@ func (u *Unit) params(r *Rule, ft *ast.FuncType, check func(*ast.Ident, types.Ty
 			if id != nil {
 				check(id, t)
 			}
-			if t != nil && typeIn(t, r.Params["types"], map[types.Type]bool{}) != "" {
+			if t != nil && typeIs(t, r.Params["types"]) != "" {
 				at := fd.Pos()
 				name := ""
 				if id != nil {
@@ -751,7 +883,7 @@ func (u *Unit) params(r *Rule, ft *ast.FuncType, check func(*ast.Ident, types.Ty
 func (u *Unit) portParams(r *Rule, m PortMethod, add addFunc) {
 	for i := range m.Sig.Params().Len() {
 		v := m.Sig.Params().At(i)
-		if typeIn(v.Type(), r.Params["types"], map[types.Type]bool{}) != "" {
+		if typeIs(v.Type(), r.Params["types"]) != "" {
 			u.paramForm(r, i, v.Name(), m.At, add)
 		}
 	}
@@ -1125,8 +1257,19 @@ func (u *Unit) stringLiterals(r *Rule, f *ast.File, add addFunc) {
 			add("0809", v.Pos(), "%s holds a text in the code: %s", id.Name, r.tail())
 		}
 	}
-	ast.Inspect(f, func(n ast.Node) bool {
+	var visit func(ast.Node) bool
+	visit = func(n ast.Node) bool {
 		switch x := n.(type) {
+		case *ast.CallExpr:
+			// V's generated calls hold texts that no person wrote: a clause, a function name, and a
+			// place. The value that a check of a literal wraps is a person's.
+			if v := u.validArg(x); v != nil {
+				ast.Inspect(v, visit)
+				return false
+			}
+			if u.Generates && u.isContractCall(x) {
+				return false
+			}
 		case *ast.ImportSpec:
 			return false
 		case *ast.Field:
@@ -1167,7 +1310,8 @@ func (u *Unit) stringLiterals(r *Rule, f *ast.File, add addFunc) {
 			}
 		}
 		return true
-	})
+	}
+	ast.Inspect(f, visit)
 }
 
 // Code form --------------------------------------------------------------------------------------
@@ -1418,39 +1562,134 @@ func (u *Unit) channelSizes(f *ast.File, report reportFunc) {
 	})
 }
 
-// skipped reports code that a contract adds: V's lowered checks and L's calls of the contract
-// package. A measure of the code does not count it, so that both arms count the same.
-func (u *Unit) skipped(n ast.Node) bool {
-	isContract := func(c *ast.CallExpr) bool {
-		sel, ok := ast.Unparen(c.Fun).(*ast.SelectorExpr)
+// isContractCall reports a call that a contract adds: V's lowered calls of its runtime and of
+// Vulcan_ names, and L's calls of the contract package.
+func (u *Unit) isContractCall(c *ast.CallExpr) bool {
+	switch f := ast.Unparen(c.Fun).(type) {
+	case *ast.IndexExpr:
+		return u.isContractCall(&ast.CallExpr{Fun: f.X})
+	case *ast.Ident:
+		return u.Generates && strings.HasPrefix(f.Name, "Vulcan_")
+	case *ast.SelectorExpr:
+		if u.Generates && strings.HasPrefix(f.Sel.Name, "Vulcan_") {
+			return true
+		}
+		id, ok := f.X.(*ast.Ident)
 		if !ok {
 			return false
 		}
-		id, ok := sel.X.(*ast.Ident)
-		if !ok {
-			return false
-		}
-		if id.Name == "vulcan_rt" {
+		if u.Generates && id.Name == "vulcan_rt" {
 			return true
 		}
 		pn, ok := u.Info.Uses[id].(*types.PkgName)
 		return ok && strings.HasSuffix(pn.Imported().Path(), "/lib/contract")
 	}
-	switch x := n.(type) {
+	return false
+}
+
+// validArg gives the value that a check of a literal wraps: L's contract.Valid(v) and V's
+// Vulcan_checkT(v, place). A person wrote that value in both.
+func (u *Unit) validArg(c *ast.CallExpr) ast.Expr {
+	name := ""
+	switch f := ast.Unparen(c.Fun).(type) {
+	case *ast.IndexExpr:
+		return u.validArg(&ast.CallExpr{Fun: f.X, Args: c.Args})
+	case *ast.Ident:
+		name = f.Name
+	case *ast.SelectorExpr:
+		name = f.Sel.Name
+	}
+	if len(c.Args) > 0 && u.isContractCall(c) && (name == "Valid" || strings.HasPrefix(name, "Vulcan_check")) {
+		return c.Args[0]
+	}
+	return nil
+}
+
+func (u *Unit) isVulcanName(e ast.Expr) bool {
+	id, ok := ast.Unparen(e).(*ast.Ident)
+	return ok && u.generated(id.Name)
+}
+
+// contractStmt reports a statement that holds only a contract: what a person did not write as a
+// statement of the body. V's prologue is `vulcan_old0 := x; _ = vulcan_old0`.
+func (u *Unit) contractStmt(s ast.Stmt) bool {
+	switch x := s.(type) {
+	case *ast.ExprStmt:
+		c, ok := ast.Unparen(x.X).(*ast.CallExpr)
+		return ok && u.isContractCall(c)
+	case *ast.DeferStmt:
+		return u.isContractCall(x.Call)
 	case *ast.IfStmt:
-		if len(x.Body.List) == 1 {
-			if s, ok := x.Body.List[0].(*ast.ExprStmt); ok {
-				if c, ok := s.X.(*ast.CallExpr); ok && isContract(c) {
-					if sel := c.Fun.(*ast.SelectorExpr); sel.X.(*ast.Ident).Name == "vulcan_rt" {
-						return true
-					}
-				}
+		return len(x.Body.List) == 1 && u.contractStmt(x.Body.List[0])
+	case *ast.DeclStmt:
+		gd, ok := x.Decl.(*ast.GenDecl)
+		if !ok || len(gd.Specs) == 0 {
+			return false
+		}
+		for _, sp := range gd.Specs {
+			vs, ok := sp.(*ast.ValueSpec)
+			if !ok || !u.generated(vs.Names[0].Name) {
+				return false
 			}
 		}
+		return true
+	case *ast.AssignStmt:
+		if len(x.Rhs) == 1 {
+			if c, ok := ast.Unparen(x.Rhs[0]).(*ast.CallExpr); ok && u.isContractCall(c) && u.validArg(c) == nil {
+				return true // L's o := contract.Old(x)
+			}
+		}
+		for _, l := range x.Lhs {
+			if u.isVulcanName(l) && !isReturnTemp(l) {
+				return true
+			}
+		}
+		if len(x.Lhs) == 1 && len(x.Rhs) == 1 {
+			if id, ok := x.Lhs[0].(*ast.Ident); ok && id.Name == "_" {
+				return u.isVulcanName(x.Rhs[0])
+			}
+		}
+	}
+	return false
+}
+
+func isReturnTemp(e ast.Expr) bool {
+	id, ok := ast.Unparen(e).(*ast.Ident)
+	return ok && strings.HasPrefix(id.Name, "vulcan_t")
+}
+
+// loweredReturn gives the values of V's lowered return, { var vulcan_t0 T; vulcan_t0 = e; checks;
+// return vulcan_t0 }, or of a bare return, { checks; return }. A person wrote `return e`.
+func (u *Unit) loweredReturn(b *ast.BlockStmt) ([]ast.Expr, bool) {
+	if !u.Generates || len(b.List) < 2 {
+		return nil, false
+	}
+	if _, ok := b.List[len(b.List)-1].(*ast.ReturnStmt); !ok {
+		return nil, false
+	}
+	var values []ast.Expr
+	for _, st := range b.List[:len(b.List)-1] {
+		if a, ok := st.(*ast.AssignStmt); ok && len(a.Lhs) > 0 && isReturnTemp(a.Lhs[0]) {
+			values = a.Rhs
+			continue
+		}
+		if !u.contractStmt(st) {
+			return nil, false
+		}
+	}
+	return values, true
+}
+
+// skipped reports code that a contract adds. A measure of the code does not count it, so that both
+// arms count the same.
+func (u *Unit) skipped(n ast.Node) bool {
+	switch x := n.(type) {
+	case *ast.IfStmt:
+		return u.Generates && u.contractStmt(x)
 	case *ast.CallExpr:
-		return isContract(x)
+		return u.isContractCall(x)
 	case *ast.DeferStmt:
-		return isContract(x.Call)
+		return u.isContractCall(x.Call)
 	}
 	return false
 }
@@ -1775,31 +2014,59 @@ func (u *Unit) retries(f *ast.File, report reportFunc) {
 	}
 }
 
-// tokens gives the form of a function: the kinds of its nodes, with names and values left out.
+// tokens gives the form of a function as a person wrote it: the kinds of its nodes, with names and
+// values left out. A statement that holds only a contract does not count, a check of a literal
+// counts as the literal, and V's lowered return counts as a return.
 func (u *Unit) tokens(fd *ast.FuncDecl) []string {
 	var out []string
-	ast.Inspect(fd.Body, func(n ast.Node) bool {
-		if n == nil || u.skipped(n) {
-			return false
-		}
-		switch x := n.(type) {
-		case *ast.SelectorExpr:
-			// A chain of names counts as a selector of one name, so that L's p.ledger.Save and V's
-			// Ledger.Save count the same.
-			if isNameChain(x) {
-				out = append(out, "*ast.SelectorExpr", "*ast.Ident", "*ast.Ident")
+	var walk func(ast.Node)
+	walk = func(root ast.Node) {
+		ast.Inspect(root, func(n ast.Node) bool {
+			if n == nil {
 				return false
 			}
-			out = append(out, fmt.Sprintf("%T", n))
-		case *ast.BinaryExpr:
-			out = append(out, x.Op.String())
-		case *ast.AssignStmt:
-			out = append(out, x.Tok.String())
-		default:
-			out = append(out, fmt.Sprintf("%T", n))
-		}
-		return true
-	})
+			if st, ok := n.(ast.Stmt); ok && u.contractStmt(st) {
+				return false
+			}
+			switch x := n.(type) {
+			case *ast.BlockStmt:
+				if values, ok := u.loweredReturn(x); ok {
+					out = append(out, "*ast.ReturnStmt")
+					for _, v := range values {
+						walk(v)
+					}
+					return false
+				}
+			case *ast.CallExpr:
+				if v := u.validArg(x); v != nil {
+					walk(v)
+					return false
+				}
+				if u.isContractCall(x) {
+					return false
+				}
+			case *ast.SelectorExpr:
+				// A chain of names counts as a selector of one name, so that L's p.ledger.Save and
+				// V's Ledger.Save count the same.
+				if isNameChain(x) {
+					out = append(out, "*ast.SelectorExpr", "*ast.Ident", "*ast.Ident")
+					return false
+				}
+			}
+			switch x := n.(type) {
+			case *ast.BinaryExpr:
+				out = append(out, x.Op.String())
+			case *ast.AssignStmt:
+				out = append(out, x.Tok.String())
+			default:
+				out = append(out, fmt.Sprintf("%T", n))
+			}
+			return true
+		})
+	}
+	for _, st := range fd.Body.List {
+		walk(st)
+	}
 	return out
 }
 

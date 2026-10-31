@@ -1,0 +1,152 @@
+N2: old, under the limit in both
+-- want.txt --
+accept
+-- api/billing/billing.go --
+package billing
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct {
+	ledger Ledger
+}
+
+// NewPayer returns a Payer.
+func NewPayer(ledger Ledger) *Payer { return &Payer{ledger: ledger} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, p.ledger.Save("x")
+}
+-- api/billing/ports.go --
+package billing
+
+// Ledger keeps payments.
+type Ledger interface {
+	Save(id string) error
+}
+-- api/orders/f.go --
+package orders
+
+import "shop/lib/contract"
+
+func oneIt(x string) int {
+	o := contract.Old(x)
+	defer contract.Ensures(func() bool { return x == o })
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	return 0
+}
+
+func twoIt(x string) int {
+	o := contract.Old(x)
+	defer contract.Ensures(func() bool { return x == o })
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	if x == "x" { return 1 }
+	return 0
+}
+-- api/store/store.go --
+package store
+
+// Store keeps things.
+type Store struct{}
+
+// Open returns a Store.
+func Open() *Store { return &Store{} }
+
+// Save keeps one thing.
+func (s *Store) Save(id string) error { return nil }
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person   = "Customer" // buys goods
+	Database External = "Database" // the file
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Gateway("api/store", Database),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/store"
+	"shop/api/web"
+)
+
+func main() {
+	keeper := store.Open()
+	payer := billing.NewPayer(keeper)
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// The states of an order.
+const (
+	Pending   = "pending"
+	Paid      = "paid"
+	Shipped   = "shipped"
+	Cancelled = "cancelled"
+)
+
+// Order is an order.
+type Order struct {
+	ID     string
+	Status string
+}
+-- rules.vulcan --
+origin test
+hash sha256:0
+
+rule X
+  kind code-form
+  level error
+  form duplicate-function
+  limit 60
+  similarity 90
+  in api/orders
+  reason A reason.
+  source A source.
