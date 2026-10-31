@@ -43,6 +43,8 @@ section 4.
   of enforced rules on T1. They were chosen by the owner after the builder reported that 39 wanted
   rules were out of reach for that reason. They come from the blind wishlist and from no rule set
   or result of a blind test, and they apply the same in L and V.
+- L rejects a wire that it cannot read (section 9, amendment 7). This leans toward an empty U. The
+  difference of the two designs does not disappear: it becomes a limit on the form of L's `main`.
 
 ## 1. Questions
 
@@ -61,10 +63,12 @@ section 4.
 **The rules file is an ordinary file that the team owns** (working name `rules.vulcan`; arm L
 reads the same format).
 
-- To tune, override, or delete a rule, edit the file. What the check enforces is what the file
-  says. There is no hidden layer of built-in rules, so deleting a rule really deletes it.
-- Each rule has an id, a kind, its parameters, `error` or `off`, a reason in one line, and the
-  source of the practice.
+- To tune, override, or delete a rule, edit the file. There is no hidden layer of rules: a deleted
+  rule's own finding stops. Two things stay outside the file (section 9, amendment 8). The model's
+  checks stay on, so code that one of them also rejects stays rejected. The effect lists, `form`,
+  and `at` live in the tool, so a new build can change what a rule enforces.
+- Each rule has an id, a kind, its parameters, `error`, `warn`, or `off`, a reason in one line, and
+  the source of the practice. A rule at `warn` prints a finding and passes the check.
 - The head of the file names its origin: `defaults v1`, or a source and hash.
 
 **Other sources.** `SOURCE` is a local file, or an `https` URL. The project records the hash of
@@ -147,6 +151,13 @@ record says what was covered, by class. The bar is not lowered, and rules are no
 class that moved compared with no defaults; and which default enforced each rule. A rule may land
 in S only because of a default that the team would have turned off, so QN is read next to it.
 
+A rule at `warn` does not count as enforced, because the check does not reject its seeded cases. The
+report lists separately each rule that a `warn` default matches.
+
+**What T1 cannot say.** Most rule kinds live in one shared package (`internal/rules`). On those kinds,
+a member of G or U comes from what an arm gives that package, or from a form that only one arm has.
+So T1 does not show that a second builder of the linter would reach the same result.
+
 *Predictions, to be measured:* classes A and B move, and classes C and D mostly do not, because
 values and behavior are not what these rule kinds state. U stays empty.
 
@@ -195,3 +206,6 @@ says yes, QN reads this repository's applications only.
 | 4 | A second session repeats the verdicts of [hypotheses-r3.md](hypotheses-r3.md) blind, before any feature from that document is built | That document, section 9 |
 | 5 | A first look at theory T8, on round 1's 72 final workspaces. It is exploratory, and no stop rule reads it | That document, section 9 |
 | 6 | Add rule kinds for the 39 wanted rules that step 2 lists under "shape", in both checkers, with no wanted rule reworded. Flow kinds stay out, and those 33 rules stay listed as not stated. Added 2026-10-30: section 2 lets the wishlist decide the kinds, but the first brief for step 2 named four, so this corrects that brief. The gate of section 5 does not change | Section 2; [NOT-STATED.md](../../experiments/poc/r3/defaults/NOT-STATED.md) |
+| 7 | Audit finding H2: L reads a wire only in plain form, and rejects a wire that `main` makes through a helper, closure, field, slice, map, or similar. V declares its wires, so it has no such limit. The owner chose this over naming the difference as a candidate for U (2026-10-31). The limit is a cost of L's form, and the T21 and form measures count it | [parity-r3.md](../../experiments/poc/parity-r3.md); section 0 |
+| 8 | Audit findings M8 and M10: section 2's claim on hidden layers is narrowed, the level `warn` is named, and a `warn` rule does not count as enforced | Sections 2 and 5 |
+| 9 | Audit section 2: `CTX-08`, `CODE-09`, and `CODE-11` stay in part at one package, in both arms. The limit is the design of the shared package, not of L. The wider forms are not built | [parity-r3.md](../../experiments/poc/parity-r3.md), section 2 |
