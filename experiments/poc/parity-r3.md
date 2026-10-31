@@ -655,3 +655,150 @@ Amendment 9 keeps the three rules at one package, and the documents now say why.
 - A real `https` source, as before.
 - The builder's intent for M3. I read the record and ran the forms.
 - Each form of main that a Go program can have. I tried those above.
+
+## Second rerun
+
+Reviewed at commit 15ef49e (branch main), with the fixes ae55653 and 15ef49e. The same reviewer ran this. The sections above stay as they were at b49bf27. This rerun is narrow, as the owner asked: the fixes, plus each existing case script for a regression.
+
+### Result
+
+**Step 3's gate (no open High finding) does not pass.** N1 and N2 are fixed. One High finding is open, and it is new here: N10. V has the same escape that N1 was in L. It was in V from the start, and my earlier runs did not try it.
+
+| Severity | Open now | Which |
+|---|---:|---|
+| High | 1 | N10 |
+| Medium | 1 | N11 |
+| Low | 5 | N9 (rest), N12, N13, N14, N15 |
+
+Of the findings open after the first rerun: N1, N2, M6 (main count), M7, N3, N4, N5 are fixed by a result that I ran. M12, N6, N7, N8 are listed, and I hold the text honest. N9 is correct in its main text, and has a rest.
+
+### How I ran it
+
+- A fresh build of 15ef49e. I reran `b1` to `b5`, `b7`, `c1`, `c2`, `a1`, `a2`, `a3`, and `a5`, with no change to their text, and compared them with the saved output of the first rerun. Of 543 rows, 36 changed. Each change is one of the fixes below, and none is a regression. The rows `td1`, `td2`, and `t1` to `t8` also gain the new finding at the file.
+- I wrote 72 new cases. `a6`: fixtures, names in rules, and witnesses for the 9 stated rules. `a7`: a nested module in each directory that V skips. `a8` and `a9`: forms of a call of the leaf's own helper.
+- `go test ./internal/rules ./poc/golint/... ./conformance` passes, with `-parallel 2` for `conformance`. A first run under full parallelism, with other work on the host, had one failure: `R20`, with a `fork/exec` error of the compiler. It passes alone, so I hold this as a fault of the host.
+- One scratch build, from `git archive` of 15ef49e, prints the tokens of each function that `CODE-09` reads. So I compared the count directly, on 26 forms and on each function of both base applications.
+
+### Results for each finding
+
+| Finding | Result | Run |
+|---|---|---|
+| N1 | Fixed | `t9`, `t13`, `t14`, `t10`: L now VL0002. See "N1" below |
+| N2 | Fixed for contracts | `m3e3`, `m3e5`, `m3e7`, `m3r8`, `m3o7`: the same result in both arms. Port calls: both at 5. See "N2" below |
+| M6 | Main count fixed | Recount below. A rest is N13 |
+| M7 | Fixed | `ty5` to `ty9`, `ty22` to `ty24`, `ty29`, `ty30`, `m1`, `m3`, `m5`, `m6`, `m15`, `m17`, `m18`: K0801 and VL0801. `ty1` to `ty3`, `m16`: exit 0 in both, as `rules-file.md` says. A rest is N12 |
+| M12 | Listed, acceptable | `z10`, `z11`, `s1c`, `s1d` pass in both. `rules-file.md` now says that this is a choice for `PAY-01`, `CTX-01`, `CTX-02`, and `ARCH-03`, and a limit for `DATA-14`. That matches the code |
+| N3 | Fixed | `z1`, `z2`, `z5`, `z6`, `z7` pass in both. `z3`, `z8`, `z12` still reject, and each is a value of the listed type |
+| N4 | Fixed | `bl1`, `bl2`, `bl3`: exit 0 in both. `bl4`: a text that a person wrote in a clause fires in both |
+| N5 | Fixed | `k3`: exit 0 in both |
+| N6 | Listed, acceptable | `e1`, `e5`, `e8`, `e9` as before. `rules-file.md` states it. Both arms fail |
+| N7 | Fixed | The analyzer's `Doc` no longer says "in strict mode". `rules-file.md` lists the edge of `v14` |
+| N8 | Listed, acceptable | `t12`: exit 0 in both. A row in the Limits table states it |
+| N9 | Main text correct. A rest is open | See "N9" below |
+
+### New findings
+
+#### N10. High. In V, a nested module under a directory that V skips passes every check
+
+- **Where:** `internal/project/project.go:153`. The walk of the project skips a directory whose name starts with `.` or `_`, and `testdata` and `vendor`. K0002 is in the part that the walk reaches. `internal/gen/leaves.go` then copies the `replace` with an absolute path.
+- **Case `ne1`, rules `ERR-08` and `ARCH-10`:** `go.mod` holds `require example.com/evil v0.0.0` and `replace example.com/evil => ./testdata/evil`. `testdata/evil/go.mod` is `module example.com/evil`, and `testdata/evil/s.go` calls `os.Exit(1)` and `net.Dial`. A leaf calls `evil.X()`. **V exit 0. `vulcan build` writes the binary. L exit 3, VL0002.**
+- **Other runs:** `ne2` (`_x/evil`), `ne3` (`.x/evil`), `ne4` (`api/orders/testdata/evil`): V exit 0, L VL0002. `ne6` (`vendor/evil`): V exit 0, L a build error. `ne5` (`third`): both reject.
+- **Why High:** it is the escape of H3 and N1: code inside the project that leaves the model and each rule, with exit 0, in one arm. I gave those High, so I give this High. The direction is the other way: V passes more. A rule can land in G because of it.
+- **Why the record misses it:** `rules-file.md` says "V ignores a `.go` file under `testdata`, a `_` name, a `.` name, or `vendor` when nothing imports it". The cases above do import it. The Limits row for a module outside the project does not cover it, because these are inside the project.
+- **Smallest fix:** make V's walk report a `go.mod` below the root in each directory, also a skipped one, with K0002.
+
+#### N11. Medium. `CODE-09` counts a call of the leaf's own helper as two more nodes in L
+
+- **Where:** `internal/rules/shape.go`, `tokens`. A chain of names counts as a selector of one name, so `a.save` is three nodes, and `save` is one. In L a helper that uses a port is a method, because the port is a field. In V the same helper can be a plain function, because a port is a package name.
+- **Case `m3d10`:** two functions of `api/billing`, each with 10 lines `save(x)` in V and `p.save(x)` in L. **V exit 0. L exit 3, VL0810.** The same through 14 lines. Both fire at 15. With an `if err := save(x)` form both fire at 5 (`m3h5`), so the steps there hide it.
+- **On the base applications:** by the probe, `api/billing` `Refund` is 126 in V and 128 in L, and `api/web` `Handler` is 237 and 283, for each route's `a.refund` against `refund`. At limit 60 and similarity 90 the findings stay equal. At similarity 80, L has 14 findings and V has 13, so one pair crosses.
+- **Severity:** the same kind and size as the first M3, which was Medium. It is not High: the place of the limit moves by a factor of 1.5 at most in a function made only of such calls, and much less in code with other statements. N2's contract form was a factor of more than two on the common form.
+- **Favors:** V passes more, near the limit. **Smallest fix:** count a selection of a method on the function's own receiver as an identifier. Or list it as a limit.
+
+#### Low
+
+| # | Finding | Case | Where | Favors | Smallest fix |
+|---|---|---|---|---|---|
+| N12 | Names in a rule still differ at the edges. `shop/cmd/shop.X`: V K0801, L exit 0. `shop/lib/contract.Nope`: V exit 0, L VL0801. `(shop/api/billing.Ledger).Save`, a port method: a fault in both, and in L it is false, because `LookupFieldOrMethod` on a pointer to an interface finds nothing. L also applies the rule. `deny-types shop/api/billing.Ledger`: V silent, L VL0807, because V's port type has another name. `map[string]shop/lib/money.Nope` and a prefix `shop/lib/money.Nop*`: no fault in either | `m7`, `m9`, `m11`, `m12`, `m4`, `m2` | `internal/rules/shape.go`, `projectName`, `resolveNames` | Mixed | Look up on the type, not on a pointer to an interface. Treat `cmd` and `lib/contract` the same in both. Say that a port cannot be named in V |
+| N13 | M6, the rest. See below | | `coverage.json` | Neither | One row for `HTTP-07`. A rule for what "names" means under the looser test |
+| N14 | L rejects a `.go` file that nothing imports, under `testdata`, `_x`, `.x`, or `vendor`. V passes it. See "N1" below | `fx1` to `fx8`, `fx10`, `fx12`, `fx15` | `poc/golint/layout/layout.go`, `hidden` | V passes more | Drop `testdata`, `_`, and `.` from `hidden`, and keep `go.mod` and `vendor` |
+| N15 | V counts one more token, `*ast.EmptyStmt`, at the end of a function with no result and a lowered contract | `f_void`, `Shrink`; `api/billing` `charge` and `refund`: 6 and 5 | `shape.go`, `tokens` | L passes more, by one token | Skip `EmptyStmt`, or the `;` in the lowering |
+
+### N1: the fixture question
+
+**Yes, the fix adds a difference between the arms.** The programs that L alone rejects are these. Each passes in V, and each is a `.go` file that nothing imports:
+
+| Place | L | V |
+|---|---|---|
+| `testdata/x.go`, in the root, a leaf, or a library (`fx1`, `fx2`, `fx7`, `fx12`) | VL0002 | exit 0 |
+| `_x/x.go`, also in a leaf (`fx3`, `fx6`) | VL0002 | exit 0 |
+| `.x/x.go`, `.github/tools/x.go` (`fx4`, `fx8`) | VL0002 | exit 0 |
+| `vendor/x.go`, also in a leaf (`fx5`, `fx15`) | VL0002 | exit 0 |
+| A nested module under `testdata`, not imported (`fx10`) | VL0002 | exit 0 |
+
+These agree: a nested module in a plain directory (`fx9`), `Testdata` and `node_modules`, which `go` lists (`fx16`, `fx17`), a `.txt` fixture (`fx13`).
+
+**How much it matters:** little. The file is not built, so no rule's result depends on it, and neither application has one. The cost is that an agent in L must move a Go fixture, or a small tool under `.github`, that an agent in V can keep. `rules-file.md` says "L is stricter on one form", and that is correct for these programs. The walk also was not needed for them: `imports.go` already rejects an import of such a path. Only `go.mod` and `vendor` need the walk.
+
+**The honest limit, if the owner does not change it:** the sentence in `rules-file.md`, with N10 corrected. **The smallest fix for both N10 and N14 is one rule in each arm:** a `go.mod` below the root fails in each directory, in both arms, and an unimported file in a skipped directory passes in both.
+
+The H3 table now reads:
+
+| Place | L | V |
+|---|---|---|
+| `testdata`, imported, in a leaf, a library, or the root | VL0002 | K0008 |
+| `_x` and `.x`, imported | VL0002 | K0008 |
+| `vendor/sub`, by the module's path | VL0002, and the go command refuses | K0008 |
+| `vendor/example.com/evil`, with `modules.txt` | VL0002 | K0209 |
+| A nested module in a plain directory, with a `replace` | VL0002 | K0002 |
+| **A nested module under `testdata`, `_x`, or `.x`, with a `replace`** | VL0002 | **Exit 0 (N10)** |
+| **A nested module under `vendor`, with a `replace`** | A build error | **Exit 0 (N10)** |
+
+### N2: the limit, and the similarity counts
+
+**Contract forms: the limit is at the same place, within one token.** The probe gives the same token list in both arms on 24 of 26 forms: returns with `ensures`, named results and a bare return, a tuple, two values, a switch, a loop, a closure, `requires`, `old`, a literal with an invariant, a pointer to one, `Keep`, labels, a person's `defer`, `select`, a nested block, one line, and a person's own block of the same shape as a lowered one. The two others are N15.
+
+**Base applications:** 118 of the 131 functions in V have the same list in L. The other 13 are constructors, which hold port parameters in L, wrappers in `ports.go`, which only L has, `startup` against `Serve`, `Refund` and `Handler` (N11), and `charge` and `refund` (N15).
+
+**Port calls:** both at 5 (`m3p3` to `m3p6`). **A call of the leaf's own helper: no** (N11).
+
+**The builder's numbers are correct for V, and not for L at 80.**
+
+| Similarity (limit 60) | V | L | Same pairs |
+|---:|---:|---:|---|
+| 80 | 13 | **14** | No: L has `Charge` and `Refund` twice |
+| 85 | 12 | 12 | Yes |
+| 90 | 10 | 10 | Yes |
+| 95 | 6 | 6 | Yes |
+| 100 | 4 | 4 | Yes |
+
+`rules-file.md` says "13, 12, 10, and 6 pairs ... in each arm". That is a small error. It comes from N11. At similarity 90, the limit gives V and L the same pairs at each of 30, 40, 50, 60, 70, 80, and 100 (34, 12, 10, 10, 8, 7, 6).
+
+### M6: the recount
+
+`coverage.json` gives `status` 9, 47, 154, and `loose_status` 41, 15, 154. Both counts hold. The 39 of amendment 6 give 4, 34, 1, and 24, 14, 1.
+
+**The strict test is applied the same way, with one exception.** The 9 are `ARCH-01`, `ARCH-02`, `ARCH-07`, `ARCH-21`, `ERR-09`, `HTTP-07`, `DATA-15`, `CODE-03`, and `CODE-06`. I tried a break of each by each limit that could reach it. The one that passes is `HTTP-07` through a library (`st5`), which is the same route as `SEC-31` through a library (`s25`), and `SEC-31` is in part. The call is `http.HandleFunc`, which `ARCH-19` and K0211 reject in a library when all defaults are on. So the break does not pass the ruleset, and it does pass the rule. By the sentence as written this gives 8, 48, 154. `st1` and `st2` are no break of the text, because it names imports.
+
+**The looser test is not applied the same way.** It says "only a limit that the wanted text names changes a status". `HTTP-13` is in part because the text names "each entry route". By that reading these also name what the limit reaches, and they are listed as stated: `ARCH-06`, `ERR-03`, `CODE-02`, `CODE-04` ("gives the reason", "with a reason"), `CONC-03` ("a comment defends"), `HTTP-02` ("a non-zero `Timeout`", and `h_l1` passes), and `HTTP-01` ("serves through", which the rule does not read). By my reading this gives 34, 22, 154. `rules-file.md`, call 23, says that this class is the builder's reading, so the record is honest about it. It leans toward a higher count under the looser test. The main count is the strict one, by the owner's decision, so I rank this Low. Another reader of "names" can reach another number.
+
+### N9: the record of `CODE-09`
+
+**Does the record state this correctly?** Call 22 of `rules-file.md` now states the forms, the counts, the order, and the reason: the builder built the one-token form, saw 10 fall to 5, and changed it because the brief of that fix said not to reduce findings. That agrees with my runs (10, 10, 10, 5). It corrects what the first rerun could say: I wrote that I could not see the intent. Three small gaps remain, and these are the rest of N9:
+
+- It says "the brief of that fix", and not that the coordinating session wrote it. A reader should know that the instruction came from outside the builder.
+- `QN-base-apps.md` holds the row `CODE-09 | 10 | 10`, with no word of this. That is where a reader of QN looks.
+- "in each arm" at similarity 80, as above.
+
+**Should `CODE-09` as built count as a tuned rule when it is read later?** Yes, for the base applications. The form of the count was selected by its result on those applications, in the direction that keeps findings. So this rule's count there is not a measure on code that was not used to shape it, and that is what QN asks of those applications (plan-r3, section 5). The record does not say whether the limit 60 and the similarity 90 were also set with these applications in view. They were in the first build of the kind, and the count depends on them.
+
+The tuning does not reach the blind tests. No T1 or T2 rule text or result went into it, so a later `CODE-09` result on T1 has no such lean. On a QN of other code, the form stays, and it is selected. I do not choose a form. Which one is right is not something that the wanted text or these runs decide.
+
+Smallest fix: a sentence in `QN-base-apps.md` beside the row, and the words "the coordinating session's brief" in call 22.
+
+### What I could not check
+
+- The sealed seeded cases, as before.
+- A Linux host, a host with a C compiler, and a real `https` source, as before.
+- How the limit 60 and the similarity 90 were first chosen. The record does not say.
+- Each form of a lowered statement. I tried 26 forms and each function of the base applications.
