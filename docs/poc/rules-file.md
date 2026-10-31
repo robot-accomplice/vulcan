@@ -31,7 +31,7 @@ rule ERR-08
   source Uber Go Style Guide (https://...)
 ```
 
-Each rule has an id, a kind, its parameters, a level, a reason in one line, and a source. A level is `error`, `warn`, or `off`. A finding of a rule at `warn` is printed, and the check still passes. A word in `in`, `except`, `from`, `deny`, `allow`, or `load` is a kind (`leaf`, `gateway`, `entry`, `library`, `main`) or the directory of a part. `leaf` means a plain leaf. A file with a fault is an error (K0801, VL0801). So is a directory that is not a part, a type or a field of a table that the project lacks, a word of `require` that a place does not take, and a place with nothing to apply. A name outside the project is not checked: `funcs os.Exitt`, `type net/http.Clent`, and `deny-types context.Contex` are accepted, and the rule then rejects nothing.
+Each rule has an id, a kind, its parameters, a level, a reason in one line, and a source. A level is `error`, `warn`, or `off`. A finding of a rule at `warn` is printed, and the check still passes. A word in `in`, `except`, `from`, `deny`, `allow`, or `load` is a kind (`leaf`, `gateway`, `entry`, `library`, `main`) or the directory of a part. `leaf` means a plain leaf. A file with a fault is an error (K0801, VL0801). So is a directory that is not a part, a word of `require` that a place does not take, and a place with nothing to apply. So is each name with the project's module path that the project lacks, in `funcs`, `deferred-ok`, `deny-types`, `types`, `param-type`, and `type`, and a type or a field of a table. A field of a `literal` rule is a fault when its type lacks it, and that is read for a type of the project, and for another type that a package uses. A name outside the project is not checked: `funcs os.Exitt`, `type net/http.Clent`, and `deny-types context.Contex` are accepted, and the rule then rejects nothing. A field of a type outside the project that no package uses is not read, and changes nothing.
 
 `lists` in the head is the version of what the tool holds and the file does not: the effect lists, `form`, and `at`. It does not cover the code of a kind, or the model's own lists.
 
@@ -85,17 +85,33 @@ Limits, the same in both arms:
 
 - **Wires in L (VL0909, amendment 7).** L reads a wire only in a plain form: the argument is a call of a leaf's constructor, or a local variable with one value that is such a call or such a variable. Each other wire in main is an error: a helper, a closure, a field, a slice, a map, a variable with a second value, a constructor as a value, and main's own type. V declares its wires, so it has no such limit. This is a cost of L's form.
 - **An import that no part holds (VL0002 in L, K0008 in V).** `go` does not list a package under `testdata`, so L reads it through the import.
+- **A Go file in a directory that no part holds (VL0002 in L, K0002 in V).** L walks the module root, and rejects a `.go` file under `testdata`, `vendor`, a name that starts with `_` or `.`, or a directory with its own `go.mod`. This also rejects a nested module with a `replace`, and a project that vendors its dependencies with `go mod vendor`. L is stricter on one form: V ignores a `.go` file under `testdata`, a `_` name, a `.` name, or `vendor` when nothing imports it, and L rejects it, also when it is a fixture.
 - **A file that the build ignores (K0901, VL0901).** Behind a build tag or for another system. Without this, what a rule reads would depend on the host.
-- **A package with a type error.** A rule does not read it, in either arm. A type error in a test leaves the package without its tests.
+- **A package with a type error.** A rule does not read it, in either arm. A type error in a test leaves the package without its tests. Both arms fail, and they print other things: V also prints model codes, and the findings of each part that depends on the broken one, and L's driver skips those parts. So V's agent reads more on such a run. Equal text would need a change of L's driver or of V's stages, and this does not change what passes.
+- **A wire in code that does not run.** L reads each constructor call in `main`, so a helper that `main` never calls still adds an edge, and a wire rule fires on it (case `LW12`). VL0909 holds in every mode, with no rules file too.
 
 ## Limits
 
-Each holds in both arms. A rule that a limit reaches is "stated in part" in [NOT-STATED.md](../../experiments/poc/r3/defaults/NOT-STATED.md).
+Each holds in both arms.
+
+- **Strict test (the main count):** a rule that a limit reaches is stated in part.
+- **Looser test (beside it):** only a limit that the wanted text names changes a status.
+
+| Status | Strict | Looser |
+|---|---:|---:|
+| Stated | 9 | 41 |
+| In part | 47 | 15 |
+| Not stated | 154 | 154 |
+
+[NOT-STATED.md](../../experiments/poc/r3/defaults/NOT-STATED.md) gives each rule under both. Neither test changes a wanted rule's text.
 
 | Limit | What passes | Why it stays |
 |---|---|---|
 | A call through a local interface or a generic constraint | `type f interface{ Fatal(...any) }; var x f = log.Default(); x.Fatal("x")`, for `forbid-call`, `only-in`, and `call-form` | Which value the interface holds is flow. A match by method name and signature needs the listed type, which a package need not import, and it rejects an honest interface of the same form. `call-form` does reject a listed method as a value |
-| A type defined from a listed type | `type M float64`, `type C context.Context` | It is another type. An underlying match would reject `time.Duration` under `DATA-14` |
+| A type defined from a listed type | `type M float64`, `type C context.Context`, `type C net.Conn` | It is another type. An underlying match would reject `time.Duration` under `DATA-14`. For `PAY-01` (no standard type is defined from a float for money), and for `CTX-01`, `CTX-02`, and `ARCH-03` (a match by `types.Identical` on an interface has no false alarm of that form), it would be safe. Leaving it out there is a choice, not a limit of the check: the parameter is not built, and these rules stay in part |
+| A break through a helper or another part | `TEST-05` and `TEST-04` read only the test file or the test body, and `SEC-31` only the entry leaf or the gateway, so a helper or a library passes. `SEC-10` reads imports, so `crypto.MD5` of package `crypto` passes (cases `R214` to `R217`) | To follow a call is flow. The audit's scripts for its forms `s18` to `s21` and `s25` are not in the repository, so these cases come from its words |
+| Any comment | Where a comment removes a finding or gives a reason, also an empty `//` | Whether a comment gives a reason is for a person to judge |
+| A module outside the project | A `replace` to a path outside the module passes, in both arms: `go` builds it, and no rule reads it | The check reads the project. A team that wants this closed reviews `go.mod` |
 | A value in a variable | `Timeout: z` with a zero `z`, and a text in a variable | Each kind that reads a constant reads only a constant. Following the variable is flow |
 | A finite list | A function that a list does not name | The audit's names are added. It tried names that it chose, not each name of the standard library |
 | A name outside the project in a rule | `funcs os.Exitt` | The check does not load what a rule names |
@@ -128,15 +144,15 @@ Each holds in both arms. A rule that a limit reaches is "stated in part" in [NOT
 | 19 | `test-logic` rejects `if err != nil` in a test body | The wanted text allows one table loop and no branch. A team that uses it may tune it | Stricter than common Go practice, as the wishlist's author chose |
 | 20 | `literal` also reaches `HTTP-01` and `HTTP-02`, though they were not among the 39 | Each had a rest with the reason "shape". A team with a deadline on each call turns `HTTP-02.timeout` off, as the wishlist's decision allows. Each stays in part | More rules enforced, in both. They are named here so that the count of 39 stays traceable |
 | 21 | A comment is read from the file that a person wrote, and a comment on the line above counts only if it fills that line | One reading in both arms, which also leaves out V's generated comments | Stricter than before in both: `x := 1 // about x` gives no reason for the next line. An empty `//` still counts |
-| 22 | `CODE-09` counts a chain of names as a selector of one name | So `p.ledger.Save` and `Ledger.Save` count the same | Lowers the count for a longer chain in both, so such a pair reaches the limit later. No finding on the base applications changed |
-| 23 | The stated rules with a method in their list are in part | The limit on local interfaces reaches each of them | A lower count of stated rules, in both |
+| 22 | `CODE-09` counts what a person wrote, and a chain of names as a selector of one name | So `p.ledger.Save` and `Ledger.Save` count the same. A lowered return block is a `return`, and a statement that holds only a contract does not count, in both arms. Forms of the chain that were tried, with limit 60 and similarity 90, on the base applications: each node, 10 pairs; a selector of one name, 10; only a selection of a port field, 10; one token for the chain, 5. The builder first built the one-token form, saw the base count fall from 10 to 5, and then changed to a selector of one name, because the brief of that fix said not to reduce findings on a base application unless a fix required it. So the base count is what separated these forms, and the record holds no other reason for the choice. Each form equalizes a port call. The chain form was not changed in this fix. The limit 60 and the similarity 90 are the builder's choices, and the wanted text gives no number. After the fix of the contract forms, at limit 60, the base applications give 13, 12, 10, and 6 pairs at similarity 80, 85, 90, and 95, in each arm. So the 10 is a result of two parameters, and no test of a form | Lowers the count for a longer chain in both, so such a pair reaches the limit later |
+| 23 | The main count uses the strict test, by the owner's decision | The sentence as written. It leans toward a low count of stated rules, in both arms. The looser test is printed beside it. The classing of a rule under the looser test is the builder's reading of the wanted text | A lower count of stated rules, in both |
 
 ## Tests
 
 | Test | What it shows |
 |---|---|
-| `conformance` and `poc/golint/conformance`, cases `R01` to `R65`, `H6a` to `H6c`, `H7a`, `H7b`, `R70` to `R137` for the shape kinds, and `R140` to `R185` for the audit | The same case in V and in L: each kind, each effect, each `at` and `form`, a rule off, a deleted rule (R04, and for the shape kinds R71, R89, R98, R111), no rules file (R05), a fault in the file, and the holes |
-| `LW*`, `LT*`, `LN1`, `VT1`, `ET1` | Forms that one arm has alone: a wire in L's main, code under `testdata`, a name with V's prefix in L, and a type error in a test. They are outside `TestRuleCasesAgree` |
+| `conformance` and `poc/golint/conformance`, cases `R01` to `R65`, `H6a` to `H6c`, `H7a`, `H7b`, `R70` to `R137` for the shape kinds, and `R140` to `R185` and `R190` to `R217` for the audit and its rerun | The same case in V and in L: each kind, each effect, each `at` and `form`, a rule off, a deleted rule (R04, and for the shape kinds R71, R89, R98, R111), no rules file (R05), a fault in the file, and the holes |
+| `LW*`, `LT*`, `LN1`, `VT*`, `ET1` | Forms that one arm has alone: a wire in L's main, code under `testdata`, a nested module, a vendored package, a name with V's prefix in L, and a type error in a test. They are outside `TestRuleCasesAgree` |
 | `TestRuleCasesAgree` | Each case lists the same codes in both arms |
 | `TestRulesCommands` | `init`, `diff`, `upgrade`, and `lock` on copies of both base applications: the same words, and the same lock. The check passes after the source is removed |
 | `TestDefaultsOnBase` | The arms agree by rule, part, and count on the base applications, with one named difference in the applications |

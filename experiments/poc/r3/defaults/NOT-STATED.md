@@ -4,18 +4,26 @@ Draft, not frozen. `gen_defaults.py` writes this file from the wishlist and `cov
 
 This list is a result of plan-r3, section 4: it says what the rule kinds cannot state.
 
-| Status | Wanted rules |
-|---|---:|
-| Stated by the kinds | 26 |
-| Stated in part | 30 |
-| Not stated | 154 |
-| Total | 210 |
+**Strict test (the main count):** a rule that a limit reaches is stated in part.
+
+**Looser test (beside it):** only a limit that the wanted text names changes a status.
+
+| Status | Strict | Looser |
+|---|---:|---:|
+| Stated by the kinds | 9 | 41 |
+| Stated in part | 47 | 15 |
+| Not stated | 154 | 154 |
+| Total | 210 | 210 |
+
+The rest of this file reads the strict test, and each row of the list of 39 gives both. A wanted rule's text does not change under either test.
+
+Each row of `coverage.json` holds `status` by the strict test and `loose_status` by the looser one.
 
 `defaults v1` also holds the 4 dependency rules of plan-r3, section 3 (`DEP-LIBRARY`, `DEP-GATEWAY`, `DEP-ENTRY`, and `DEP-LOCK`, which is off). The wishlist does not ask for them.
 
 A rule that the model already enforces and that a kind can state is in the file too: `ARCH-07`, `ARCH-10`, `ARCH-11`, `ARCH-19`, `HTTP-07` in part, and `SEC-30`. If a team deletes one of these, the rule stops firing, but its model check (K0101, K0205, K0125, K0211, K0124) stays. Plan-r3's "no hidden layer" holds for the rules file. It does not switch off the model. See `QN-base-apps.md`.
 
-Two stated rules are wider than their wanted text, because a kind cannot see a purpose. `SEC-10` bans the broken algorithms in all code, not only in security code; its note in the wishlist expects a written exception for a checksum, which here is an edit of `from` or `except`. `DATA-15` bans `time.Now`, `time.Since`, and `time.Until` in all code of a plain leaf or a library, not only for a business decision.
+Two rules are wider than their wanted text, because a kind cannot see a purpose. `SEC-10` bans the broken algorithms in all code, not only in security code; its note in the wishlist expects a written exception for a checksum, which here is an edit of `from` or `except`. `DATA-15` bans `time.Now`, `time.Since`, and `time.Until` in all code of a plain leaf or a library, not only for a business decision.
 
 Four rules hold a finite list where the wanted text is open or says "such as": `ARCH-19` (Appendix D's global mutators), `CTX-06` (the forms without a context in the standard library), and `ARCH-10` and `ARCH-11` (Appendix D's network functions, with holes H3 and H7 and the names of audit M13). A name that a list lacks is not found, in both arms.
 
@@ -42,180 +50,248 @@ Stated forms that hold a finite list, or are wider than the words, for the same 
 
 | Reason | Wanted rules |
 |---|---:|
-| shape | 6 |
-| flow | 11 |
-| meaning | 8 |
+| shape | 11 |
+| flow | 18 |
+| meaning | 13 |
 | project-facts | 1 |
 | outside-source | 1 |
 | whole-program | 3 |
 
 ## The 39 wanted rules of amendment 6
 
-| Rule | Outcome | Entries |
-|---|---|---|
-| ARCH-03 | stated | `ARCH-03` |
-| ARCH-06 | stated | `ARCH-06` |
-| ARCH-21 | stated | `ARCH-21` |
-| ERR-01 | stated | `ERR-01` |
-| ERR-03 | stated | `ERR-03` |
-| ERR-04 | stated | `ERR-04` |
-| ERR-09 | stated | `ERR-09` |
-| ERR-13 | stated | `ERR-13` |
-| CTX-01 | in part (shape) | `CTX-01` |
-| CTX-02 | in part (shape) | `CTX-02` |
-| CTX-03 | stated | `CTX-03` |
-| CTX-07 | in part (meaning) | `CTX-07` |
-| CTX-08 | in part (whole-program) | `CTX-08` |
-| HTTP-09 | in part (meaning) | `HTTP-09` |
-| HTTP-11 | stated | `HTTP-11` |
-| HTTP-13 | in part (shape) | `HTTP-13` |
-| HTTP-17 | in part (shape) | `HTTP-17` |
-| SEC-01 | in part (meaning) | `SEC-01` |
-| SEC-02 | in part (meaning) | `SEC-02` |
-| SEC-07 | in part (meaning) | `SEC-07` |
-| DATA-03 | in part (flow) | `DATA-03` |
-| DATA-14 | in part (meaning) | `DATA-14` |
-| PAY-01 | in part (project-facts) | `PAY-01` |
-| RES-02 | in part (flow) | `RES-02` |
-| CONC-03 | stated | `CONC-03` |
-| OBS-02 | in part (flow) | `OBS-02` |
-| CON-01 | in part (meaning) | `CON-01` |
-| CON-02 | not stated (meaning) |  |
-| CON-03 | in part (flow) | `CON-03` |
-| CODE-02 | stated | `CODE-02` |
-| CODE-03 | stated | `CODE-03` |
-| CODE-04 | stated | `CODE-04` |
-| CODE-05 | in part (flow) | `CODE-05.json`, `CODE-05.xml` |
-| CODE-06 | stated | `CODE-06` |
-| CODE-08 | stated | `CODE-08` |
-| CODE-09 | in part (whole-program) | `CODE-09` |
-| CODE-11 | in part (whole-program) | `CODE-11.deprecated`, `CODE-11.unused` |
-| TEST-04 | stated | `TEST-04` |
-| BLD-07 | in part (meaning) | `BLD-07` |
+| Rule | Strict | Looser | Entries |
+|---|---|---|---|
+| ARCH-03 | in part (shape) | stated | `ARCH-03` |
+| ARCH-06 | in part (meaning) | stated | `ARCH-06` |
+| ARCH-21 | stated | stated | `ARCH-21` |
+| ERR-01 | in part (shape) | stated | `ERR-01` |
+| ERR-03 | in part (meaning) | stated | `ERR-03` |
+| ERR-04 | in part (flow) | stated | `ERR-04` |
+| ERR-09 | stated | stated | `ERR-09` |
+| ERR-13 | in part (flow) | stated | `ERR-13` |
+| CTX-01 | in part (shape) | stated | `CTX-01` |
+| CTX-02 | in part (shape) | stated | `CTX-02` |
+| CTX-03 | in part (flow) | stated | `CTX-03` |
+| CTX-07 | in part (meaning) | partly | `CTX-07` |
+| CTX-08 | in part (whole-program) | partly | `CTX-08` |
+| HTTP-09 | in part (meaning) | partly | `HTTP-09` |
+| HTTP-11 | in part (flow) | stated | `HTTP-11` |
+| HTTP-13 | in part (shape) | partly | `HTTP-13` |
+| HTTP-17 | in part (shape) | partly | `HTTP-17` |
+| SEC-01 | in part (meaning) | partly | `SEC-01` |
+| SEC-02 | in part (meaning) | partly | `SEC-02` |
+| SEC-07 | in part (meaning) | stated | `SEC-07` |
+| DATA-03 | in part (flow) | stated | `DATA-03` |
+| DATA-14 | in part (meaning) | partly | `DATA-14` |
+| PAY-01 | in part (project-facts) | partly | `PAY-01` |
+| RES-02 | in part (flow) | partly | `RES-02` |
+| CONC-03 | in part (meaning) | stated | `CONC-03` |
+| OBS-02 | in part (flow) | stated | `OBS-02` |
+| CON-01 | in part (meaning) | partly | `CON-01` |
+| CON-02 | not stated (meaning) | not-stated |  |
+| CON-03 | in part (flow) | stated | `CON-03` |
+| CODE-02 | in part (shape) | stated | `CODE-02` |
+| CODE-03 | stated | stated | `CODE-03` |
+| CODE-04 | in part (meaning) | stated | `CODE-04` |
+| CODE-05 | in part (flow) | stated | `CODE-05.json`, `CODE-05.xml` |
+| CODE-06 | stated | stated | `CODE-06` |
+| CODE-08 | in part (meaning) | stated | `CODE-08` |
+| CODE-09 | in part (whole-program) | partly | `CODE-09` |
+| CODE-11 | in part (whole-program) | partly | `CODE-11.deprecated`, `CODE-11.unused` |
+| TEST-04 | in part (flow) | stated | `TEST-04` |
+| BLD-07 | in part (meaning) | partly | `BLD-07` |
 
-Of the 39: 17 stated, 21 in part, 1 not stated.
+Of the 39, by the strict test: 4 stated, 34 in part, 1 not stated. By the looser test: 24, 14, 1.
 
 ## Stated in part
 
+**ARCH-03.** A port signature does not carry `*http.Request`, `http.ResponseWriter`, `*http.Response`, `*sql.DB`, `*sql.Tx`, `*sql.Rows`, or `net.Conn`.
+
+- Reason: shape. A type defined from a listed type passes: it is another type. Looser test: stated.
+
+**ARCH-06.** Each entry in `strict_exempt`, `strict_interfaces`, `strict_shared`, `allow_network`, and `allow_acquiring` has a comment that gives the reason.
+
+- Reason: meaning. Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge. Looser test: stated.
+
 **ARCH-10.** Only a gateway leaf or an entry leaf reaches a network function.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
 
 **ARCH-11.** An entry leaf reaches only serve functions, and only a gateway leaf reaches a dial function.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
+
+**ARCH-19.** Leaf code and library code do not call a global mutator such as `os.Setenv`, `http.Handle`, `slog.SetDefault`, or `flag.Parse`.
+
+- Reason: shape. A name that the list does not hold passes. Looser test: stated.
+
+**ERR-01.** Code does not drop an `error` result.
+
+- Reason: shape. A type defined from a listed type passes: it is another type. Looser test: stated.
+
+**ERR-03.** Each `_ = f()` that discards an error has a comment that gives the reason.
+
+- Reason: meaning. Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge. Looser test: stated.
+
+**ERR-04.** Code compares errors with `errors.Is` or `errors.As`, not with `==`, a type assertion, or the error text.
+
+- Reason: flow. A value in a variable passes: the kind reads a constant. Looser test: stated.
 
 **ERR-08.** Leaf code and library code do not call `os.Exit`, `log.Fatal`, or `log.Panic` functions.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
+
+**ERR-13.** Error strings start with a lower-case letter and do not end with punctuation.
+
+- Reason: flow. A value in a variable passes: the kind reads a constant. Looser test: stated.
 
 **CTX-01.** A function that takes a `context.Context` takes it as the first parameter, named `ctx`.
 
-- Reason: shape. A parameter of `context.Context`, or of an alias, or of an interface that embeds it, is stated. A type defined from it is another type, and is not found.
+- Reason: shape. A parameter of `context.Context`, or of an alias, or of an interface that embeds it, is stated. A type defined from it is another type, and is not found. Looser test: stated.
 
 **CTX-02.** A struct does not have a `context.Context` field.
 
-- Reason: shape. A field that holds `context.Context` through an alias, a pointer, a slice, a map, a type argument, or an embedded interface is stated. A type defined from it is another type, and is not found.
+- Reason: shape. A field that holds `context.Context` through an alias, a pointer, a slice, a map, a type argument, or an embedded interface is stated. A type defined from it is another type, and is not found. Looser test: stated.
+
+**CTX-03.** Code does not pass a nil `context.Context`.
+
+- Reason: flow. A value in a variable passes: the kind reads a constant. Looser test: stated.
 
 **CTX-06.** Code uses the context forms of calls that can block: `http.NewRequestWithContext`, `QueryContext`, `ExecContext`, `BeginTx`, `DialContext`, `exec.CommandContext`.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
 
 **CTX-07.** Context values use an unexported key type and hold only request-scoped data, not optional parameters.
 
-- Reason: meaning. The unexported key type is stated. Whether a value holds only request-scoped data is for a person to judge.
+- Reason: meaning. The unexported key type is stated. Whether a value holds only request-scoped data is for a person to judge. Looser test: in part. It names request-scoped data.
 
 **CTX-08.** A port method whose provider reaches a network or acquiring function takes `context.Context` as its first parameter.
 
-- Reason: whole-program. A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, which the design of `rules.Unit` does not give.
+- Reason: whole-program. A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, which the design of `rules.Unit` does not give. Looser test: in part. It names each provider that reaches a network or an acquiring function.
 
 **HTTP-01.** An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`.
 
-- Reason: shape. The ban on the package-level functions, and each timeout set in a literal of `http.Server`, are stated. A timeout from a variable that is zero passes, and the check does not read that the entry serves through that server.
+- Reason: shape. The ban on the package-level functions, and each timeout set in a literal of `http.Server`, are stated. A timeout from a variable that is zero passes, and the check does not read that the entry serves through that server. Looser test: stated.
 
 **HTTP-02.** A gateway uses an `http.Client` with a non-zero `Timeout`, and does not call `http.Get`, `http.Post`, `http.Head`, `http.PostForm`, or `http.DefaultClient`.
 
-- Reason: shape. The ban on the package-level functions and on `http.DefaultClient`, and a `Timeout` set in a literal of `http.Client`, are stated. A variable that is zero passes, and so does a client built through a type defined from `http.Client`.
+- Reason: shape. The ban on the package-level functions and on `http.DefaultClient`, and a `Timeout` set in a literal of `http.Client`, are stated. A variable that is zero passes, and so does a client built through a type defined from `http.Client`. Looser test: stated.
 
 **HTTP-09.** A gateway does not follow a redirect automatically, unless it checks the target against an allow-list.
 
-- Reason: meaning. That a client sets `CheckRedirect` is stated. Whether that function checks the target against an allow-list is for a person to judge.
+- Reason: meaning. That a client sets `CheckRedirect` is stated. Whether that function checks the target against an allow-list is for a person to judge. Looser test: in part. It names the check against an allow-list.
+
+**HTTP-11.** Code does not set `InsecureSkipVerify: true` or a `MinVersion` below TLS 1.2, except in test files.
+
+- Reason: flow. A value in a variable passes: the kind reads a constant. Looser test: stated.
 
 **HTTP-13.** Each entry route accepts only the methods that it lists, and answers others with 405.
 
-- Reason: shape. A route of `http.ServeMux` is stated. A handler with no mux has no route to read.
+- Reason: shape. A route of `http.ServeMux` is stated. A handler with no mux has no route to read. Looser test: in part. It names each entry route.
 
 **HTTP-17.** Each session cookie sets `Secure`, `HttpOnly`, and `SameSite` with the value `Strict` or `Lax`.
 
-- Reason: shape. A literal of `http.Cookie` is stated. A cookie that a handler writes as a header is not read.
+- Reason: shape. A literal of `http.Cookie` is stated. A cookie that a handler writes as a header is not read. Looser test: in part. It names each session cookie.
 
 **SEC-01.** Source files, declaration files, and test fixtures hold no real secret, key, or password.
 
-- Reason: meaning. A string in the code that has the form of a key, or that a name marks as a secret, is stated. Declaration files and fixtures are not read, and only a person can say that a value is real.
+- Reason: meaning. A string in the code that has the form of a key, or that a name marks as a secret, is stated. Declaration files and fixtures are not read, and only a person can say that a value is real. Looser test: in part. It names declaration files and test fixtures.
 
 **SEC-02.** A settings field that holds a credential has the tag `vulcan:"secret"`.
 
-- Reason: meaning. A settings field whose name shows a credential is stated. A credential under another name is not found, as the wishlist's note says.
+- Reason: meaning. A settings field whose name shows a credential is stated. A credential under another name is not found, as the wishlist's note says. Looser test: in part. It names each field that holds a credential.
 
 **SEC-07.** A SQL statement is a constant string, and each value goes in as a parameter.
 
-- Reason: meaning. A constant statement is stated. A comment removes the finding, and the wishlist's decision asks for a fixed allow-list in the same function. Whether a comment describes one is for a person to judge.
+- Reason: meaning. A constant statement is stated. A comment removes the finding, and the wishlist's decision asks for a fixed allow-list in the same function. Whether a comment describes one is for a person to judge. Looser test: stated.
+
+**SEC-10.** Security code does not use MD5, SHA-1, DES, or RC4.
+
+- Reason: shape. An import of the four packages is stated. `crypto.MD5` of package `crypto` passes (case R216). Looser test: stated.
 
 **SEC-30.** Leaf code and library code do not import `unsafe` or `syscall`, do not use cgo, and do not call `reflect.Value.Call` or `reflect.Value.Method`.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
+
+**SEC-31.** An entry leaf or a gateway does not decode outside data with `encoding/gob`.
+
+- Reason: flow. A call of `gob.NewDecoder` in an entry leaf or a gateway is stated. A decode through a library passes (case R217). Looser test: stated.
 
 **DATA-03.** SQL text does not hold `BEGIN`, `COMMIT`, or `ROLLBACK`.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
 
 **DATA-14.** Code uses `time.Time` for instants and `time.Duration` for periods, not integers or strings.
 
-- Reason: meaning. A value whose name shows a time or a period is stated. A value under another name is not found, as the wishlist's note says.
+- Reason: meaning. A value whose name shows a time or a period is stated. A value under another name is not found, as the wishlist's note says. Looser test: in part. It names instants and periods, under any name.
 
 **PAY-01.** A money amount is an integer in the currency's smallest unit, or an exact decimal, and is never `float32` or `float64`.
 
-- Reason: project-facts. A float whose name shows money is stated. The name of the project's money type would give a stronger check, as the wishlist's note says.
+- Reason: project-facts. A float whose name shows money is stated. The name of the project's money type would give a stronger check, as the wishlist's note says. Looser test: in part. It names each money amount, under any name.
 
 **RES-02.** A retry loop has a limit on attempts, exponential backoff, and jitter.
 
-- Reason: flow. A loop that calls `time.Sleep` is stated: it needs a condition, a growing wait, and a random value in its function. A retry in another form is not found, as the wishlist's note says, and that the wait grows or is random is read from the form only.
+- Reason: flow. A loop that calls `time.Sleep` is stated: it needs a condition, a growing wait, and a random value in its function. A retry in another form is not found, as the wishlist's note says, and that the wait grows or is random is read from the form only. Looser test: in part. It names a limit, backoff, and jitter of each retry loop.
+
+**CONC-03.** A channel is unbuffered or has size one, unless a comment defends a larger size.
+
+- Reason: meaning. Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge. Looser test: stated.
 
 **OBS-01.** Leaf code and library code log through `log/slog`, not through `log` or `fmt.Print` functions.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
 
 **OBS-02.** A log message text is constant, and variable data goes in attributes.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
 
 **API-04.** A production build exposes no debug or profiling route, and each old API version has an owner and an end date.
 
-- Reason: outside-source. The ban on the debug and profiling packages is stated, in every build. An owner and an end date for each old API version are not in the source.
+- Reason: outside-source. The ban on the debug and profiling packages is stated, in every build. An owner and an end date for each old API version are not in the source. Looser test: in part. It names an owner and an end date for each old API version.
 
 **CON-01.** A port method that changes state declares a `requires` for the limits of its arguments.
 
-- Reason: meaning. That a clause exists is stated, on each port method that takes arguments and whose name does not show a read. Whether a method changes state, and whether a clause is enough, are for a person to judge.
+- Reason: meaning. That a clause exists is stated, on each port method that takes arguments and whose name does not show a read. Whether a method changes state, and whether a clause is enough, are for a person to judge. Looser test: in part. It names a method that changes state.
 
 **CON-03.** A `return` in a function with `ensures` does not itself cause an effect, such as `return tx.Commit()`.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
+
+**CODE-02.** Each suppression of a check names the check and gives a reason.
+
+- Reason: shape. A name that the list does not hold passes. Looser test: stated.
+
+**CODE-04.** A `switch` over a named constant set covers each value, or has a `default` with a reason.
+
+- Reason: meaning. Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge. Looser test: stated.
 
 **CODE-05.** A struct that code marshals has a field tag on each marshaled field.
 
-- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow. Looser test: stated.
+
+**CODE-08.** Each port, topic, `external`, library, and exported name has a doc comment.
+
+- Reason: meaning. Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge. Looser test: stated.
 
 **CODE-09.** Near-duplicate functions become one function, in the leaf or in a library.
 
-- Reason: whole-program. Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, which the design of `rules.Unit` does not give.
+- Reason: whole-program. Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, which the design of `rules.Unit` does not give. Looser test: in part. It names a function in a leaf or in a library, so another package too.
 
 **CODE-11.** Code does not use a deprecated function, and has no unused name.
 
-- Reason: whole-program. A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, which the design of `rules.Unit` does not give, and an unused method or field is not read.
+- Reason: whole-program. A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, which the design of `rules.Unit` does not give, and an unused method or field is not read. Looser test: in part. It names each unused name.
+
+**TEST-04.** A test body has no branch or loop, apart from a loop over a table of cases.
+
+- Reason: flow. A branch or a loop in the body of a test is stated. A branch in a helper of a test file passes (case R215). Looser test: stated.
+
+**TEST-05.** A test does not call `time.Sleep`.
+
+- Reason: flow. A call of `time.Sleep` in a test file is stated. A test that reaches it through a helper in a code file passes (case R214). Looser test: stated.
 
 **BLD-07.** Each deployment-specific value comes from a flag or from the environment, and leaf code holds no address or hostname literal.
 
-- Reason: meaning. An address or a host name in a string of a leaf is stated. Whether any other value is specific to a deployment is for a person to judge.
+- Reason: meaning. An address or a host name in a string of a leaf is stated. Whether any other value is specific to a deployment is for a person to judge. Looser test: in part. It names each deployment-specific value.
 
 ## model
 
