@@ -32,6 +32,9 @@ net/http.Get net/http.Head net/http.Post net/http.PostForm (*net/http.Client).Do
 net/http.ListenAndServe net/http.ListenAndServeTLS net/http.Serve net/http.ServeTLS
 (*net/http.Server).ListenAndServe (*net/http.Server).ListenAndServeTLS (*net/http.Server).Serve (*net/http.Server).ServeTLS
 net/smtp.Dial net/smtp.SendMail net/rpc.Dial net/rpc.DialHTTP net/rpc.DialHTTPPath net/textproto.Dial
+net/rpc/jsonrpc.Dial log/syslog.Dial log/syslog.New log/syslog.NewLogger net/http/fcgi.Serve
+(*net.Dialer).DialTCP (*net.Dialer).DialUDP (*net.Dialer).DialIP (*net.Dialer).DialUnix
+(*os/exec.Cmd).Run (*os/exec.Cmd).Start (*os/exec.Cmd).Output (*os/exec.Cmd).CombinedOutput
 database/sql.Open database/sql.OpenDB os/exec.Command os/exec.CommandContext os.StartProcess
 syscall.Socket syscall.Connect syscall.Bind syscall.Listen syscall.Accept syscall.Exec syscall.ForkExec syscall.StartProcess
 (net/http.RoundTripper).RoundTrip
@@ -60,7 +63,7 @@ net.Listen net.ListenPacket net.ListenTCP net.ListenUDP net.ListenIP net.ListenU
 net.ListenMulticastUDP net.FileListener (*net.ListenConfig).Listen (*net.ListenConfig).ListenPacket crypto/tls.Listen
 net/http.ListenAndServe net/http.ListenAndServeTLS net/http.Serve net/http.ServeTLS
 (*net/http.Server).ListenAndServe (*net/http.Server).ListenAndServeTLS (*net/http.Server).Serve (*net/http.Server).ServeTLS
-syscall.Bind syscall.Listen syscall.Accept
+syscall.Bind syscall.Listen syscall.Accept net/http/fcgi.Serve
 `)
 
 var globalMutators = names(`

@@ -38,7 +38,7 @@ os/exec.Command"""
 
 SQL_FUNCS = """(*database/sql.DB).Query (*database/sql.DB).QueryRow (*database/sql.DB).Exec (*database/sql.DB).Prepare (*database/sql.DB).QueryContext (*database/sql.DB).QueryRowContext (*database/sql.DB).ExecContext (*database/sql.DB).PrepareContext (*database/sql.Tx).Query (*database/sql.Tx).QueryRow (*database/sql.Tx).Exec (*database/sql.Tx).Prepare (*database/sql.Tx).QueryContext (*database/sql.Tx).QueryRowContext (*database/sql.Tx).ExecContext (*database/sql.Tx).PrepareContext (*database/sql.Conn).QueryContext (*database/sql.Conn).QueryRowContext (*database/sql.Conn).ExecContext (*database/sql.Conn).PrepareContext"""
 
-SLOG_FUNCS = """log/slog.Debug log/slog.Info log/slog.Warn log/slog.Error log/slog.DebugContext log/slog.InfoContext log/slog.WarnContext log/slog.ErrorContext log/slog.Log (*log/slog.Logger).Debug (*log/slog.Logger).Info (*log/slog.Logger).Warn (*log/slog.Logger).Error (*log/slog.Logger).DebugContext (*log/slog.Logger).InfoContext (*log/slog.Logger).WarnContext (*log/slog.Logger).ErrorContext (*log/slog.Logger).Log"""
+SLOG_FUNCS = """log/slog.Debug log/slog.Info log/slog.Warn log/slog.Error log/slog.DebugContext log/slog.InfoContext log/slog.WarnContext log/slog.ErrorContext log/slog.Log (*log/slog.Logger).Debug (*log/slog.Logger).Info (*log/slog.Logger).Warn (*log/slog.Logger).Error (*log/slog.Logger).DebugContext (*log/slog.Logger).InfoContext (*log/slog.Logger).WarnContext (*log/slog.Logger).ErrorContext (*log/slog.Logger).Log log/slog.LogAttrs (*log/slog.Logger).LogAttrs"""
 
 RETURN_EFFECTS = """(*database/sql.Tx).Commit (*database/sql.Tx).Exec (*database/sql.Tx).ExecContext (*database/sql.DB).Exec (*database/sql.DB).ExecContext
 (*net/http.Client).Do (*net/http.Client).Post (*net/http.Client).Get net/smtp.SendMail os.WriteFile os.Remove"""
@@ -113,7 +113,7 @@ PARTLY = {
     "CTX-07": ([("", "call-form", {"funcs": "context.WithValue", "arg": "1", "require": "unexported-type", "in": CODE})],
                "meaning", "The unexported key type is stated. Whether a value holds only request-scoped data is for a person to judge."),
     "CTX-08": ([("", "declaration", {"at": "wired-port", "to": "gateway"})],
-               "whole-program", "A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, and L's analyzers read one package at a time."),
+               "whole-program", "A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, which the design of `rules.Unit` does not give."),
     "HTTP-09": ([("", "literal", {"type": "net/http.Client", "require": "CheckRedirect", "in": "gateway"})],
                 "meaning", "That a client sets `CheckRedirect` is stated. Whether that function checks the target against an allow-list is for a person to judge."),
     "SEC-01": ([("", "literal", {"deny-text": r"(sk_live_|sk_test_|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|-----BEGIN[A-Z\s]*PRIVATE\sKEY)", "names": "*password* *Password* *secret* *Secret* *apiKey* *ApiKey* *APIKey* *token* *Token*", "in": CODE})],
@@ -129,18 +129,41 @@ PARTLY = {
     "CON-01": ([("", "declaration", {"at": "port-method", "require": "requires", "except-names": "Get* List* Find* Read* Is* Has* Count* Load* Lookup* Exists*", "in": LEAVES})],
                "meaning", "That a clause exists is stated, on each port method that takes arguments and whose name does not show a read. Whether a method changes state, and whether a clause is enough, are for a person to judge."),
     "CODE-09": ([("", "code-form", {"form": "duplicate-function", "limit": "60", "similarity": "90", "in": CODE, "files": "code"})],
-                "whole-program", "Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, and L's analyzers read one package at a time."),
+                "whole-program", "Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, which the design of `rules.Unit` does not give."),
     "CODE-11": ([(".deprecated", "code-form", {"form": "deprecated-use", "in": CODE}),
                  (".unused", "code-form", {"form": "unused-name", "in": CODE})],
-                "whole-program", "A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, and an unused method or field is not read."),
+                "whole-program", "A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, which the design of `rules.Unit` does not give, and an unused method or field is not read."),
     "BLD-07": ([("", "literal", {"deny-text": r"^(https?://|\d+\.\d+\.\d+\.\d+|localhost|[a-z0-9.-]+\.(com|net|org|io|dev|local|internal)(:\d+)?$|[a-z0-9.-]*:\d+$)", "in": LEAVES, "files": "code"})],
                "meaning", "An address or a host name in a string of a leaf is stated. Whether any other value is specific to a deployment is for a person to judge."),
+}
+
+# Stated rules that the parity audit shows to be in part (parity-r3.md, M6, and M11 to M13). The
+# entries stay the same.
+IFACE = "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
+MOVED = {
+    "HTTP-01": ("shape", "The ban on the package-level functions, and each timeout set in a literal of `http.Server`, are stated. A timeout from a variable that is zero passes, and the check does not read that the entry serves through that server."),
+    "HTTP-02": ("shape", "The ban on the package-level functions and on `http.DefaultClient`, and a `Timeout` set in a literal of `http.Client`, are stated. A variable that is zero passes, and so does a client built through a type defined from `http.Client`."),
+    "HTTP-13": ("shape", "A route of `http.ServeMux` is stated. A handler with no mux has no route to read."),
+    "HTTP-17": ("shape", "A literal of `http.Cookie` is stated. A cookie that a handler writes as a header is not read."),
+    "SEC-07": ("meaning", "A constant statement is stated. A comment removes the finding, and the wishlist's decision asks for a fixed allow-list in the same function. Whether a comment describes one is for a person to judge."),
+    "CTX-01": ("shape", "A parameter of `context.Context`, or of an alias, or of an interface that embeds it, is stated. A type defined from it is another type, and is not found."),
+    "CTX-02": ("shape", "A field that holds `context.Context` through an alias, a pointer, a slice, a map, a type argument, or an embedded interface is stated. A type defined from it is another type, and is not found."),
+    "ERR-08": ("flow", IFACE),
+    "CTX-06": ("flow", IFACE),
+    "OBS-01": ("flow", IFACE),
+    "OBS-02": ("flow", IFACE),
+    "SEC-30": ("flow", IFACE),
+    "ARCH-10": ("flow", IFACE),
+    "ARCH-11": ("flow", IFACE),
+    "DATA-03": ("flow", IFACE),
+    "CODE-05": ("flow", IFACE),
+    "CON-03": ("flow", IFACE),
 }
 
 # Each other wanted rule: why no kind states it.
 REASONS = {
     "model": "The model check enforces it, and no rule kind states it, so it is not in the rules file and a team cannot delete it there.",
-    "shape": "It is a shape of the code that no kind reads. No wanted rule stays here: amendment 6 added the kinds.",
+    "shape": "It is a shape of the code that no kind reads.",
     "flow": "It needs the flow of a value or the paths of a function. `transitions` follows one status field only, and no other kind follows flow.",
     "meaning": "Only a person or a reviewing model can judge it. It depends on what the code means.",
     "run-time": "Only a test, a probe, or the deployment shows a breach, when the code runs.",
@@ -148,7 +171,7 @@ REASONS = {
     "outside-source": "It is about CI, the repository, or a process, which a check of the source does not read.",
     "declaration": "It is about a config key or the text of an external in the system file. Amendment 6 adds kinds for the shape rules only, so no kind states these.",
     "deferred": "It is about topics, remote ports, or transports, which release 1 defers.",
-    "whole-program": "It needs a view of the whole module. L's analyzers read one package at a time.",
+    "whole-program": "It needs a view of the whole module. The shared package reads one package at a time, in both arms, by the design of `rules.Unit`. Neither arm is limited by its form, and the wider forms are not built.",
 }
 
 NOT_STATED = {
@@ -256,6 +279,8 @@ def main():
         row = {"id": i, "status": status, "entries": ids, "reason": reason}
         if status == "partly":
             row["not_stated_part"] = PARTLY[i][2]
+        if i in MOVED:
+            row["status"], row["reason"], row["not_stated_part"] = "partly", MOVED[i][0], MOVED[i][1]
         if i in NOTES:
             row["note"] = NOTES[i]
         coverage.append(row)
@@ -268,7 +293,7 @@ def main():
     n = lambda st: sum(1 for c in coverage if c["status"] == st)
     md = ["# What `defaults v1` cannot state", "",
           "Draft, not frozen. `gen_defaults.py` writes this file from the wishlist and `coverage.json`. The wanted text is the wishlist's.", "",
-          "This list is a result of plan-r3, section 4: it says what the four rule kinds cannot state.", "",
+          "This list is a result of plan-r3, section 4: it says what the rule kinds cannot state.", "",
           "| Status | Wanted rules |", "|---|---:|",
           f"| Stated by the kinds | {n('stated')} |",
           f"| Stated in part | {n('partly')} |",
@@ -277,9 +302,10 @@ def main():
           "`defaults v1` also holds the 4 dependency rules of plan-r3, section 3 (`DEP-LIBRARY`, `DEP-GATEWAY`, `DEP-ENTRY`, and `DEP-LOCK`, which is off). The wishlist does not ask for them.", "",
           "A rule that the model already enforces and that a kind can state is in the file too: `ARCH-07`, `ARCH-10`, `ARCH-11`, `ARCH-19`, `HTTP-07` in part, and `SEC-30`. If a team deletes one of these, the rule stops firing, but its model check (K0101, K0205, K0125, K0211, K0124) stays. Plan-r3's \"no hidden layer\" holds for the rules file. It does not switch off the model. See `QN-base-apps.md`.", "",
           "Two stated rules are wider than their wanted text, because a kind cannot see a purpose. `SEC-10` bans the broken algorithms in all code, not only in security code; its note in the wishlist expects a written exception for a checksum, which here is an edit of `from` or `except`. `DATA-15` bans `time.Now`, `time.Since`, and `time.Until` in all code of a plain leaf or a library, not only for a business decision.", "",
-          "Four stated rules hold a finite list where the wanted text is open or says \"such as\": `ARCH-19` (Appendix D's global mutators), `CTX-06` (the forms without a context in the standard library), and `ARCH-10` and `ARCH-11` (Appendix D's network functions, with holes H3 and H7).", "",
+          "Four rules hold a finite list where the wanted text is open or says \"such as\": `ARCH-19` (Appendix D's global mutators), `CTX-06` (the forms without a context in the standard library), and `ARCH-10` and `ARCH-11` (Appendix D's network functions, with holes H3 and H7 and the names of audit M13). A name that a list lacks is not found, in both arms.", "",
+          "`CONC-03`, `CON-03`, and `CODE-03` are at level `warn`. A rule at `warn` does not count as enforced in T1 (plan-r3, sections 2 and 5).", "",
           "Stated forms that hold a finite list, or are wider than the words, for the same reason: `ERR-13` reads `errors.New` and `fmt.Errorf` only. `HTTP-13` reads the patterns of `http.ServeMux`, where a method in the pattern gives 405 for the others. `HTTP-17` reads each cookie of an entry leaf, not only a session cookie. `ERR-01` allows a bare `defer` of a listed `Close` or `Rollback`, and it cannot tell a read handle from a write handle. `CON-03` lists its effects and adds each port call. `CODE-08` holds for each exported name, also a struct field and an interface method. `CODE-08` and `CON-01` name no topic, because release 1 has none.", "",
-          "`HTTP-01` and `HTTP-02` were stated in part, with \"shape\" as the reason for the rest. The kind `literal` states the rest, so both are now stated. They were not among the 39.", "",
+          "`HTTP-01` and `HTTP-02` were not among the 39. The kind `literal` reaches more of each. The audit shows that each stays in part.", "",
           "## Not stated, by reason", "",
           "| Reason | Wanted rules | Meaning |", "|---|---:|---|"]
     for reason, text_ in REASONS.items():

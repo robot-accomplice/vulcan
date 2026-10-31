@@ -32,6 +32,7 @@ func (c *Checker) Rules() {
 			libVars = packageVars(gp.Types)
 		}
 		c.foreignCode(pkg)
+		c.ignoredFiles(gp)
 		for _, f := range gp.Syntax {
 			if c.Generated(f) {
 				continue
@@ -56,6 +57,23 @@ func (c *Checker) Rules() {
 	}
 	c.componentImports()
 	c.contractsDeferred()
+}
+
+// ignoredFiles rejects a code file that the build ignores, such as a file behind a build tag: no
+// rule would read it, and what a rule reads would depend on the host (K0901).
+func (c *Checker) ignoredFiles(gp *packages.Package) {
+	for _, name := range gp.IgnoredFiles {
+		rel := c.rel(name)
+		build := filepath.ToSlash(filepath.Join(".vulcan", "build")) + "/"
+		if !strings.HasPrefix(rel, build) || rules.IsForeign(name) {
+			continue
+		}
+		src := strings.TrimSuffix(strings.TrimPrefix(rel, build), ".go") + ".vulcan"
+		if strings.HasPrefix(filepath.Base(src), "vulcan_") {
+			continue
+		}
+		c.D.Errorf(diag.Pos{File: src, Line: 1, Col: 1}, "K0901", "the build ignores %s (a build constraint or a file name for another system); every file of a package is built, so remove the constraint", src)
+	}
 }
 
 // bodyless applies hole H6: a function with no body has its code outside Go (K0126). The go

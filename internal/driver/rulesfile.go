@@ -20,7 +20,7 @@ func RulesTool() rules.Tool {
 func scaffold(root string, stdout io.Writer) error {
 	name := moduleName(filepath.Base(root))
 	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
-		if err := os.WriteFile(filepath.Join(root, "go.mod"), fmt.Appendf(nil, "module %s\n\ngo 1.26.0\n", name), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(root, "go.mod"), fmt.Appendf(nil, "module %s\n\ngo %s\n", name, rules.GoVersion), 0o644); err != nil {
 			return err
 		}
 		fmt.Fprintln(stdout, "wrote go.mod")

@@ -1,0 +1,313 @@
+H4: a type error in a test, with each form on: the error, and no panic
+-- want.txt --
+error api/orders/x_test.vulcan:7:20 K0008
+-- api/billing/billing.vulcan --
+package billing
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct{}
+
+// NewPayer returns a Payer.
+func NewPayer() *Payer { return &Payer{} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, Ledger.Save("x")
+}
+-- api/billing/component.vulcan --
+component Billing {
+    needs port Ledger {
+        func Save(id string) error
+    }
+}
+-- api/orders/component.vulcan --
+import "shop/lib/money"
+
+component Orders {
+    // Checkout takes payment.
+    needs port Checkout {
+        // Pay takes a payment.
+        func Pay(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/orders/orders.vulcan --
+package orders
+
+import "shop/lib/money"
+
+// Service places orders.
+type Service struct{}
+
+// NewService returns a Service.
+func NewService() *Service { return &Service{} }
+
+// Place takes payment for an order.
+func (s *Service) Place(amt money.Money) (money.Receipt, error) {
+	return Checkout.Pay(amt)
+}
+-- api/orders/x_test.vulcan --
+package orders
+
+import "testing"
+
+func TestX(t *testing.T) {
+	cases := []struct{ A int }{{1}}
+	for _, c := range casess {
+		_ = c
+	}
+	_ = cases
+}
+-- api/store/component.vulcan --
+component Store {
+    gateway for Database
+}
+-- api/store/store.vulcan --
+package store
+
+// Store keeps things.
+type Store struct{}
+
+// Open returns a Store.
+func Open() *Store { return &Store{} }
+
+// Save keeps one thing.
+func (s *Store) Save(id string) error { return nil }
+-- api/web/component.vulcan --
+import "shop/lib/money"
+
+component Web {
+    entry for Customer
+
+    needs port Orders {
+        func Place(amt money.Money) (money.Receipt, error)
+    }
+}
+-- api/web/web.vulcan --
+package web
+
+import (
+	"context"
+	"fmt"
+)
+
+func startup(ctx context.Context) error {
+	r, err := Orders.Place(42)
+	if err != nil {
+		return err
+	}
+	fmt.Println("paid", r.Amount)
+	return nil
+}
+-- lib/money/library.vulcan --
+// money holds amounts.
+library money {
+}
+-- lib/money/money.vulcan --
+package money
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// The states of an order.
+const (
+	Pending   = "pending"
+	Paid      = "paid"
+	Shipped   = "shipped"
+	Cancelled = "cancelled"
+)
+
+// Order is an order.
+type Order struct {
+	ID     string
+	Status string
+}
+-- rules.vulcan --
+origin test
+hash sha256:0
+
+rule F0
+  kind code-form
+  level error
+  form dropped-error
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F1
+  kind code-form
+  level error
+  form discard-error
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F2
+  kind code-form
+  level error
+  form error-compare
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F3
+  kind code-form
+  level error
+  form one-value-assertion
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F4
+  kind code-form
+  level error
+  form channel-size
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F5
+  kind code-form
+  level error
+  form function-complexity
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F6
+  kind code-form
+  level error
+  form switch-exhaustive
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F7
+  kind code-form
+  level error
+  form test-logic
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F8
+  kind code-form
+  level error
+  form suppression
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F9
+  kind code-form
+  level error
+  form return-effect
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F10
+  kind code-form
+  level error
+  form retry-loop
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F11
+  kind code-form
+  level error
+  form duplicate-function
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F12
+  kind code-form
+  level error
+  form unused-name
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F13
+  kind code-form
+  level error
+  form deprecated-use
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule D1
+  kind declaration
+  level error
+  at doc
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule D2
+  kind declaration
+  level error
+  at param
+  types context.Context
+  require first
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule D3
+  kind declaration
+  level error
+  at field
+  deny-types context.Context
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule C1
+  kind call-form
+  level error
+  funcs errors.New
+  require constant
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule C2
+  kind call-form
+  level error
+  param-type context.Context
+  require not-nil
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule L1
+  kind literal
+  level error
+  type net/http.Server
+  require ReadTimeout
+  in api/orders
+  reason A reason.
+  source A source.
+-- system.vulcan --
+// Shop is the online store.
+system Shop {
+    person Customer "Buys goods"
+    external Database "The file"
+
+    container Api {
+        Web, Orders, Billing, Store
+
+        Web.Orders:      Orders.NewService
+        Orders.Checkout: Billing.NewPayer
+        Billing.Ledger:  Store.Open
+    }
+}

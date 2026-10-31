@@ -1,5 +1,6 @@
 An unexported port method (K0110).
 -- want.txt --
+error cmd/shop/main.go:17:17 VL0909
 error api/orders/ports.go:7:2 VL0110
 -- api/orders/orders.go --
 // Package orders places orders.

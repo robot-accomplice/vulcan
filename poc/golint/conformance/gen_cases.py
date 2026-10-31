@@ -206,7 +206,7 @@ type place struct{}
 func (place) Place(amt money.Money) (money.Receipt, error) { return money.Receipt{Amount: amt}, nil }
 
 func main() {
-	api := web.New(place{})
+	api := web.New(@VL0909@place{})
 	if err := api.Start(context.Background()); err != nil {
 		os.Exit(1)
 	}

@@ -64,6 +64,13 @@ var warnRE = regexp.MustCompile(`^(.+?):(\d+):(\d+): warning (VL\d{4}) `)
 // paths relative to dir, and the whole output.
 func Lint(t *testing.T, dir string) ([]string, string) {
 	t.Helper()
+	return lint(t, dir, false)
+}
+
+// lint runs the command. With allowBroken, it accepts exit 1: a package with a type error, which
+// the driver reports with no code and no analyzer reads.
+func lint(t *testing.T, dir string, allowBroken bool) ([]string, string) {
+	t.Helper()
 	cmd := exec.Command(lintBin, "./...")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOFLAGS=", "GOWORK=off", "GOPROXY=off")
@@ -71,7 +78,7 @@ func Lint(t *testing.T, dir string) ([]string, string) {
 	cmd.Stdout, cmd.Stderr = &out, &out
 	err := cmd.Run()
 	var exit *exec.ExitError
-	if err != nil && !(errors.As(err, &exit) && exit.ExitCode() == 3) {
+	if err != nil && !(errors.As(err, &exit) && (exit.ExitCode() == 3 || allowBroken && exit.ExitCode() == 1)) {
 		t.Fatalf("vulcan-lint: %v\n%s", err, out.String())
 	}
 	var got []string
@@ -117,7 +124,7 @@ func TestConformance(t *testing.T) {
 			t.Parallel()
 			c := lintest.Read(t, path)
 			var want []string
-			accept := false
+			accept, broken := false, false
 			for _, f := range c.Files {
 				if f.Name != "want.txt" {
 					continue
@@ -127,6 +134,8 @@ func TestConformance(t *testing.T) {
 					switch {
 					case len(fields) == 1 && fields[0] == "accept":
 						accept = true
+					case len(fields) == 1 && fields[0] == "broken":
+						broken = true
 					case len(fields) == 3 && fields[0] == "error":
 						want = append(want, fields[1]+" "+fields[2])
 					case len(fields) == 3 && fields[0] == "warn":
@@ -136,11 +145,14 @@ func TestConformance(t *testing.T) {
 					}
 				}
 			}
-			if accept == (len(want) > 0) {
+			if !broken && accept == (len(want) > 0) {
 				t.Fatalf("want.txt lists accept, or errors, not both")
 			}
 			sort.Strings(want)
-			got, out := Lint(t, lintest.Write(t, base, c))
+			got, out := lint(t, lintest.Write(t, base, c), broken)
+			if broken && !strings.Contains(out, "undefined") {
+				t.Errorf("no type error in the output:\n%s", out)
+			}
 			if strings.Join(got, "\n") != strings.Join(want, "\n") {
 				t.Errorf("diagnostics\n got: %v\nwant: %v\noutput:\n%s", got, want, out)
 			}

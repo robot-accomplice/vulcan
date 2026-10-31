@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -19,6 +20,9 @@ func TestDefaultsParse(t *testing.T) {
 	}
 	if len(f.Rules) == 0 {
 		t.Fatal("defaults v1 has no rules")
+	}
+	if obs := f.Find("OBS-02"); obs == nil || !slices.Contains(obs.Params["funcs"], "log/slog.LogAttrs") {
+		t.Errorf("OBS-02 does not list slog.LogAttrs (audit M13)")
 	}
 	for _, r := range f.Rules {
 		if r.ID == "DEP-LOCK" && r.Level != Off {

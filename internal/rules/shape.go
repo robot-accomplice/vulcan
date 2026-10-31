@@ -5,8 +5,10 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/parser"
+	"go/scanner"
 	"go/token"
 	"go/types"
+	"os"
 	"os/exec"
 	"path"
 	"regexp"
@@ -86,6 +88,7 @@ func (r *Rule) checkShape(bad func(string, ...any)) {
 				bad("rule %s: to names %q, which is not a kind or the directory of a part", r.ID, v)
 			}
 		}
+		r.checkDeclaration(bad)
 	case "call-form":
 		if (len(r.Params["funcs"]) > 0) == (len(r.Params["param-type"]) > 0) {
 			bad("rule %s of kind call-form needs funcs or param-type", r.ID)
@@ -125,6 +128,87 @@ func (r *Rule) checkShape(bad func(string, ...any)) {
 	}
 }
 
+// checkDeclaration reports a rule that would read a place and apply nothing to it, and a word of
+// require that its place does not take.
+func (r *Rule) checkDeclaration(bad func(string, ...any)) {
+	has := func(keys ...string) bool {
+		for _, k := range keys {
+			if len(r.Params[k]) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+	for _, at := range r.Params["at"] {
+		applies := true
+		switch at {
+		case "field", "var", "port-signature":
+			applies = has("deny-types")
+		case "param":
+			applies = has("deny-types", "require")
+		case "port-method", "settings-field", "external", "config-entry":
+			applies = has("require")
+		case "library":
+			applies = has("deny-names", "require")
+		case "wired-port":
+			applies = has("to")
+		}
+		if !applies {
+			bad("rule %s: at %s has nothing to apply: it needs a parameter that says what to reject", r.ID, at)
+		}
+		for _, q := range r.Params["require"] {
+			k, _, hasValue := strings.Cut(q, "=")
+			ok := false
+			switch at {
+			case "port-method":
+				ok = q == "requires"
+			case "param":
+				ok = q == "first" || k == "name" && hasValue
+			case "settings-field":
+				ok = hasValue
+			case "external", "config-entry", "library":
+				ok = q == "comment"
+			}
+			if !ok {
+				bad("rule %s: at %s has no require %q", r.ID, at, q)
+			}
+		}
+	}
+}
+
+// ResolveTypes reports a table whose type or field the package of its directory does not have. A
+// name outside the project is not checked.
+func (s *Set) ResolveTypes(u *Unit) []Problem {
+	if s == nil || u.Pkg == nil {
+		return nil
+	}
+	var out []Problem
+	for _, r := range s.File.Rules {
+		if r.Kind != "transitions" || len(r.Params["type"]) != 1 {
+			continue
+		}
+		dir, name, _ := strings.Cut(r.Params["type"][0], ".")
+		if dir != u.Part.Dir {
+			continue
+		}
+		obj := u.Pkg.Scope().Lookup(name)
+		if obj == nil {
+			out = append(out, Problem{r.Line, fmt.Sprintf("rule %s: type names %s, which package %s does not declare", r.ID, name, dir)})
+			continue
+		}
+		st, ok := obj.Type().Underlying().(*types.Struct)
+		field := first(r, "field", "")
+		found := false
+		for i := 0; ok && i < st.NumFields(); i++ {
+			found = found || st.Field(i).Name() == field
+		}
+		if !found {
+			out = append(out, Problem{r.Line, fmt.Sprintf("rule %s: type %s has no field %s", r.ID, name, field)})
+		}
+	}
+	return out
+}
+
 func first(r *Rule, key, def string) string {
 	if v := r.Params[key]; len(v) > 0 {
 		return v[0]
@@ -146,34 +230,87 @@ func glob(words []string, name string) bool {
 	return false
 }
 
-// commentNear reports whether a comment is on the line of pos or ends on the line above it.
-func (u *Unit) commentNear(f *ast.File, pos token.Pos) bool {
-	line := u.Fset.Position(pos).Line
-	for _, cg := range f.Comments {
-		for _, c := range cg.List {
-			if l := u.Fset.Position(c.End()).Line; l == line || l == line-1 {
-				if !strings.HasPrefix(c.Text, "//line") {
-					return true
-				}
+// Comments says which lines of a source file hold a comment. Both arms read the file that a person
+// wrote, so a comment that a tool generates (V's /*line*/ and its header) does not count. A comment
+// after code on the line above belongs to that code.
+type Comments struct {
+	trailing, full map[int]bool
+}
+
+// ScanComments reads the comments of a source file. Go's scanner reads a .vulcan file too: a
+// comment there has Go's form.
+func ScanComments(src []byte) *Comments {
+	c := &Comments{map[int]bool{}, map[int]bool{}}
+	fset := token.NewFileSet()
+	file := fset.AddFile("", -1, len(src))
+	var s scanner.Scanner
+	s.Init(file, src, func(token.Position, string) {}, scanner.ScanComments)
+	last := 0
+	for {
+		pos, tok, lit := s.Scan()
+		if tok == token.EOF {
+			return c
+		}
+		line := fset.Position(pos).Line
+		if tok != token.COMMENT {
+			if !(tok == token.SEMICOLON && lit == "\n") {
+				last = line
 			}
+			continue
+		}
+		if strings.HasPrefix(lit, "//line") || strings.HasPrefix(lit, "/*line") {
+			continue
+		}
+		end := line + strings.Count(lit, "\n")
+		for l := line; l <= end; l++ {
+			if l == last {
+				c.trailing[l] = true
+			} else {
+				c.full[l] = true
+			}
+		}
+	}
+}
+
+// Near reports whether a comment is on a line (from 1), or fills the line above it.
+func (c *Comments) Near(line int) bool {
+	return c.trailing[line] || c.full[line] || c.full[line-1]
+}
+
+func (c *Comments) any(from, to int) bool {
+	for l := from; l <= to; l++ {
+		if c.trailing[l] || c.full[l] {
+			return true
 		}
 	}
 	return false
 }
 
-// HasComment reports whether a line of a source file (from 1) holds a comment, or the line above
-// it does. An arm uses it for what is not Go code.
-func HasComment(src []byte, line int) bool {
-	lines := strings.Split(string(Normalize(src)), "\n")
-	if line >= 1 && line <= len(lines) && strings.Contains(lines[line-1], "//") {
-		return true
+var scanned sync.Map // file name -> *Comments
+
+func commentsOf(file string) *Comments {
+	if c, ok := scanned.Load(file); ok {
+		return c.(*Comments)
 	}
-	return line >= 2 && line-2 < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[line-2]), "//")
+	b, err := os.ReadFile(file)
+	if err != nil {
+		b = nil
+	}
+	c := ScanComments(b)
+	scanned.Store(file, c)
+	return c
 }
 
-// generated reports V's names of generated functions, which no rule reads.
-func generatedName(name string) bool {
-	return strings.HasPrefix(name, "vulcan_") || strings.HasPrefix(name, "Vulcan_")
+// commentNear reports whether a comment is on the line of pos or fills the line above it.
+func (u *Unit) commentNear(pos token.Pos) bool {
+	p := u.Fset.Position(pos)
+	return commentsOf(p.Filename).Near(p.Line)
+}
+
+// generated reports V's names of generated code, which no rule reads. In L, such a name is
+// an ordinary name.
+func (u *Unit) generated(name string) bool {
+	return u.Generates && (strings.HasPrefix(name, "vulcan_") || strings.HasPrefix(name, "Vulcan_"))
 }
 
 // Declaration ------------------------------------------------------------------------------------
@@ -237,6 +374,7 @@ func carried(t types.Type, deny []string, seen map[types.Type]bool) string {
 		return ""
 	}
 	seen[t] = true
+	t = types.Unalias(t)
 	if s := types.TypeString(t, nil); slices.Contains(deny, s) {
 		return s
 	}
@@ -274,7 +412,7 @@ func (u *Unit) docs(r *Rule, add addFunc) {
 		}
 	}
 	missing := func(id *ast.Ident) {
-		if !generatedName(id.Name) {
+		if !u.generated(id.Name) {
 			add("0807", id.Pos(), "the exported name %s has no doc comment: %s", id.Name, r.tail())
 		}
 	}
@@ -394,20 +532,25 @@ func (u *Unit) settingsTypes() map[string]bool {
 // declared reads each declared field, parameter, or variable.
 func (u *Unit) declared(r *Rule, at string, add addFunc) {
 	wantTypes := r.Params["types"]
+	checkName := func(name string, t types.Type, at token.Pos) {
+		if t == nil || name == "_" || u.generated(name) {
+			return
+		}
+		if names := r.Params["names"]; len(names) > 0 && !glob(names, name) {
+			return
+		}
+		if len(wantTypes) > 0 && typeIn(t, wantTypes, map[types.Type]bool{}) == "" {
+			return
+		}
+		if s := typeIn(t, r.Params["deny-types"], map[types.Type]bool{}); s != "" {
+			add("0807", at, "%s has the type %s here: %s", name, s, r.tail())
+		}
+	}
 	check := func(id *ast.Ident, t types.Type) {
-		if id == nil || t == nil || id.Name == "_" {
+		if id == nil {
 			return
 		}
-		if names := r.Params["names"]; len(names) > 0 && !glob(names, id.Name) {
-			return
-		}
-		s := types.TypeString(t, nil)
-		if len(wantTypes) > 0 && !slices.Contains(wantTypes, s) {
-			return
-		}
-		if slices.Contains(r.Params["deny-types"], s) {
-			add("0807", id.Pos(), "%s has the type %s here: %s", id.Name, s, r.tail())
-		}
+		checkName(id.Name, t, id.Pos())
 	}
 	settings := map[string]bool{}
 	if at == "settings-field" {
@@ -420,6 +563,12 @@ func (u *Unit) declared(r *Rule, at string, add addFunc) {
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch x := n.(type) {
 			case *ast.TypeSpec:
+				if at == "field" && x.Assign.IsValid() {
+					// An alias of a generic struct: its fields hold the type argument.
+					if n, ok := types.Unalias(u.Info.TypeOf(x.Type)).(*types.Named); ok && n.TypeArgs() != nil {
+						checkName(x.Name.Name, n, x.Name.Pos())
+					}
+				}
 				st, ok := x.Type.(*ast.StructType)
 				if !ok {
 					return true
@@ -445,7 +594,7 @@ func (u *Unit) declared(r *Rule, at string, add addFunc) {
 							check(id, u.Info.TypeOf(fd.Type))
 						}
 						if len(fd.Names) == 0 {
-							if s := types.TypeString(u.Info.TypeOf(fd.Type), nil); slices.Contains(r.Params["deny-types"], s) {
+							if s := typeIn(u.Info.TypeOf(fd.Type), r.Params["deny-types"], map[types.Type]bool{}); s != "" {
 								add("0807", fd.Pos(), "a struct holds %s: %s", s, r.tail())
 							}
 						}
@@ -477,15 +626,70 @@ func (u *Unit) declared(r *Rule, at string, add addFunc) {
 			return true
 		})
 	}
-	if at == "param" {
+	// In L, ports.go is among the files, so the walk above read each port. In V, it is generated.
+	if at == "param" && len(u.PortFiles) > 0 {
 		for _, p := range u.Ports {
 			for _, m := range p.Methods {
-				if m.Sig != nil {
-					u.portParams(r, p, m, add)
+				if m.Sig == nil {
+					continue
 				}
+				params := m.Sig.Params()
+				for i := range params.Len() {
+					checkName(params.At(i).Name(), params.At(i).Type(), m.At)
+				}
+				results := m.Sig.Results()
+				for i := range results.Len() {
+					checkName(results.At(i).Name(), results.At(i).Type(), m.At)
+				}
+				u.portParams(r, m, add)
 			}
 		}
 	}
+}
+
+// typeIn names a listed type that t is, through an alias, a pointer, a slice, an array, a map, a
+// type argument, or an embedded interface; or "". A type defined from a listed type is another
+// type, and is not found.
+func typeIn(t types.Type, list []string, seen map[types.Type]bool) string {
+	if t == nil || len(list) == 0 || seen[t] {
+		return ""
+	}
+	seen[t] = true
+	t = types.Unalias(t)
+	if s := types.TypeString(t, nil); slices.Contains(list, s) {
+		return s
+	}
+	switch x := t.(type) {
+	case *types.Pointer:
+		return typeIn(x.Elem(), list, seen)
+	case *types.Slice:
+		return typeIn(x.Elem(), list, seen)
+	case *types.Array:
+		return typeIn(x.Elem(), list, seen)
+	case *types.Map:
+		if s := typeIn(x.Key(), list, seen); s != "" {
+			return s
+		}
+		return typeIn(x.Elem(), list, seen)
+	case *types.Named:
+		if args := x.TypeArgs(); args != nil {
+			for i := range args.Len() {
+				if s := typeIn(args.At(i), list, seen); s != "" {
+					return s
+				}
+			}
+		}
+		if _, ok := x.Underlying().(*types.Interface); ok {
+			return typeIn(x.Underlying(), list, seen)
+		}
+	case *types.Interface:
+		for i := range x.NumEmbeddeds() {
+			if s := typeIn(x.EmbeddedType(i), list, seen); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func (u *Unit) settingsFields(r *Rule, st *ast.StructType, add addFunc) {
@@ -510,6 +714,13 @@ func (u *Unit) settingsFields(r *Rule, st *ast.StructType, add addFunc) {
 
 // params checks the place and the name of a parameter of a listed type.
 func (u *Unit) params(r *Rule, ft *ast.FuncType, check func(*ast.Ident, types.Type), add addFunc) {
+	if ft.Results != nil {
+		for _, fd := range ft.Results.List {
+			for _, id := range fd.Names {
+				check(id, u.Info.TypeOf(fd.Type))
+			}
+		}
+	}
 	if ft.Params == nil {
 		return
 	}
@@ -524,7 +735,7 @@ func (u *Unit) params(r *Rule, ft *ast.FuncType, check func(*ast.Ident, types.Ty
 			if id != nil {
 				check(id, t)
 			}
-			if t != nil && slices.Contains(r.Params["types"], types.TypeString(t, nil)) {
+			if t != nil && typeIn(t, r.Params["types"], map[types.Type]bool{}) != "" {
 				at := fd.Pos()
 				name := ""
 				if id != nil {
@@ -537,10 +748,10 @@ func (u *Unit) params(r *Rule, ft *ast.FuncType, check func(*ast.Ident, types.Ty
 	}
 }
 
-func (u *Unit) portParams(r *Rule, p Port, m PortMethod, add addFunc) {
+func (u *Unit) portParams(r *Rule, m PortMethod, add addFunc) {
 	for i := range m.Sig.Params().Len() {
 		v := m.Sig.Params().At(i)
-		if slices.Contains(r.Params["types"], types.TypeString(v.Type(), nil)) {
+		if typeIn(v.Type(), r.Params["types"], map[types.Type]bool{}) != "" {
 			u.paramForm(r, i, v.Name(), m.At, add)
 		}
 	}
@@ -624,6 +835,7 @@ func (u *Unit) callForm(r *Rule, add addFunc) {
 		if !u.fileIn(r, f) {
 			continue
 		}
+		u.funcValues(r, f, funcs, add)
 		ast.Inspect(f, func(n ast.Node) bool {
 			c, ok := n.(*ast.CallExpr)
 			if !ok || u.Info.Types[c.Fun].IsType() {
@@ -652,6 +864,38 @@ func (u *Unit) callForm(r *Rule, add addFunc) {
 			return true
 		})
 	}
+}
+
+// funcValues rejects a listed function that the code uses as a value (f := d.Exec), because this
+// kind then cannot read the argument of its call.
+func (u *Unit) funcValues(r *Rule, f *ast.File, funcs map[string]bool, add addFunc) {
+	if len(funcs) == 0 {
+		return
+	}
+	called := map[*ast.Ident]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		if c, ok := n.(*ast.CallExpr); ok {
+			fun := ast.Unparen(c.Fun)
+			if ix, ok := fun.(*ast.IndexExpr); ok {
+				fun = ast.Unparen(ix.X)
+			}
+			switch x := fun.(type) {
+			case *ast.Ident:
+				called[x] = true
+			case *ast.SelectorExpr:
+				called[x.Sel] = true
+			}
+		}
+		return true
+	})
+	ast.Inspect(f, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok && !called[id] {
+			if fn, ok := u.Info.Uses[id].(*types.Func); ok && matches(funcs, fn.FullName()) {
+				add("0808", id.Pos(), "this uses %s as a value, so its argument cannot be read: %s", fn.FullName(), r.tail())
+			}
+		}
+		return true
+	})
 }
 
 func calledFunc(info *types.Info, c *ast.CallExpr) *types.Func {
@@ -688,7 +932,7 @@ func argIndex(r *Rule, sig *types.Signature) int {
 }
 
 func (u *Unit) argument(r *Rule, a ast.Expr, f *ast.File, comment bool, add addFunc) {
-	if comment && u.commentNear(f, a.Pos()) {
+	if comment && u.commentNear(a.Pos()) {
 		return
 	}
 	tv := u.Info.Types[a]
@@ -946,9 +1190,8 @@ func (u *Unit) codeForm(r *Rule, add addFunc) {
 		if !u.fileIn(r, f) {
 			continue
 		}
-		file := f
 		report := func(at token.Pos, format string, args ...any) {
-			if comment && u.commentNear(file, at) {
+			if comment && u.commentNear(at) {
 				return
 			}
 			add("0810", at, "%s: %s", fmt.Sprintf(format, args...), r.tail())
@@ -1160,7 +1403,11 @@ func (u *Unit) channelSizes(f *ast.File, report reportFunc) {
 		if !ok || id.Name != "make" {
 			return true
 		}
-		if _, isChan := u.Info.TypeOf(c.Args[0]).Underlying().(*types.Chan); !isChan {
+		t := u.Info.TypeOf(c.Args[0])
+		if t == nil {
+			return true
+		}
+		if _, isChan := t.Underlying().(*types.Chan); !isChan {
 			return true
 		}
 		tv := u.Info.Types[c.Args[1]]
@@ -1212,7 +1459,7 @@ func (u *Unit) complexity(r *Rule, f *ast.File, report reportFunc) {
 	limit, _ := strconv.Atoi(first(r, "limit", "15"))
 	for _, d := range f.Decls {
 		fd, ok := d.(*ast.FuncDecl)
-		if !ok || fd.Body == nil || generatedName(fd.Name.Name) {
+		if !ok || fd.Body == nil || u.generated(fd.Name.Name) {
 			continue
 		}
 		n := 1
@@ -1260,7 +1507,7 @@ func (u *Unit) exhaustive(f *ast.File, report reportFunc) {
 		all := map[string]string{}
 		scope := named.Obj().Pkg().Scope()
 		for _, name := range scope.Names() {
-			if c, ok := scope.Lookup(name).(*types.Const); ok && types.Identical(c.Type(), named) && (c.Exported() || c.Pkg() == u.Info.Types[x.Tag].Type.(*types.Named).Obj().Pkg()) {
+			if c, ok := scope.Lookup(name).(*types.Const); ok && types.Identical(c.Type(), named) && (c.Exported() || c.Pkg() == u.pkgOf(x.Tag)) {
 				all[stateOf(c.Val())] = name
 			}
 		}
@@ -1290,20 +1537,30 @@ func (u *Unit) exhaustive(f *ast.File, report reportFunc) {
 		switch {
 		case deflt == nil:
 			report(x.Pos(), "this switch over %s does not cover %s, and has no default", named.Obj().Name(), strings.Join(missing, ", "))
-		case !u.commentNear(f, deflt.Pos()) && !u.commentInside(f, deflt):
+		case !u.commentNear(deflt.Pos()) && !u.commentInside(deflt):
 			report(deflt.Pos(), "this default of a switch over %s has no comment that gives a reason", named.Obj().Name())
 		}
 		return true
 	})
 }
 
-func (u *Unit) commentInside(f *ast.File, n ast.Node) bool {
-	for _, cg := range f.Comments {
-		if cg.Pos() >= n.Pos() && cg.End() <= n.End() {
-			return true
+// commentInside reports a comment on a line of a node.
+func (u *Unit) commentInside(n ast.Node) bool {
+	from, to := u.Fset.Position(n.Pos()), u.Fset.Position(n.End())
+	return commentsOf(from.Filename).any(from.Line, to.Line)
+}
+
+// pkgOf gives the package whose code holds an expression.
+func (u *Unit) pkgOf(e ast.Expr) *types.Package {
+	if u.Pkg != nil {
+		return u.Pkg
+	}
+	if id, ok := e.(*ast.Ident); ok {
+		if obj := u.Info.Uses[id]; obj != nil {
+			return obj.Pkg()
 		}
 	}
-	return false
+	return nil
 }
 
 func (u *Unit) testLogic(f *ast.File, report reportFunc) {
@@ -1339,7 +1596,11 @@ func (u *Unit) testLogic(f *ast.File, report reportFunc) {
 // isTable reports a range over a slice, an array, or a map of structs: a table of cases.
 func (u *Unit) isTable(rs *ast.RangeStmt) bool {
 	var elem types.Type
-	switch t := u.Info.TypeOf(rs.X).Underlying().(type) {
+	rt := u.Info.TypeOf(rs.X)
+	if rt == nil {
+		return false
+	}
+	switch t := rt.Underlying().(type) {
 	case *types.Slice:
 		elem = t.Elem()
 	case *types.Array:
@@ -1426,7 +1687,7 @@ func (u *Unit) returnEffects(r *Rule, f *ast.File, report reportFunc) {
 	}
 	for _, d := range f.Decls {
 		fd, ok := d.(*ast.FuncDecl)
-		if !ok || fd.Body == nil || u.HasEnsures == nil || generatedName(fd.Name.Name) || !u.HasEnsures(fd) {
+		if !ok || fd.Body == nil || u.HasEnsures == nil || u.generated(fd.Name.Name) || !u.HasEnsures(fd) {
 			continue
 		}
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
@@ -1522,6 +1783,14 @@ func (u *Unit) tokens(fd *ast.FuncDecl) []string {
 			return false
 		}
 		switch x := n.(type) {
+		case *ast.SelectorExpr:
+			// A chain of names counts as a selector of one name, so that L's p.ledger.Save and V's
+			// Ledger.Save count the same.
+			if isNameChain(x) {
+				out = append(out, "*ast.SelectorExpr", "*ast.Ident", "*ast.Ident")
+				return false
+			}
+			out = append(out, fmt.Sprintf("%T", n))
 		case *ast.BinaryExpr:
 			out = append(out, x.Op.String())
 		case *ast.AssignStmt:
@@ -1532,6 +1801,16 @@ func (u *Unit) tokens(fd *ast.FuncDecl) []string {
 		return true
 	})
 	return out
+}
+
+func isNameChain(e ast.Expr) bool {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return true
+	case *ast.SelectorExpr:
+		return isNameChain(x.X)
+	}
+	return false
 }
 
 func trigrams(toks []string) map[string]bool {
@@ -1546,6 +1825,7 @@ func (u *Unit) duplicates(r *Rule, add addFunc) {
 	limit, _ := strconv.Atoi(first(r, "limit", "60"))
 	similarity, _ := strconv.Atoi(first(r, "similarity", "90"))
 	type fn struct {
+		name string
 		decl *ast.FuncDecl
 		set  map[string]bool
 	}
@@ -1556,15 +1836,16 @@ func (u *Unit) duplicates(r *Rule, add addFunc) {
 		}
 		for _, d := range f.Decls {
 			fd, ok := d.(*ast.FuncDecl)
-			if !ok || fd.Body == nil || generatedName(fd.Name.Name) {
+			if !ok || fd.Body == nil || u.generated(fd.Name.Name) {
 				continue
 			}
 			if toks := u.tokens(fd); len(toks) >= limit {
-				all = append(all, fn{fd, trigrams(toks)})
+				all = append(all, fn{recvName(fd) + "." + fd.Name.Name, fd, trigrams(toks)})
 			}
 		}
 	}
-	slices.SortFunc(all, func(a, b fn) int { return int(a.decl.Pos() - b.decl.Pos()) })
+	// By name, not by place: the arms have other files, and a pair must read the same way in both.
+	slices.SortFunc(all, func(a, b fn) int { return strings.Compare(a.name, b.name) })
 	for i, a := range all {
 		for _, b := range all[i+1:] {
 			both := 0
@@ -1579,6 +1860,13 @@ func (u *Unit) duplicates(r *Rule, add addFunc) {
 			}
 		}
 	}
+}
+
+func recvName(fd *ast.FuncDecl) string {
+	if fd.Recv == nil || len(fd.Recv.List) != 1 {
+		return ""
+	}
+	return types.ExprString(fd.Recv.List[0].Type)
 }
 
 // unused reports an unexported name at package level that nothing in the package uses. It cannot
@@ -1613,7 +1901,7 @@ func (u *Unit) unused(r *Rule, add addFunc) {
 				}
 			}
 			for _, id := range ids {
-				if id.IsExported() || id.Name == "_" || id.Name == "init" || id.Name == "main" || id.Name == "setup" || id.Name == "startup" || generatedName(id.Name) {
+				if id.IsExported() || id.Name == "_" || id.Name == "init" || id.Name == "main" || id.Name == "setup" || id.Name == "startup" || u.generated(id.Name) {
 					continue
 				}
 				if obj := u.Info.Defs[id]; obj != nil && !used[obj] {
@@ -1673,7 +1961,11 @@ func (u *Unit) deprecated(f *ast.File, report reportFunc) {
 		if !ok || fn.Pkg() == nil || !fn.Pos().IsValid() {
 			return true
 		}
-		if file := u.Fset.Position(fn.Pos()).Filename; file != "" && strings.HasSuffix(file, ".go") && deprecatedIn(file)[fn.Name()] {
+		file := u.Fset.Position(fn.Pos()).Filename
+		if u.SourceFile != nil {
+			file = u.SourceFile(file)
+		}
+		if file != "" && strings.HasSuffix(file, ".go") && deprecatedIn(file)[fn.Name()] {
 			report(id.Pos(), "this uses %s, which is deprecated", fn.FullName())
 		}
 		return true

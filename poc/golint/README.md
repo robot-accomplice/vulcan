@@ -71,9 +71,10 @@ Vulcan's syntax, or a hole that Go closes.
 | | VL0121 | K0121 | A directory listed twice |
 | | VL0206 | K0206 | A gateway or an entry for a name that the manifest does not declare (in practice a compile error first) |
 | | VL0207 | K0207 | Two gateways for one external |
-| | VL0901 | — | A file of a project package that the build ignores |
+| | VL0901 | K0901 | A file of a project package that the build ignores |
 | | VL0902 | — | A manifest that is missing or not in its literal form; `Config` outside `arch/config.go`; `StrictExempt` naming no leaf |
-| A2 `imports` | VL0101 | K0101 | A leaf imports another leaf |
+| A2 `imports` | VL0002 | K0008 | An import of a path in the module that the manifest does not list, such as a package under `testdata` |
+| | VL0101 | K0101 | A leaf imports another leaf |
 | | VL0118 | K0118 | Code imports the manifest (Vulcan: the generated-code runtime) |
 | | VL0122 | K0122 | `//go:linkname` in a leaf or a library |
 | | VL0124 | K0124 | Strict: `unsafe`, `syscall`, or cgo in a leaf or a library |
@@ -96,6 +97,7 @@ Vulcan's syntax, or a hole that Go closes.
 | | VL0607 | K0607 | Strict: main calls a constructor of a leaf that is not in `StrictExempt` a second time, so it makes a second instance |
 | | VL0907 | — | Main calls a function of the module that is not a constructor or a lifecycle method of a leaf |
 | | VL0908 | — | Main builds a leaf value (not settings) with a literal or `new` |
+| | VL0909 | none | A wire that main makes in a form that the rules cannot read: a helper, a closure, a field, a slice, a map, a variable with a second value, a constructor as a value, or main's own type (plan-r3, amendment 7) |
 | A5 `effects` | VL0124 | K0124 | Strict: a `reflect` call function |
 | | VL0125 | K0125 | Strict: an entry leaf dials |
 | | VL0203 | K0203 | A library uses a function that chooses a file or a resource by name |
@@ -147,7 +149,7 @@ real command. All pass.
 | A6 | A15, A15b, A15c, A15d, A15e, N09, N09b |
 | A7 | C02, C06, C07, C17, H4, H4b, L4, M2 |
 | A8 | C09, C10, C11, L3, M1a, M1b, M1c |
-| A2, A5, A9 | `R01` to `R65`, `R70` to `R137`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
+| A2, A5, A9 | `R01` to `R65`, `R70` to `R137`, `R140` to `R185`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
 
 Two cases map to another code in Go: P11 (a leaf that `system.vulcan` does not list, K0003) is
 VL0002, because Go has no component file, so an unlisted package is the same mistake as P10; A02
@@ -266,7 +268,7 @@ compiler on the same change.
 | J1 | The H3 extension of departure 8 (network values, types, `RoundTripper.RoundTrip`) | The desk test says Go can do more than the PoC there; this is the cheap part of it | Stricter than the PoC on network use |
 | J2 | No call graph or facts (departure 8) | Check-loop cost, not reach: facts load every dependency from source | Equal to the PoC |
 | J3 | `Keep` at every return, also nested (departure 6) | `defer` cannot tell an outer call from an inner one without state per goroutine | Stricter at run time |
-| J4 | Main outside strict mode, and free to call the standard library and other modules | Vulcan generates main; a Go main must read flags and signals, so it needs them | Looser than Vulcan, whose main is generated, not written by the agent |
+| J4 | Main outside strict mode, and free to call the standard library and other modules (VL0909 limits how it wires) | Vulcan generates main; a Go main must read flags and signals, so it needs them | Looser than Vulcan, whose main is generated, not written by the agent |
 | J5 | Main may call no function of a library of the module (VL0907) | Vulcan's generated main calls none; wiring needs none | Stricter than a typical Go team, equal to Vulcan |
 | J6 | A "flag value" is a local variable or `m["key"]` (VL0606) | No generic rule can see that a variable came from a flag; this is the narrowest form that the existing main fits | Looser than Vulcan: a variable can hold a computed value |
 | J7 | One constructor called twice is an error in strict mode (VL0607), and not reported in ordinary mode | Strict mode makes K0607 an error (parity review R2, item 2); the driver has no warning level for ordinary mode. In Go any second call is a second instance; in Vulcan only a wire with other settings is | Equal in effect: in both, strict mode rejects a second instance and ordinary mode passes |

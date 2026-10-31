@@ -42,6 +42,10 @@ func run(pass *analysis.Pass) (any, error) {
 				model.Report(pass, pos, "VL0118", "code imports the manifest %s; the manifest is read by vulcan-lint, never by the code", p)
 				continue
 			}
+			if m.InModule(p) && m.PartOf(p) == nil {
+				model.Report(pass, pos, "VL0002", "%s %s imports %s, a package that the manifest does not list, so no rule reads it; every package of the module is a part of the manifest (%s)", kindName(self), self.Dir, p, model.ManifestDir)
+				continue
+			}
 			if t := m.PartOf(p); t != nil && t.IsLeaf() && t != self {
 				switch {
 				case self.IsLeaf():

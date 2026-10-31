@@ -85,7 +85,10 @@ func Load(root string) *Set {
 // directory must not switch a rule off without a word.
 func (s *Set) Resolve(parts map[string]Part) {
 	for _, r := range s.File.Rules {
-		for _, key := range []string{"in", "except", "from", "deny", "load"} {
+		for _, key := range []string{"in", "except", "from", "deny", "load", "to"} {
+			if r.Kind == "literal" && key == "deny" {
+				continue
+			}
 			for _, v := range r.Params[key] {
 				if strings.Contains(v, "/") && parts[v].Dir == "" {
 					s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, which is not a part of the project", r.ID, key, v)})
@@ -120,7 +123,12 @@ type Unit struct {
 	// PortFiles are V's generated port declarations: only their imports count, which are the
 	// imports of component.vulcan, as L's ports.go has them.
 	PortFiles []*ast.File
-	Info      *types.Info
+	// Pkg is the package. Generates says that this arm's lowering adds names with the prefix
+	// vulcan_, which no rule reads. SourceFile maps a file of a position to one that Go can parse.
+	Pkg        *types.Package
+	Generates  bool
+	SourceFile func(string) string
+	Info       *types.Info
 	// Ports are the ports of the leaf. HasEnsures says whether a function has an ensures clause.
 	// TestsAbsent says that the package has tests, and this load left them out.
 	Ports       []Port

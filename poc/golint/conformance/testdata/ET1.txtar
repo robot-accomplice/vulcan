@@ -1,0 +1,298 @@
+H4: a type error in a test, with each form on: the error, and no panic
+-- want.txt --
+broken
+-- api/billing/billing.go --
+package billing
+
+import "shop/lib/money"
+
+// Payer takes payments.
+type Payer struct {
+	ledger Ledger
+}
+
+// NewPayer returns a Payer.
+func NewPayer(ledger Ledger) *Payer { return &Payer{ledger: ledger} }
+
+// Pay takes a payment.
+func (p *Payer) Pay(amt money.Money) (money.Receipt, error) {
+	return money.Receipt{Amount: amt}, p.ledger.Save("x")
+}
+-- api/billing/ports.go --
+package billing
+
+// Ledger keeps payments.
+type Ledger interface {
+	Save(id string) error
+}
+-- api/orders/ports.go --
+package orders
+
+import "shop/lib/money"
+
+// Checkout takes payment.
+type Checkout interface {
+	// Pay takes a payment.
+	Pay(amt money.Money) (money.Receipt, error)
+}
+-- api/orders/x_test.go --
+package orders
+
+import "testing"
+
+func TestX(t *testing.T) {
+	cases := []struct{ A int }{{1}}
+	for _, c := range casess {
+		_ = c
+	}
+	_ = cases
+}
+-- api/store/store.go --
+package store
+
+// Store keeps things.
+type Store struct{}
+
+// Open returns a Store.
+func Open() *Store { return &Store{} }
+
+// Save keeps one thing.
+func (s *Store) Save(id string) error { return nil }
+-- arch/arch.go --
+package arch
+
+// The persons and the external systems.
+const (
+	Customer Person   = "Customer" // buys goods
+	Database External = "Database" // the file
+)
+
+// Manifest is the architecture of the shop.
+var Manifest = System{
+	Parts: []Part{
+		Main("cmd/shop"),
+		Entry("api/web", Customer),
+		Leaf("api/orders"),
+		Leaf("api/billing"),
+		Gateway("api/store", Database),
+		Library("lib/money"),
+		Library("lib/contract"),
+	},
+}
+-- cmd/shop/main.go --
+// Command shop runs the shop.
+package main
+
+import (
+	"context"
+	"os"
+
+	"shop/api/billing"
+	"shop/api/orders"
+	"shop/api/store"
+	"shop/api/web"
+)
+
+func main() {
+	keeper := store.Open()
+	payer := billing.NewPayer(keeper)
+	service := orders.NewService(payer)
+	api := web.New(service)
+	if err := api.Start(context.Background()); err != nil {
+		os.Exit(1)
+	}
+}
+-- lib/money/money.go --
+// Package money holds amounts.
+package money
+
+// Money is an amount in cents.
+type Money int64
+
+// Receipt records a payment.
+type Receipt struct {
+	Amount Money
+}
+
+// The states of an order.
+const (
+	Pending   = "pending"
+	Paid      = "paid"
+	Shipped   = "shipped"
+	Cancelled = "cancelled"
+)
+
+// Order is an order.
+type Order struct {
+	ID     string
+	Status string
+}
+-- rules.vulcan --
+origin test
+hash sha256:0
+
+rule F0
+  kind code-form
+  level error
+  form dropped-error
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F1
+  kind code-form
+  level error
+  form discard-error
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F2
+  kind code-form
+  level error
+  form error-compare
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F3
+  kind code-form
+  level error
+  form one-value-assertion
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F4
+  kind code-form
+  level error
+  form channel-size
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F5
+  kind code-form
+  level error
+  form function-complexity
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F6
+  kind code-form
+  level error
+  form switch-exhaustive
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F7
+  kind code-form
+  level error
+  form test-logic
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F8
+  kind code-form
+  level error
+  form suppression
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F9
+  kind code-form
+  level error
+  form return-effect
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F10
+  kind code-form
+  level error
+  form retry-loop
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F11
+  kind code-form
+  level error
+  form duplicate-function
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F12
+  kind code-form
+  level error
+  form unused-name
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule F13
+  kind code-form
+  level error
+  form deprecated-use
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule D1
+  kind declaration
+  level error
+  at doc
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule D2
+  kind declaration
+  level error
+  at param
+  types context.Context
+  require first
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule D3
+  kind declaration
+  level error
+  at field
+  deny-types context.Context
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule C1
+  kind call-form
+  level error
+  funcs errors.New
+  require constant
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule C2
+  kind call-form
+  level error
+  param-type context.Context
+  require not-nil
+  in api/orders
+  reason A reason.
+  source A source.
+
+rule L1
+  kind literal
+  level error
+  type net/http.Server
+  require ReadTimeout
+  in api/orders
+  reason A reason.
+  source A source.

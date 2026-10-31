@@ -50,6 +50,7 @@ type Problem struct {
 type File struct {
 	Origin string
 	Hash   string
+	Lists  string // the version of the tool's lists when the head was written
 	Rules  []*Rule
 
 	originLine, hashLine int // from 0, or -1
@@ -126,6 +127,8 @@ func Parse(b []byte) (*File, []Problem) {
 			f.Origin, f.originLine = rest, i
 		case key == "hash" && r == nil:
 			f.Hash, f.hashLine = rest, i
+		case key == "lists" && r == nil:
+			f.Lists = rest
 		case key == "rule":
 			finish()
 			r = &Rule{ID: rest, Params: map[string][]string{}, Line: i + 1, start: i, end: i + 1}

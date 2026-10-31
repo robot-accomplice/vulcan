@@ -9,8 +9,10 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,7 +22,7 @@ import (
 
 	"github.com/robot-accomplice/vulcan/internal/rules"
 	"github.com/robot-accomplice/vulcan/poc/golint/model"
-	"github.com/robot-accomplice/vulcan/poc/golint/ports"
+	"github.com/robot-accomplice/vulcan/poc/golint/wiring"
 )
 
 // Analyzer is A9.
@@ -73,7 +75,7 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	parts := partsOf(u.M)
 	if u.Part.Kind == model.Main {
-		for _, f := range set.CheckWires(parts, Wires(u.M, pass.TypesInfo, plainFiles(pass))) {
+		for _, f := range set.CheckWires(parts, wires(pass, u)) {
 			emit(pass, f.At.(token.Pos), f)
 		}
 		return nil, nil
@@ -84,11 +86,12 @@ func run(pass *analysis.Pass) (any, error) {
 	unit := &rules.Unit{
 		Part: parts[u.Part.Dir], Module: u.M.Module, Parts: parts, Fset: pass.Fset, Files: pass.Files, Info: pass.TypesInfo,
 		IsTest: func(f *ast.File) bool { return model.IsTest(pass, f) },
-		Ports:  portsOf(pass, u), TestsAbsent: testsAbsent(pass, u),
+		Pkg:    pass.Pkg, Ports: portsOf(pass, u), TestsAbsent: testsAbsent(pass, u),
 		HasEnsures: func(fd *ast.FuncDecl) bool {
 			return len(model.PrologueOf(pass.TypesInfo, fd.Body, u.M.ContractPath()).Ensures) > 0
 		},
 	}
+	reportProblems(pass, u, set.ResolveTypes(unit))
 	for _, f := range set.CheckUnit(unit) {
 		emit(pass, f.At.(token.Pos), f)
 	}
@@ -247,15 +250,9 @@ func manifestDecls(pass *analysis.Pass) []rules.Decl {
 							continue
 						}
 						for _, x := range list.Elts {
-							line := pass.Fset.Position(x.Pos()).Line
-							commented := false
-							for _, cg := range f.Comments {
-								for _, c := range cg.List {
-									if l := pass.Fset.Position(c.End()).Line; l == line || l == line-1 {
-										commented = true
-									}
-								}
-							}
+							p := pass.Fset.Position(x.Pos())
+							src, _ := os.ReadFile(p.Filename)
+							commented := rules.ScanComments(src).Near(p.Line)
 							name := strings.Trim(types.ExprString(x), `"`)
 							out = append(out, rules.Decl{What: "config-entry", Name: name, Commented: commented, At: x.Pos()})
 						}
@@ -265,6 +262,11 @@ func manifestDecls(pass *analysis.Pass) []rules.Decl {
 		}
 	}
 	return out
+}
+
+func wires(pass *analysis.Pass, u *model.Unit) []rules.Edge {
+	edges, _ := wiring.ReadWires(u.M, pass.TypesInfo, plainFiles(pass))
+	return edges
 }
 
 func plainFiles(pass *analysis.Pass) []*ast.File {
@@ -279,7 +281,11 @@ func plainFiles(pass *analysis.Pass) []*ast.File {
 
 // problems reports what is wrong with the rules file, at its own lines.
 func problems(pass *analysis.Pass, u *model.Unit, set *rules.Set) {
-	if len(set.Probs) == 0 {
+	reportProblems(pass, u, set.Probs)
+}
+
+func reportProblems(pass *analysis.Pass, u *model.Unit, probs []rules.Problem) {
+	if len(probs) == 0 {
 		return
 	}
 	file := filepath.Join(u.M.Root, rules.FileName)
@@ -289,131 +295,18 @@ func problems(pass *analysis.Pass, u *model.Unit, set *rules.Set) {
 	}
 	tf := pass.Fset.AddFile(file, -1, len(b)+1)
 	tf.SetLinesForContent(b)
-	for _, p := range set.Probs {
+	for _, p := range probs {
 		line := min(max(p.Line, 1), tf.LineCount())
 		model.Report(pass, tf.LineStart(line), "VL0801", "%s", p.Msg)
 	}
 }
 
-// Wires gives the wires that main makes: each port that a constructor call gets, with the leaf that
-// provides it. The provider is the package of the argument's type. For an argument of an interface
-// type, it is the type of the value that main assigned to the variable.
-func Wires(m *model.Manifest, info *types.Info, files []*ast.File) []rules.Edge {
-	from := map[types.Object]ast.Expr{} // the value that main assigned to each variable
-	for _, f := range files {
-		ast.Inspect(f, func(n ast.Node) bool {
-			switch x := n.(type) {
-			case *ast.AssignStmt:
-				if len(x.Rhs) == 1 && len(x.Lhs) >= 1 {
-					if id, ok := x.Lhs[0].(*ast.Ident); ok {
-						record(info, from, id, x.Rhs[0])
-					}
-				} else if len(x.Rhs) == len(x.Lhs) {
-					for i, l := range x.Lhs {
-						if id, ok := l.(*ast.Ident); ok {
-							record(info, from, id, x.Rhs[i])
-						}
-					}
-				}
-			case *ast.ValueSpec:
-				for i, id := range x.Names {
-					if i < len(x.Values) {
-						record(info, from, id, x.Values[i])
-					}
-				}
-			}
-			return true
-		})
-	}
-	var out []rules.Edge
-	for _, f := range files {
-		ast.Inspect(f, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			fn := model.CalledFunc(info, call)
-			if fn == nil || fn.Pkg() == nil {
-				return true
-			}
-			need := m.PartOf(fn.Pkg().Path())
-			if need == nil || !need.IsLeaf() || !ports.IsConstructor(fn) {
-				return true
-			}
-			params := fn.Type().(*types.Signature).Params()
-			for i, a := range call.Args {
-				if i >= params.Len() || !types.IsInterface(params.At(i).Type()) {
-					continue
-				}
-				if tv, ok := info.Types[a]; ok && tv.IsNil() {
-					continue // VL0104
-				}
-				if sup := provider(m, info, from, a, 0); sup != "" && sup != need.Dir {
-					out = append(out, rules.Edge{From: need.Dir, To: sup, Via: "wire", At: a.Pos(), Methods: portMethods(params.At(i).Type())})
-				}
-			}
-			return true
-		})
-	}
-	return out
-}
-
-func portMethods(t types.Type) []rules.PortMethod {
-	iface, ok := t.Underlying().(*types.Interface)
-	if !ok {
-		return nil
-	}
-	var out []rules.PortMethod
-	for i := range iface.NumExplicitMethods() {
-		m := iface.ExplicitMethod(i)
-		out = append(out, rules.PortMethod{Name: m.Name(), Sig: m.Type().(*types.Signature)})
-	}
-	return out
-}
-
-func record(info *types.Info, from map[types.Object]ast.Expr, id *ast.Ident, v ast.Expr) {
-	obj := info.Defs[id]
-	if obj == nil {
-		obj = info.Uses[id]
-	}
-	if obj != nil {
-		from[obj] = v
-	}
-}
-
-func provider(m *model.Manifest, info *types.Info, from map[types.Object]ast.Expr, e ast.Expr, depth int) string {
-	if depth > 16 {
-		return ""
-	}
-	e = ast.Unparen(e)
-	if t := info.TypeOf(e); t != nil && !types.IsInterface(t) {
-		if tup, ok := t.(*types.Tuple); ok && tup.Len() > 0 {
-			t = tup.At(0).Type()
-		}
-		if tn := model.NamedOf(t); tn != nil && tn.Pkg() != nil {
-			if p := m.PartOf(tn.Pkg().Path()); p != nil {
-				return p.Dir
-			}
-		}
-	}
-	switch x := e.(type) {
-	case *ast.Ident:
-		if v, ok := from[info.Uses[x]]; ok {
-			return provider(m, info, from, v, depth+1)
-		}
-	case *ast.CallExpr:
-		if fn := model.CalledFunc(info, x); fn != nil && fn.Pkg() != nil {
-			if p := m.PartOf(fn.Pkg().Path()); p != nil && p.IsLeaf() {
-				return p.Dir
-			}
-		}
-	}
-	return ""
-}
-
 // Edges gives what rules lock writes: the wires of main, and the imports of libraries. It refuses a
 // module that does not type-check.
 func Edges(root string) ([]rules.Edge, error) {
+	if err := modelErrors(root); err != nil {
+		return nil, err
+	}
 	m := model.Read(root)
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
@@ -434,7 +327,8 @@ func Edges(root string) ([]rules.Edge, error) {
 			continue
 		}
 		if part.Kind == model.Main {
-			for _, e := range Wires(m, pkg.TypesInfo, pkg.Syntax) {
+			edges, _ := wiring.ReadWires(m, pkg.TypesInfo, pkg.Syntax)
+			for _, e := range edges {
 				e.At = nil
 				out = append(out, e)
 			}
@@ -451,6 +345,38 @@ func Edges(root string) ([]rules.Edge, error) {
 		}
 	}
 	return out, nil
+}
+
+var diagLine = regexp.MustCompile(`: VL(\d{4}) `)
+
+// modelErrors runs this command's own check, and refuses an error that is not a rule's: an error
+// of a rule must not stop the lock that would clear it.
+func modelErrors(root string) error {
+	self, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(self, "./...")
+	cmd.Dir = root
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	found := false
+	for _, line := range strings.Split(string(out), "\n") {
+		m := diagLine.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		found = true
+		if !strings.HasPrefix(m[1], "08") {
+			return fmt.Errorf("the project has errors; fix them first: %s", strings.TrimSpace(line))
+		}
+	}
+	if !found {
+		return errBuild
+	}
+	return nil
 }
 
 type buildError struct{}

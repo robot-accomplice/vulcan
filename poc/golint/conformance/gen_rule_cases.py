@@ -227,6 +227,11 @@ def rules(*blocks):
     return HEAD + "\n".join(blocks)
 
 
+def rawcode(path, text):
+    """One code file, the same text in both arms, with no package line of its own to add."""
+    return {"v": {path + ".vulcan": text}, "l": {path + ".go": text}}
+
+
 def code(path, text):
     """One code file, the same text in both arms."""
     return {"v": {path + ".vulcan": text}, "l": {path + ".go": text}}
@@ -592,7 +597,161 @@ CASES += [
 # R79: the port has its doc comments, so that the exported name is the only finding.
 CASES[[c[0] for c in CASES].index("R79")] = ("R79", "declaration: an exported name with no doc comment", rules(DECL(at="doc", **{"in": "api/orders"})), join(UNDOC, PORT_DOC), e("api/orders/extra", "Exported", "0807"))
 
+
+# The cases of the parity audit, experiments/poc/parity-r3.md. Each failed before its fix.
+def ensured(pkg, sig, cond, body, imports="", before=""):
+    """A function with an ensures clause, in the form of each arm: forms that one arm has alone."""
+    names = imports.split()
+    vimp = "import (\n" + "".join(f'\t"{i}"\n' for i in names) + ")\n\n" if names else ""
+    limp = "import (\n" + "".join(f'\t"{i}"\n' for i in names) + '\n\t"shop/lib/contract"\n)\n\n'
+    return {"v": {f"api/{pkg}/f.vulcan": f"package {pkg}\n\n{vimp}{before}func {sig}\n\tensures {cond}\n{{\n{body}}}\n"},
+            "l": {f"api/{pkg}/f.go": f"package {pkg}\n\n{limp}{before}func {sig} {{\n\tdefer contract.Ensures(func() bool {{ return {cond} }})\n{body}}}\n"}}
+
+
+def ef(pkg, snippet, digits, offset=0):
+    return {"v": [(f"api/{pkg}/f.vulcan", snippet, digits, offset)], "l": [(f"api/{pkg}/f.go", snippet, digits, offset)]}
+
+
+def both_at(pv, pl, snippet, digits, offset=0):
+    return {"v": [(pv, snippet, digits, offset)], "l": [(pl, snippet, digits, offset)]}
+
+
+DISCARD_RULE = rule("X", "code-form", form="discard-error", unless_comment="yes")
+GFN = "func g() error { return nil }\n\n"
+REFUND = {"v": {"api/orders/component.vulcan": 'import "shop/lib/money"\n\ncomponent Orders {\n    needs port Checkout {\n        func Pay(amt money.Money) (money.Receipt, error)\n        func Refund(amount float64) error\n    }\n}\n',
+                "api/billing/raw.vulcan": "package billing\n\n// Refund pays back.\nfunc (p *Payer) Refund(x float64) error { return nil }\n"},
+          "l": {"api/orders/ports.go": 'package orders\n\nimport "shop/lib/money"\n\n// Checkout takes payment for an order.\ntype Checkout interface {\n\tPay(amt money.Money) (money.Receipt, error)\n\tRefund(amount float64) error\n}\n',
+                "api/billing/raw.go": "package billing\n\n// Refund pays back.\nfunc (p *Payer) Refund(x float64) error { return nil }\n"}}
+PING = {"v": {"api/orders/component.vulcan": 'import (\n\t"context"\n\n\t"shop/lib/money"\n)\n\ncomponent Orders {\n    needs port Checkout {\n        func Pay(amt money.Money) (money.Receipt, error)\n        func Ping(c context.Context) error\n    }\n}\n',
+              "api/billing/raw.vulcan": 'package billing\n\nimport "context"\n\n// Ping answers.\nfunc (p *Payer) Ping(ctx context.Context) error { return nil }\n'},
+        "l": {"api/orders/ports.go": 'package orders\n\nimport (\n\t"context"\n\n\t"shop/lib/money"\n)\n\n// Checkout takes payment for an order.\ntype Checkout interface {\n\tPay(amt money.Money) (money.Receipt, error)\n\tPing(c context.Context) error\n}\n',
+              "api/billing/raw.go": 'package billing\n\nimport "context"\n\n// Ping answers.\nfunc (p *Payer) Ping(ctx context.Context) error { return nil }\n'}}
+SAVES_V = "\tif err := Ledger.Save(x); err != nil {\n\t\treturn err\n\t}\n"
+SAVES_L = "\tif err := p.ledger.Save(x); err != nil {\n\t\treturn err\n\t}\n"
+PAIR = lambda s, n: f"package billing\n\nfunc (p *Payer) oneIt(x string) error {{\n{s * n}\treturn nil\n}}\n\nfunc (p *Payer) twoIt(x string) error {{\n{s * n}\treturn nil\n}}\n"
+DUP_PORT = lambda n: {"v": {"api/billing/dup.vulcan": PAIR(SAVES_V, n)}, "l": {"api/billing/dup.go": PAIR(SAVES_L, n)}}
+OLD = join(code("lib/money/old", "package money\n\n// Old is old.\n//\n// Deprecated: use New.\nfunc Old() int { return 1 }\n"),
+           extra("orders", "func useIt() int { return money.Old() }\n", "shop/lib/money"))
+ALIAS_SWITCH = extra("orders", "type s int\n\ntype z = s\n\nconst (\n\ta s = iota\n\tb\n)\n\nvar _ = b\n\nfunc pickIt(v z) int {\n\tswitch v {\n\tcase a:\n\t\treturn 1\n\t}\n\treturn 0\n}\n")
+LISTS3 = lambda text: {"v": {"system.vulcan": V_BASE["system.vulcan"].replace("    container Api", "    config {\n        strict_shared: [\n            " + text.replace("\n", "\n            ") + "\n        ]\n    }\n\n    container Api")},
+                       "l": {"arch/config.go": 'package arch\n\n// Config is the check configuration.\nvar Config = Settings{\n\tStrictShared: []string{\n\t\t' + text.replace("\n", "\n\t\t") + '\n\t},\n}\n'}}
+CFGRULE = rule("X", "declaration", at="config-entry", require="comment")
+SQLRULE = rule("X", "call-form", funcs="(*database/sql.DB).Exec", require="constant", unless_comment="yes")
+CTX = lambda body: extra("orders", body, "context")
+FIELDCTX = rule("X", "declaration", at="field", deny_types="context.Context")
+CTXFIRST = rule("X", "declaration", at="param", types="context.Context", require="first")
+FLOATVAR = rule("X", "declaration", at="var", names="*amount*", deny_types="float64")
+FLOATFIELD = rule("X", "declaration", at="field", names="*Amount*", deny_types="float64")
+LOGATTRS = rule("X", "call-form", funcs="log/slog.LogAttrs (*log/slog.Logger).LogAttrs", require="constant")
+ONLY = {"in": "api/orders"}
+ALLFORMS = rules(*[rule(f"F{i}", "code-form", form=fm, **ONLY) for i, fm in enumerate(["dropped-error", "discard-error", "error-compare", "one-value-assertion", "channel-size", "function-complexity", "switch-exhaustive", "test-logic", "suppression", "return-effect", "retry-loop", "duplicate-function", "unused-name", "deprecated-use"])],
+                 rule("D1", "declaration", at="doc", **ONLY), rule("D2", "declaration", at="param", types="context.Context", require="first", **ONLY), rule("D3", "declaration", at="field", deny_types="context.Context", **ONLY),
+                 rule("C1", "call-form", funcs="errors.New", require="constant", **ONLY), rule("C2", "call-form", param_type="context.Context", require="not-nil", **ONLY), rule("L1", "literal", type="net/http.Server", require="ReadTimeout", **ONLY))
+BROKEN_TEST = 'package orders\n\nimport "testing"\n\nfunc TestX(t *testing.T) {\n\tcases := []struct{ A int }{{1}}\n\tfor _, c := range casess {\n\t\t_ = c\n\t}\n\t_ = cases\n}\n'
+
+CASES += [
+    # H1
+    ("R140", "H1: a discard after a return, in a function with ensures", rules(DISCARD_RULE), ensured("store", "F(a int) int", "a > 0", "\tif a > 1 { return 1 }\n\t_ = g()\n\treturn 2\n", before=GFN), ef("store", "_ = g()", "0810")),
+    ("R141", "H1: a built query after a return, in a function with ensures", rules(SQLRULE), ensured("store", 'F(d *sql.DB, q string) int', "d != nil", '\tif q == "" { return 1 }\n\t_, _ = d.Exec(q)\n\treturn 2\n', imports="database/sql"), ef("store", "q)\n", "0808")),
+    ("R142", "H1: a default that follows a return, in a function with ensures", rules(rule("X", "code-form", form="switch-exhaustive")), ensured("orders", "pickIt(c color) int", "c >= 0", "\tswitch c {\n\tcase red:\n\t\treturn 1\n\tdefault:\n\t\treturn 2\n\t}\n", before=COLOR), ef("orders", "default:", "0810")),
+    ("R143", "H1: return-effect with unless-comment fires at warn in both", rules(rule("X", "code-form", level="warn", form="return-effect", funcs="(*database/sql.Tx).Commit", unless_comment="yes")), ensured("orders", "commitIt(t *sql.Tx) error", "t != nil", "\treturn t.Commit()\n", imports="database/sql"), ef("orders", "t.Commit()", "w0810")),
+    ("R144", "H1: a discard on line 1 of a file, where V's generated header would be", rules(DISCARD_RULE), rawcode("api/store/one", "package store; func g() error { return nil }; func aIt() { _ = g() }\n"), {"v": [("api/store/one.vulcan", "_ = g()", "0810", 0)], "l": [("api/store/one.go", "_ = g()", "0810", 0)]}),
+    ("R145", "H1: a real comment still removes the finding, with ensures", rules(DISCARD_RULE), ensured("store", "F(a int) int", "a > 0", "\tif a > 1 { return 1 }\n\t// nothing can be done here\n\t_ = g()\n\treturn 2\n", before=GFN), NO),
+    ("R146", "H1: a comment after the code on the line above is not a reason", rules(DISCARD_RULE), extra("store", "func g() error { return nil }\n\nfunc aIt() {\n\tx := 1 // about x\n\t_ = g()\n\t_ = x\n}\n"), e("api/store/extra", "_ = g()", "0810")),
+    # M1
+    ("R147", "M1: a port parameter with a listed name and type", rules(rule("X", "declaration", at="param", names="*amount*", deny_types="float64")), REFUND, {"v": [("api/orders/component.vulcan", "Refund(amount", "0807", 0)], "l": [("api/orders/ports.go", "amount float64", "0807", 0)]}),
+    ("R148", "M1: a port parameter of another kind of name stays accepted", rules(rule("X", "declaration", at="param", names="*timeout*", deny_types="float64")), REFUND, NO),
+    ("R149", "M1: a port parameter with another name is one finding in both", rules(rule("X", "declaration", at="param", types="context.Context", require="name=ctx", **{"in": "api/orders"})), PING, {"v": [("api/orders/component.vulcan", "Ping(c", "0807", 0)], "l": [("api/orders/ports.go", "c context", "0807", 0)]}),
+    # M2
+    ("R150", "M2: a file behind a build tag", None, {"v": {"api/orders/tagged.vulcan": '//go:build foo\n\npackage orders\n\nimport "os"\n\nfunc stopIt() { os.Exit(1) }\n'}, "l": {"api/orders/tagged.go": '//go:build foo\n\npackage orders\n\nimport "os"\n\nfunc stopIt() { os.Exit(1) }\n'}},
+     {"v": [("api/orders/tagged.vulcan", "//go:build", "0901", 0)], "l": [("api/orders/orders.go", (2, 1), "0901", 0)]}),
+    ("R151", "M2: a file for another system", None, {"v": {"api/orders/extra_plan9.vulcan": "package orders\n\nfunc stopIt() {}\n"}, "l": {"api/orders/extra_plan9.go": "package orders\n\nfunc stopIt() {}\n"}},
+     {"v": [("api/orders/extra_plan9.vulcan", "package", "0901", 0)], "l": [("api/orders/orders.go", (2, 1), "0901", 0)]}),
+    # M3
+    ("R152", "M3: one port call counts the same in both: under the limit in both", rules(rule("X", "code-form", form="duplicate-function", limit="60", similarity="90", **{"in": "api/billing"})), DUP_PORT(4), NO),
+    ("R185", "M3: one port call counts the same in both: over the limit in both", rules(rule("X", "code-form", form="duplicate-function", limit="60", similarity="90", **{"in": "api/billing"})), DUP_PORT(6), both_at("api/billing/dup.vulcan", "api/billing/dup.go", "twoIt", "0810")),
+    # M4
+    ("R153", "M4: a deprecated function of the module itself", rules(rule("X", "code-form", form="deprecated-use", **{"in": "api/orders"})), OLD, e("api/orders/extra", "Old()", "0810")),
+    # M5
+    ("R154", "M5: a switch over an alias of a type with unexported constants", rules(rule("X", "code-form", form="switch-exhaustive")), ALIAS_SWITCH, e("api/orders/extra", "switch v", "0810")),
+    # M7
+    ("R155", "M7: a word of require that the place does not take", rules(rule("X", "declaration", at="port-method", require="requirs")), NO, both_at("rules.vulcan", "rules.vulcan", "rule X", "0801")),
+    ("R156", "M7: a place with nothing to apply", rules(rule("X", "declaration", at="field")), NO, both_at("rules.vulcan", "rules.vulcan", "rule X", "0801")),
+    ("R157", "M7: a table of a type that the package does not declare", rules(rule("X", "transitions", type="lib/money.Ordr", field="Status", allow="a->b")), NO, both_at("rules.vulcan", "rules.vulcan", "rule X", "0801")),
+    ("R158", "M7: a table of a field that the type does not have", rules(rule("X", "transitions", type="lib/money.Order", field="Statuss", allow="a->b")), NO, both_at("rules.vulcan", "rules.vulcan", "rule X", "0801")),
+    ("R159", "M7: to names a directory that is not a part", rules(rule("X", "declaration", at="wired-port", to="api/nope")), NO, both_at("rules.vulcan", "rules.vulcan", "rule X", "0801")),
+    # M11
+    ("R160", "M11: a listed method as a value leaves no argument to read", rules(rule("X", "call-form", funcs="(*database/sql.DB).Exec", require="constant")), extra("store", "func runIt(d *sql.DB, q string) {\n\tf := d.Exec\n\t_, _ = f(q)\n}\n", "database/sql"), e("api/store/extra", "Exec\n", "0808")),
+    ("R161", "M11, a limit: a call through a local interface passes in both", rules(rule("X", "call-form", funcs="(*database/sql.DB).Exec", require="constant")), extra("store", "type runner interface {\n\tExec(string, ...any) (sql.Result, error)\n}\n\nfunc runIt(d runner, q string) {\n\t_, _ = d.Exec(q)\n}\n", "database/sql"), NO),
+    # M12
+    ("R162", "M12: a field of an alias of a listed type", rules(FIELDCTX), CTX("type c = context.Context\n\ntype holder struct {\n\tX c\n}\n\nvar _ = holder{}\n"), e("api/orders/extra", "X c", "0807")),
+    ("R163", "M12: a field of a pointer to a listed type", rules(FIELDCTX), CTX("type holder struct {\n\tX *context.Context\n}\n\nvar _ = holder{}\n"), e("api/orders/extra", "X *context", "0807")),
+    ("R164", "M12: a field of a slice of a listed type", rules(FIELDCTX), CTX("type holder struct {\n\tX []context.Context\n}\n\nvar _ = holder{}\n"), e("api/orders/extra", "X []context", "0807")),
+    ("R165", "M12: an alias of a generic type with a listed type argument", rules(FIELDCTX), CTX("type box[v any] struct {\n\tX v\n}\n\ntype t = box[context.Context]\n\nvar _ = t{}\n"), e("api/orders/extra", "t = box", "0807")),
+    ("R166", "M12: a field of an interface that embeds a listed type", rules(FIELDCTX), CTX("type i interface{ context.Context }\n\ntype holder struct {\n\tX i\n}\n\nvar _ = holder{}\n"), e("api/orders/extra", "X i", "0807")),
+    ("R167", "M12: a parameter of an alias of a listed type", rules(CTXFIRST), CTX("type c = context.Context\n\nfunc doIt(a int, x c) {}\n"), e("api/orders/extra", "x c", "0807")),
+    ("R168", "M12: a variable of an alias of a listed type", rules(FLOATVAR), extra("orders", "type m = float64\n\nfunc priceIt() m {\n\tamount := m(1)\n\treturn amount\n}\n"), e("api/orders/extra", "amount :=", "0807")),
+    ("R169", "M12: a field that is a slice of a listed type", rules(FLOATFIELD), extra("orders", "type bill struct {\n\tAmounts []float64\n}\n\nvar _ = bill{}\n"), e("api/orders/extra", "Amounts", "0807")),
+    ("R170", "M12: a named result", rules(rule("X", "declaration", at="param", names="timeout", deny_types="int")), extra("orders", "func waitIt() (timeout int) {\n\treturn 1\n}\n"), e("api/orders/extra", "timeout int", "0807")),
+    ("R171", "M12, a limit: a type defined from a listed type passes in both", rules(FLOATFIELD), extra("orders", "type m float64\n\ntype bill struct {\n\tAmount m\n}\n\nvar _ = bill{}\n"), NO),
+    # M13
+    ("R172", "M13: a method of net.Dialer", rules(rule("X", "only-in", effect="network", **{"in": "gateway entry"})), extra("orders", "func dialIt(x *net.Dialer) any { return x.DialTCP }\n", "net"), both(e("api/orders/extra", "DialTCP", "0205"), e("api/orders/extra", "DialTCP", "0803"))),
+    ("R173", "M13: a method of exec.Cmd", rules(rule("X", "only-in", effect="processes", **{"in": "gateway"})), extra("orders", 'func runIt() {\n\tc := exec.Cmd{Path: "x"}\n\t_ = c.Run()\n}\n', "os/exec"), both(e("api/orders/extra", "Run()", "0205"), e("api/orders/extra", "Run()", "0803"))),
+    ("R174", "M13: the value crypto/rand.Reader", rules(rule("X", "only-in", effect="randomness", **{"in": "gateway"})), extra("orders", "func randIt(b []byte) { _, _ = io.ReadFull(rand.Reader, b) }\n", "crypto/rand io"), e("api/orders/extra", "Reader,", "0803")),
+    ("R175", "M13: slog.LogAttrs", rules(LOGATTRS), extra("orders", "func logIt(c context.Context, m string) { slog.LogAttrs(c, slog.LevelInfo, m) }\n", "context log/slog"), e("api/orders/extra", "m) }", "0808")),
+    ("R176", "M13: context.WithTimeout reads the clock", rules(rule("X", "only-in", effect="clock", **{"in": "gateway"})), extra("orders", "func timeIt(c context.Context) { _, f := context.WithTimeout(c, 1); f() }\n", "context"), e("api/orders/extra", "WithTimeout", "0803")),
+    ("R177", "M13: template.ParseFiles reads a file", rules(rule("X", "only-in", effect="files", **{"in": "gateway"})), extra("orders", 'func readIt() { _, _ = template.ParseFiles("x") }\n', "html/template"), e("api/orders/extra", "ParseFiles", "0803")),
+    ("R178", "M13: net/rpc/jsonrpc.Dial", rules(rule("X", "only-in", effect="network", **{"in": "gateway entry"})), extra("orders", 'func dialIt() { _, _ = jsonrpc.Dial("tcp", "x") }\n', "net/rpc/jsonrpc"), both(e("api/orders/extra", "Dial", "0205"), e("api/orders/extra", "Dial", "0803"))),
+    # L1
+    ("R179", "L1: a comment on the entry before is not a reason", rules(CFGRULE), LISTS3('"a.B", // why\n"c.D",'), both_at("system.vulcan", "arch/config.go", '"c.D"', "0807")),
+    ("R180", "L1: a block comment above an entry is a reason", rules(CFGRULE), LISTS3('/* why */\n"a.B",'), NO),
+    ("R181", "L1: // inside an entry's text is no comment", rules(CFGRULE), LISTS3('"http://x",'), both_at("system.vulcan", "arch/config.go", '"http://x"', "0807")),
+    # L3, L4
+    ("R183", "L3: ensures on a method of a generic type", rules(rule("X", "code-form", level="warn", form="return-effect", funcs="(*database/sql.Tx).Commit")), ensured("orders", "(b *box[T]) commitIt(t *sql.Tx) error", "t != nil", "\treturn t.Commit()\n", imports="database/sql", before="type box[T any] struct{}\n\n"), ef("orders", "t.Commit()", "w0810")),
+    ("R184", "L4: at var does not read V's lowered temporaries", rules(rule("X", "declaration", at="var", deny_types="float64")), ensured("orders", "priceIt(a float64) float64", "a > 0", "\treturn a\n"), NO),
+]
+
+# Forms that one arm has alone. These are not in TestRuleCasesAgree.
+def main_with(body, decls=""):
+    return L_BASE["cmd/shop/main.go"].replace("func main() {", decls + "func main() {").replace("\tkeeper := store.Open()\n\tpayer := billing.NewPayer(keeper)\n", body)
+
+
+UNREAD = [
+    ("LW1", "H2: a helper that returns the provider", main_with("\tpayer := billing.NewPayer(mk())\n", "func mk() billing.Ledger { return store.Open() }\n\n"), [("mk())", 0)]),
+    ("LW2", "H2: a helper that takes the provider", main_with("\tpayer := mk(store.Open())\n", "func mk(l billing.Ledger) *billing.Payer { return billing.NewPayer(l) }\n\n"), [("l) }", 0), ("(payer)", 1)]),
+    ("LW3", "H2: a field", main_with("\tb := box{store.Open()}\n\tpayer := billing.NewPayer(b.l)\n", "type box struct{ l billing.Ledger }\n\n"), [("b.l)", 0)]),
+    ("LW4", "H2: a slice", main_with("\tls := []billing.Ledger{store.Open()}\n\tpayer := billing.NewPayer(ls[0])\n"), [("ls[0])", 0)]),
+    ("LW5", "H2: a closure", main_with("\tf := func() billing.Ledger { return store.Open() }\n\tpayer := billing.NewPayer(f())\n"), [("f())", 0)]),
+    ("LW6", "H2: a wire inside a closure", main_with("\tvar payer *billing.Payer\n\tfunc() { payer = billing.NewPayer(store.Open()) }()\n"), [("store.Open()) }", 0)]),
+    ("LW7", "H2: a variable with a second value", main_with("\tk := store.Open()\n\tk = store.Open()\n\tpayer := billing.NewPayer(k)\n"), [("k)", 0)]),
+    ("LW8", "H2: a map", main_with('\tm := map[string]billing.Ledger{"a": store.Open()}\n\tpayer := billing.NewPayer(m["a"])\n'), [('m["a"])', 0)]),
+    ("LW9", "H2: a function variable", main_with("\tf := store.Open\n\tpayer := billing.NewPayer(f())\n"), [("Open\n", 0), ("f())", 0)]),
+]
+PLAIN = main_with("\tvar k billing.Ledger = store.Open()\n\tj := k\n\tpayer := billing.NewPayer(j)\n")
+LOCK_HELPER = main_with("\tpayer := billing.NewPayer(mk())\n", "func mk() billing.Ledger { return store.Open() }\n\n")
+TESTDATA_S = 'package sub\n\nimport "os"\n\n// X stops.\nfunc X() { os.Exit(1) }\n'
+TESTDATA_USE = 'package orders\n\nimport "shop/api/orders/testdata/sub"\n\nfunc stopIt() { sub.X() }\n'
+ERR08 = rule("X", "forbid-call", funcs="os.Exit", **{"in": "leaf gateway entry library"})
+
+
+def arm_cases():
+    out = []
+    for id_, desc, main_text, wants in UNREAD:
+        out.append(("l", id_, desc, {"cmd/shop/main.go": main_text}, [("cmd/shop/main.go", s, "0909", o) for s, o in wants]))
+    out.append(("l", "LW10", "H2: plain forms stay accepted", {"cmd/shop/main.go": PLAIN}, []))
+    out.append(("l", "LW11", "H2: a helper cannot hide a new dependency from the lock", {"cmd/shop/main.go": LOCK_HELPER, "rules.vulcan": rules(LOCKED), "rules.lock": LOCK_NO_WIRE}, [("cmd/shop/main.go", "mk())", "0909", 0)]))
+    out.append(("l", "LT1", "H3: code under testdata", {"api/orders/testdata/sub/s.go": TESTDATA_S, "api/orders/extra.go": TESTDATA_USE, "rules.vulcan": rules(ERR08)}, [("api/orders/extra.go", '"shop/api', "0002", 0)]))
+    out.append(("l", "LT2", "H3: code under testdata at the root of the module", {"testdata/sub/s.go": TESTDATA_S, "api/orders/extra.go": TESTDATA_USE.replace("shop/api/orders/testdata", "shop/testdata")}, [("api/orders/extra.go", '"shop/testdata', "0002", 0)]))
+    out.append(("v", "VT1", "H3: code under testdata", {"api/orders/testdata/sub/s.vulcan": TESTDATA_S, "api/orders/extra.vulcan": TESTDATA_USE, "rules.vulcan": rules(ERR08)}, [("api/orders/extra.vulcan", '"shop/api', "0008", 0)]))
+    out.append(("l", "LN1", "L2: in L, the prefix vulcan_ is an ordinary name", {"api/orders/extra.go": "package orders\n\nfunc vulcan_x() {}\n", "rules.vulcan": rules(rule("X", "code-form", form="unused-name", **{"in": "api/orders"}))}, [("api/orders/extra.go", "vulcan_x", "0810", 0)]))
+    out.append(("l", "ET1", "H4: a type error in a test, with each form on: the error, and no panic", {"api/orders/x_test.go": BROKEN_TEST, "rules.vulcan": ALLFORMS, **PORT_DOC["l"]}, "broken"))
+    out.append(("v", "ET1", "H4: a type error in a test, with each form on: the error, and no panic", {"api/orders/x_test.vulcan": BROKEN_TEST, "rules.vulcan": ALLFORMS, **PORT_DOC["v"]}, [("api/orders/x_test.vulcan", "casess", "0008", 0)]))
+    return out
+
+
 def pos(text, snippet, offset):
+    if isinstance(snippet, tuple):
+        return snippet
     i = text.index(snippet) + offset
     line = text.count("\n", 0, i) + 1
     col = i - (text.rfind("\n", 0, i) + 1) + 1
@@ -604,7 +763,7 @@ def archive(desc, files, wants, prefix, base):
     all_files.update(files)
     lines = []
     for path, snippet, digits, offset in sorted(wants):
-        text = all_files[path]
+        text = all_files.get(path, "")
         line, col = pos(text, snippet, offset)
         word = "warn" if digits.startswith("w") else "error"
         lines.append(f"{word} {path}:{line}:{col} {prefix}{digits.lstrip('w')}")
@@ -637,6 +796,15 @@ def main():
         lf.update(l_files)
         (V_DIR / f"{id_}.txtar").write_text(archive(desc, vf, wants["v"], "K", vf), encoding="utf-8", newline="\n")
         (L_DIR / f"{id_}.txtar").write_text(archive(desc, lf, wants["l"], "VL", {**L_FROM_BASE, **lf}), encoding="utf-8", newline="\n")
+    for arm, id_, desc, files, wants in arm_cases():
+        base = dict(V_BASE if arm == "v" else L_ALL)
+        base.update(files)
+        prefix = "K" if arm == "v" else "VL"
+        if wants == "broken":
+            text = archive(desc, base, [], prefix, base).replace("-- want.txt --\naccept\n", "-- want.txt --\nbroken\n")
+        else:
+            text = archive(desc, base, wants, prefix, base)
+        (V_DIR if arm == "v" else L_DIR).joinpath(f"{id_}.txtar").write_text(text, encoding="utf-8", newline="\n")
 
 
 # The files of base.txtar that a case can name in want.txt.

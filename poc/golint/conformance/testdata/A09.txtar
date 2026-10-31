@@ -1,5 +1,6 @@
 A port method parameter of a type private to Orders (K0112).
 -- want.txt --
+error cmd/shop/main.go:17:17 VL0909
 error api/orders/ports.go:7:2 VL0112
 -- api/orders/orders.go --
 // Package orders places orders.

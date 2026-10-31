@@ -16,6 +16,9 @@ import (
 	"time"
 )
 
+// GoVersion is the Go version that init writes in a new go.mod: the current stable toolchain.
+const GoVersion = "1.27.3"
+
 // DefaultsName names the built-in ruleset of this tool.
 const DefaultsName = "defaults v1"
 
@@ -108,11 +111,11 @@ func parseSource(b []byte, name string) (*File, error) {
 // withHead gives the text of a source with the head of a project.
 func withHead(src []byte, origin, hash string) string {
 	var out []string
-	head := fmt.Sprintf("origin %s\nhash %s", origin, hash)
+	head := fmt.Sprintf("origin %s\nhash %s\nlists %s", origin, hash, Lists())
 	done := false
 	for _, line := range strings.Split(string(Normalize(src)), "\n") {
 		key, _, _ := strings.Cut(strings.TrimSpace(line), " ")
-		if key == "origin" || key == "hash" {
+		if key == "origin" || key == "hash" || key == "lists" {
 			if !done {
 				out, done = append(out, head), true
 			}
@@ -315,6 +318,9 @@ func (t Tool) diff(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "origin %s\nhash %s\n", f.Origin, f.Hash)
+	if f.Lists != Lists() {
+		fmt.Fprintf(stdout, "lists %s here, and %s in this tool: a rule can enforce more or less than when the head was written\n", f.Lists, Lists())
+	}
 	n := 0
 	for _, r := range of.Rules {
 		p := f.Find(r.ID)
@@ -325,7 +331,7 @@ func (t Tool) diff(args []string, stdout, stderr io.Writer) int {
 		case !Equal(r, p):
 			n++
 			what := "changed by the team"
-			if r.Level == Error && p.Level == Off {
+			if p.Level == Off && r.Level != Off {
 				what = "turned off by the team"
 			}
 			fmt.Fprintf(stdout, "~ rule %s: %s: %s\n", r.ID, what, strings.Join(paramChanges(r, p), "; "))
@@ -416,6 +422,7 @@ func applyUpgrade(f, nf *File, plan []change, origin, hash string) string {
 		}
 		lines = slices.Replace(lines, e.start, e.end, repl...)
 	}
+	hasLists := false
 	for i, line := range lines {
 		key, _, _ := strings.Cut(strings.TrimSpace(line), " ")
 		if key == "origin" {
@@ -424,8 +431,16 @@ func applyUpgrade(f, nf *File, plan []change, origin, hash string) string {
 		if key == "hash" {
 			lines[i] = "hash " + hash
 		}
+		if key == "lists" {
+			lines[i], hasLists = "lists "+Lists(), true
+		}
 		if key == "rule" {
 			break
+		}
+	}
+	if !hasLists {
+		if i := slices.IndexFunc(lines, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), "hash ") }); i >= 0 {
+			lines = slices.Insert(lines, i+1, "lists "+Lists())
 		}
 	}
 	text := strings.TrimRight(strings.Join(lines, "\n"), "\n") + "\n"
@@ -477,7 +492,11 @@ func (t Tool) upgrade(args []string, stdout, stderr io.Writer) int {
 	}
 	hash := Hash(src)
 	fmt.Fprintf(stdout, "from %s %s\nto %s %s\n", f.Origin, f.Hash, origin, hash)
-	if hash == f.Hash && origin == f.Origin {
+	listsChanged := f.Lists != Lists()
+	if listsChanged {
+		fmt.Fprintf(stdout, "the tool's lists changed, so the same rules can enforce more or less: lists %s here, and %s in this tool\n", f.Lists, Lists())
+	}
+	if hash == f.Hash && origin == f.Origin && !listsChanged {
 		fmt.Fprintln(stdout, "the source has not changed")
 		return 0
 	}

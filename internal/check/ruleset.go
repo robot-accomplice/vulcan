@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -42,6 +43,7 @@ func (c *Checker) ports(pkg *project.Package, gp *packages.Package) []rules.Port
 		return nil
 	}
 	var out []rules.Port
+	comments := rules.ScanComments(pkg.CompSrc.Src)
 	for _, port := range pkg.Comp.Ports {
 		tn, ok := gp.Types.Scope().Lookup(gen.PortType(port.Name)).(*types.TypeName)
 		if !ok {
@@ -51,9 +53,9 @@ func (c *Checker) ports(pkg *project.Package, gp *packages.Package) []rules.Port
 		if !ok {
 			continue
 		}
-		p := rules.Port{Name: port.Name, Type: tn.Type(), At: tn.Pos(), Doc: rules.HasComment(pkg.CompSrc.Src, pkg.CompSrc.Pos(port.Pos).Line)}
+		p := rules.Port{Name: port.Name, Type: tn.Type(), At: tn.Pos(), Doc: comments.Near(pkg.CompSrc.Pos(port.Pos).Line)}
 		for _, m := range port.Methods {
-			pm := rules.PortMethod{Name: m.Name, At: tn.Pos(), Doc: rules.HasComment(pkg.CompSrc.Src, pkg.CompSrc.Pos(m.Pos).Line)}
+			pm := rules.PortMethod{Name: m.Name, At: tn.Pos(), Doc: comments.Near(pkg.CompSrc.Pos(m.Pos).Line)}
 			for i := range iface.NumExplicitMethods() {
 				if x := iface.ExplicitMethod(i); x.Name() == m.Name {
 					pm.Sig, pm.At = x.Type().(*types.Signature), x.Pos()
@@ -67,6 +69,14 @@ func (c *Checker) ports(pkg *project.Package, gp *packages.Package) []rules.Port
 		out = append(out, p)
 	}
 	return out
+}
+
+// buildFile maps a .vulcan file of a position to its copy in the build directory, which is Go.
+func (c *Checker) buildFile(file string) string {
+	if !strings.HasSuffix(file, ".vulcan") {
+		return file
+	}
+	return filepath.Join(gen.BuildDir(c.P), filepath.FromSlash(gen.GoFileName(c.rel(file))))
 }
 
 // ensuresOf says whether a function of a package has an ensures clause.
@@ -87,6 +97,12 @@ func ensuresOf(pkg *project.Package) func(*ast.FuncDecl) bool {
 			t := fd.Recv.List[0].Type
 			if s, ok := t.(*ast.StarExpr); ok {
 				t = s.X
+			}
+			switch g := t.(type) {
+			case *ast.IndexExpr:
+				t = g.X
+			case *ast.IndexListExpr:
+				t = g.X
 			}
 			if id, ok := t.(*ast.Ident); ok {
 				recv = id.Name
@@ -117,10 +133,11 @@ func testsAbsent(pkg *project.Package, gp *packages.Package) bool {
 func (c *Checker) decls() []rules.Decl {
 	var out []rules.Decl
 	sys, src := c.P.System, c.P.SysSrc
+	comments := rules.ScanComments(src.Src)
 	if sys != nil {
 		for _, n := range sys.Externals {
 			pos := src.Pos(n.Pos)
-			out = append(out, rules.Decl{What: "external", Name: n.Name, Commented: n.Desc != "" || rules.HasComment(src.Src, pos.Line), At: pos})
+			out = append(out, rules.Decl{What: "external", Name: n.Name, Commented: n.Desc != "" || comments.Near(pos.Line), At: pos})
 		}
 	}
 	for _, key := range []string{"strict_exempt", "strict_interfaces", "strict_shared", "mutators"} {
@@ -131,14 +148,14 @@ func (c *Checker) decls() []rules.Decl {
 		for _, it := range v.List {
 			pos := src.Pos(it.Pos)
 			name := strings.Trim(strings.TrimSpace(it.Text), `"`)
-			out = append(out, rules.Decl{What: "config-entry", Name: name, Commented: rules.HasComment(src.Src, pos.Line), At: pos})
+			out = append(out, rules.Decl{What: "config-entry", Name: name, Commented: comments.Near(pos.Line), At: pos})
 		}
 	}
 	for _, lib := range c.P.Libs {
 		d := rules.Decl{What: "library", Name: lib.GoName, At: diag.Pos{File: lib.Dir, Line: 0}}
 		if lib.LibSrc != nil && lib.Lib != nil {
 			pos := lib.LibSrc.Pos(lib.Lib.Pos)
-			d.Commented, d.At = rules.HasComment(lib.LibSrc.Src, pos.Line), pos
+			d.Commented, d.At = rules.ScanComments(lib.LibSrc.Src).Near(pos.Line), pos
 		}
 		out = append(out, d)
 	}
@@ -206,7 +223,12 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 	}
 	for _, pkg := range all {
 		gp := c.Full[pkg.ImportPath]
-		if gp == nil || gp.TypesInfo == nil {
+		// As L's driver does, a rule does not read a package with a type error. A type error in a
+		// test leaves the package without its tests, which L's driver reads too.
+		if gp != nil && len(gp.Errors) > 0 {
+			gp = c.Plain[pkg.ImportPath]
+		}
+		if gp == nil || gp.TypesInfo == nil || len(gp.Errors) > 0 {
 			continue
 		}
 		u := &rules.Unit{
@@ -214,6 +236,7 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 			IsTest: func(f *ast.File) bool {
 				return strings.HasSuffix(c.Fset.PositionFor(f.Package, false).Filename, "_test.go")
 			},
+			Pkg: gp.Types, Generates: true, SourceFile: c.buildFile,
 			Ports:       c.ports(pkg, gp),
 			HasEnsures:  ensuresOf(pkg),
 			TestsAbsent: testsAbsent(pkg, gp),
@@ -224,6 +247,9 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 			} else if strings.HasSuffix(c.Fset.PositionFor(f.Package, false).Filename, "vulcan_ports.go") {
 				u.PortFiles = append(u.PortFiles, f)
 			}
+		}
+		for _, p := range set.ResolveTypes(u) {
+			c.D.Errorf(diag.Pos{File: rules.FileName, Line: p.Line, Col: 1}, "K0801", "%s", p.Msg)
 		}
 		for _, f := range set.CheckUnit(u) {
 			report(c.Pos(f.At.(token.Pos)), f)

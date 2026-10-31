@@ -81,7 +81,7 @@ net.Listen net.ListenPacket net.ListenTCP net.ListenUDP net.ListenIP net.ListenU
 net.ListenMulticastUDP net.FileListener (*net.ListenConfig).Listen (*net.ListenConfig).ListenPacket crypto/tls.Listen
 net/http.ListenAndServe net/http.ListenAndServeTLS net/http.Serve net/http.ServeTLS
 (*net/http.Server).ListenAndServe (*net/http.Server).ListenAndServeTLS (*net/http.Server).Serve (*net/http.Server).ServeTLS
-syscall.Bind syscall.Listen syscall.Accept
+syscall.Bind syscall.Listen syscall.Accept net/http/fcgi.Serve
 `)
 
 // globalMutators are the global mutators of Appendix D.

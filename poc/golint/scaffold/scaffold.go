@@ -70,7 +70,7 @@ func write(root string, stdout io.Writer) error {
 	out := []struct {
 		rel  string
 		data []byte
-	}{{"go.mod", fmt.Appendf(nil, "module %s\n\ngo 1.26.0\n", moduleName(filepath.Base(root)))}}
+	}{{"go.mod", fmt.Appendf(nil, "module %s\n\ngo %s\n", moduleName(filepath.Base(root)), rules.GoVersion)}}
 	if _, err := os.Stat(filepath.Join(root, model.ManifestDir)); err != nil {
 		out = append(out,
 			struct {

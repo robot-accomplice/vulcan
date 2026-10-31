@@ -272,11 +272,12 @@ func TestRulesCommands(t *testing.T) {
 }
 
 // TestDefaultsOnBase runs both arms with the draft of defaults v1 on a copy of each base
-// application, and compares the rules that fire. Which rules fire is a measure for QN, not a fault:
-// the test fails only when the arms differ.
+// application, and compares the findings by rule, part, and count. Which rules fire is a measure
+// for QN, not a fault: the test fails only when the arms differ.
 func TestDefaultsOnBase(t *testing.T) {
 	code := regexp.MustCompile(`(K|VL)08\d\d\b`)
 	id := regexp.MustCompile(`\(rule ([\w.-]+) in rules\.vulcan`)
+	part := regexp.MustCompile(`((?:api|lib)[/\\][\w]+|system\.vulcan|cmd[/\\]\w+)`)
 	fired := map[string]map[string]int{}
 	for _, arm := range arms(t) {
 		if c, out := run(t, arm.dir, arm.bin, "init"); c != 0 {
@@ -294,19 +295,118 @@ func TestDefaultsOnBase(t *testing.T) {
 			if m == nil {
 				t.Fatalf("%s: a rule's finding with no id: %s", arm.name, line)
 			}
-			fired[arm.name][m[1]]++
+			where := part.FindString(strings.TrimPrefix(line, arm.dir))
+			where = strings.ReplaceAll(where, "\\", "/")
+			if where == "system.vulcan" || strings.HasPrefix(where, "cmd/") {
+				where = "wires" // V declares them in system.vulcan, and L makes them in main
+			}
+			fired[arm.name][m[1]+" "+where]++
 		}
-		t.Logf("%s fires %v", arm.name, fired[arm.name])
 	}
-	for rule := range fired["V"] {
-		if fired["L"][rule] == 0 {
-			t.Errorf("rule %s fires in V and not in L", rule)
+	// The one difference is in the applications: V's lib/shop has a comment on its library.vulcan,
+	// and L's has no package comment.
+	fired["V"]["CODE-08 lib/shop"]++
+	for key, n := range fired["V"] {
+		if fired["L"][key] != n {
+			t.Errorf("%s: %d findings in V, and %d in L", key, n, fired["L"][key])
 		}
 	}
-	for rule := range fired["L"] {
-		if fired["V"][rule] == 0 {
-			t.Errorf("rule %s fires in L and not in V", rule)
+	for key, n := range fired["L"] {
+		if fired["V"][key] != n {
+			t.Errorf("%s: %d findings in L, and %d in V", key, n, fired["V"][key])
 		}
+	}
+}
+
+// TestListsInUpgrade checks that rules upgrade shows a change of the tool's lists, with the source
+// the same, and that accepting it records the new version (audit M8).
+func TestListsInUpgrade(t *testing.T) {
+	for _, arm := range arms(t) {
+		t.Run(arm.name, func(t *testing.T) {
+			if c, out := run(t, arm.dir, arm.bin, "init"); c != 0 {
+				t.Fatal(out)
+			}
+			path := filepath.Join(arm.dir, "rules.vulcan")
+			b, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			text := string(b)
+			lists := regexp.MustCompile(`(?m)^lists (sha256:\w+)$`).FindStringSubmatch(text)
+			if lists == nil {
+				t.Fatalf("no lists in the head:\n%s", text[:200])
+			}
+			if _, out := run(t, arm.dir, arm.bin, "rules", "upgrade"); !strings.Contains(out, "has not changed") {
+				t.Errorf("with the same lists: %s", out)
+			}
+			old := strings.Replace(text, lists[1], "sha256:0", 1)
+			if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, out := run(t, arm.dir, arm.bin, "rules", "upgrade")
+			if !strings.Contains(out, "lists changed") || !strings.Contains(out, "nothing changed") {
+				t.Fatalf("rules upgrade does not show the change:\n%s", out)
+			}
+			if _, d := run(t, arm.dir, arm.bin, "rules", "diff"); !strings.Contains(d, "lists sha256:0 here") {
+				t.Errorf("rules diff does not show the change:\n%s", d)
+			}
+			hash := regexp.MustCompile(`--accept (sha256:\w+)`).FindStringSubmatch(out)[1]
+			if c, o := run(t, arm.dir, arm.bin, "rules", "upgrade", "--accept", hash); c != 0 {
+				t.Fatal(o)
+			}
+			if b, _ := os.ReadFile(path); !strings.Contains(string(b), "lists "+lists[1]) {
+				t.Errorf("the accept did not record the lists")
+			}
+		})
+	}
+}
+
+// TestDiffSaysTurnedOff checks the words of rules diff for each level (audit L6).
+func TestDiffSaysTurnedOff(t *testing.T) {
+	src := "rule A\n  kind forbid-call\n  level warn\n  funcs net/url.NoSuch\n  reason R.\n  source S.\n\n" +
+		"rule B\n  kind forbid-call\n  level error\n  funcs net/url.NoOther\n  reason R.\n  source S.\n"
+	source := filepath.Join(t.TempDir(), "team.rules")
+	if err := os.WriteFile(source, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, arm := range arms(t) {
+		if c, out := run(t, arm.dir, arm.bin, "init", "--rules", source); c != 0 {
+			t.Fatal(out)
+		}
+		path := filepath.Join(arm.dir, "rules.vulcan")
+		b, _ := os.ReadFile(path)
+		text := strings.Replace(strings.ReplaceAll(string(b), "\r\n", "\n"), "level warn", "level off", 1)
+		text = strings.Replace(text, "level error", "level warn", 1)
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, out := run(t, arm.dir, arm.bin, "rules", "diff")
+		if !strings.Contains(out, "~ rule A: turned off") || !strings.Contains(out, "~ rule B: changed") {
+			t.Errorf("%s: %s", arm.name, out)
+		}
+	}
+}
+
+// TestLockRefusesModelError checks that rules lock stops on an error of the model, in both arms
+// (audit L5), and that L stops on a wire that it cannot read.
+func TestLockRefusesModelError(t *testing.T) {
+	for _, arm := range arms(t) {
+		t.Run(arm.name, func(t *testing.T) {
+			name, text := "api/orders/extra.vulcan", "package orders\n\nimport \"stockroom/api/billing\"\n\nvar _ = billing.Ledger{}\n"
+			if arm.name == "L" {
+				name = "api/orders/extra.go"
+			}
+			if err := os.WriteFile(filepath.Join(arm.dir, filepath.FromSlash(name)), []byte(text), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			code, out := run(t, arm.dir, arm.bin, "rules", "lock")
+			if code == 0 {
+				t.Errorf("rules lock passes with a leaf that imports a leaf:\n%s", out)
+			}
+			if _, err := os.Stat(filepath.Join(arm.dir, "rules.lock")); err == nil {
+				t.Errorf("rules lock wrote a lock")
+			}
+		})
 	}
 }
 
@@ -369,6 +469,9 @@ func TestInitIsClean(t *testing.T) {
 				if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 					t.Error(err)
 				}
+			}
+			if b, _ := os.ReadFile(filepath.Join(dir, "go.mod")); !strings.Contains(string(b), "go 1.27.3") {
+				t.Errorf("go.mod does not name the current toolchain:\n%s", b)
 			}
 			if code, out := run(t, dir, arm.bin, arm.check...); code != 0 {
 				t.Errorf("the check of a new project: %s", out)

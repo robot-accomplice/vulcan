@@ -70,19 +70,21 @@
   },
   {
    "id": "ARCH-10",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "ARCH-10"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "ARCH-11",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "ARCH-11"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "ARCH-12",
@@ -224,11 +226,12 @@
   },
   {
    "id": "ERR-08",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "ERR-08"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "ERR-09",
@@ -278,19 +281,21 @@
   },
   {
    "id": "CTX-01",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "CTX-01"
    ],
-   "reason": null
+   "reason": "shape",
+   "not_stated_part": "A parameter of `context.Context`, or of an alias, or of an interface that embeds it, is stated. A type defined from it is another type, and is not found."
   },
   {
    "id": "CTX-02",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "CTX-02"
    ],
-   "reason": null
+   "reason": "shape",
+   "not_stated_part": "A field that holds `context.Context` through an alias, a pointer, a slice, a map, a type argument, or an embedded interface is stated. A type defined from it is another type, and is not found."
   },
   {
    "id": "CTX-03",
@@ -314,11 +319,12 @@
   },
   {
    "id": "CTX-06",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "CTX-06"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "CTX-07",
@@ -336,7 +342,7 @@
     "CTX-08"
    ],
    "reason": "whole-program",
-   "not_stated_part": "A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, and L's analyzers read one package at a time."
+   "not_stated_part": "A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, which the design of `rules.Unit` does not give."
   },
   {
    "id": "CTX-09",
@@ -346,21 +352,23 @@
   },
   {
    "id": "HTTP-01",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "HTTP-01",
     "HTTP-01.timeouts"
    ],
-   "reason": null
+   "reason": "shape",
+   "not_stated_part": "The ban on the package-level functions, and each timeout set in a literal of `http.Server`, are stated. A timeout from a variable that is zero passes, and the check does not read that the entry serves through that server."
   },
   {
    "id": "HTTP-02",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "HTTP-02",
     "HTTP-02.timeout"
    ],
-   "reason": null
+   "reason": "shape",
+   "not_stated_part": "The ban on the package-level functions and on `http.DefaultClient`, and a `Timeout` set in a literal of `http.Client`, are stated. A variable that is zero passes, and so does a client built through a type defined from `http.Client`."
   },
   {
    "id": "HTTP-03",
@@ -431,11 +439,12 @@
   },
   {
    "id": "HTTP-13",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "HTTP-13"
    ],
-   "reason": null
+   "reason": "shape",
+   "not_stated_part": "A route of `http.ServeMux` is stated. A handler with no mux has no route to read."
   },
   {
    "id": "HTTP-14",
@@ -457,11 +466,12 @@
   },
   {
    "id": "HTTP-17",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "HTTP-17"
    ],
-   "reason": null
+   "reason": "shape",
+   "not_stated_part": "A literal of `http.Cookie` is stated. A cookie that a handler writes as a header is not read."
   },
   {
    "id": "HTTP-18",
@@ -531,11 +541,12 @@
   },
   {
    "id": "SEC-07",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "SEC-07"
    ],
-   "reason": null
+   "reason": "meaning",
+   "not_stated_part": "A constant statement is stated. A comment removes the finding, and the wishlist's decision asks for a fixed allow-list in the same function. Whether a comment describes one is for a person to judge."
   },
   {
    "id": "SEC-08",
@@ -673,12 +684,13 @@
   },
   {
    "id": "SEC-30",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "SEC-30.imports",
     "SEC-30.calls"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "SEC-31",
@@ -720,11 +732,12 @@
   },
   {
    "id": "DATA-03",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "DATA-03"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "DATA-04",
@@ -1067,19 +1080,21 @@
   },
   {
    "id": "OBS-01",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "OBS-01"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "OBS-02",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "OBS-02"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "OBS-03",
@@ -1174,11 +1189,12 @@
   },
   {
    "id": "CON-03",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "CON-03"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "CON-04",
@@ -1218,12 +1234,13 @@
   },
   {
    "id": "CODE-05",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "CODE-05.json",
     "CODE-05.xml"
    ],
-   "reason": null
+   "reason": "flow",
+   "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow."
   },
   {
    "id": "CODE-06",
@@ -1254,7 +1271,7 @@
     "CODE-09"
    ],
    "reason": "whole-program",
-   "not_stated_part": "Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, and L's analyzers read one package at a time."
+   "not_stated_part": "Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, which the design of `rules.Unit` does not give."
   },
   {
    "id": "CODE-10",
@@ -1270,7 +1287,7 @@
     "CODE-11.unused"
    ],
    "reason": "whole-program",
-   "not_stated_part": "A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, and an unused method or field is not read."
+   "not_stated_part": "A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, which the design of `rules.Unit` does not give, and an unused method or field is not read."
   },
   {
    "id": "TEST-01",
