@@ -2,12 +2,12 @@
 
 Draft, not frozen. `gen_defaults.py` writes this file from the wishlist and `coverage.json`. The wanted text is the wishlist's.
 
-This list is a result of plan-r3, section 4: it says what the four rule kinds cannot state.
+This list is a result of plan-r3, section 4: it says what the rule kinds cannot state.
 
 | Status | Wanted rules |
 |---|---:|
-| Stated by the kinds | 43 |
-| Stated in part | 13 |
+| Stated by the kinds | 26 |
+| Stated in part | 30 |
 | Not stated | 154 |
 | Total | 210 |
 
@@ -17,11 +17,13 @@ A rule that the model already enforces and that a kind can state is in the file 
 
 Two stated rules are wider than their wanted text, because a kind cannot see a purpose. `SEC-10` bans the broken algorithms in all code, not only in security code; its note in the wishlist expects a written exception for a checksum, which here is an edit of `from` or `except`. `DATA-15` bans `time.Now`, `time.Since`, and `time.Until` in all code of a plain leaf or a library, not only for a business decision.
 
-Four stated rules hold a finite list where the wanted text is open or says "such as": `ARCH-19` (Appendix D's global mutators), `CTX-06` (the forms without a context in the standard library), and `ARCH-10` and `ARCH-11` (Appendix D's network functions, with holes H3 and H7).
+Four rules hold a finite list where the wanted text is open or says "such as": `ARCH-19` (Appendix D's global mutators), `CTX-06` (the forms without a context in the standard library), and `ARCH-10` and `ARCH-11` (Appendix D's network functions, with holes H3 and H7 and the names of audit M13). A name that a list lacks is not found, in both arms.
+
+`CONC-03`, `CON-03`, and `CODE-03` are at level `warn`. A rule at `warn` does not count as enforced in T1 (plan-r3, sections 2 and 5).
 
 Stated forms that hold a finite list, or are wider than the words, for the same reason: `ERR-13` reads `errors.New` and `fmt.Errorf` only. `HTTP-13` reads the patterns of `http.ServeMux`, where a method in the pattern gives 405 for the others. `HTTP-17` reads each cookie of an entry leaf, not only a session cookie. `ERR-01` allows a bare `defer` of a listed `Close` or `Rollback`, and it cannot tell a read handle from a write handle. `CON-03` lists its effects and adds each port call. `CODE-08` holds for each exported name, also a struct field and an interface method. `CODE-08` and `CON-01` name no topic, because release 1 has none.
 
-`HTTP-01` and `HTTP-02` were stated in part, with "shape" as the reason for the rest. The kind `literal` states the rest, so both are now stated. They were not among the 39.
+`HTTP-01` and `HTTP-02` were not among the 39. The kind `literal` reaches more of each. The audit shows that each stays in part.
 
 ## Not stated, by reason
 
@@ -40,8 +42,9 @@ Stated forms that hold a finite list, or are wider than the words, for the same 
 
 | Reason | Wanted rules |
 |---|---:|
-| flow | 1 |
-| meaning | 7 |
+| shape | 6 |
+| flow | 11 |
+| meaning | 8 |
 | project-facts | 1 |
 | outside-source | 1 |
 | whole-program | 3 |
@@ -58,31 +61,31 @@ Stated forms that hold a finite list, or are wider than the words, for the same 
 | ERR-04 | stated | `ERR-04` |
 | ERR-09 | stated | `ERR-09` |
 | ERR-13 | stated | `ERR-13` |
-| CTX-01 | stated | `CTX-01` |
-| CTX-02 | stated | `CTX-02` |
+| CTX-01 | in part (shape) | `CTX-01` |
+| CTX-02 | in part (shape) | `CTX-02` |
 | CTX-03 | stated | `CTX-03` |
 | CTX-07 | in part (meaning) | `CTX-07` |
 | CTX-08 | in part (whole-program) | `CTX-08` |
 | HTTP-09 | in part (meaning) | `HTTP-09` |
 | HTTP-11 | stated | `HTTP-11` |
-| HTTP-13 | stated | `HTTP-13` |
-| HTTP-17 | stated | `HTTP-17` |
+| HTTP-13 | in part (shape) | `HTTP-13` |
+| HTTP-17 | in part (shape) | `HTTP-17` |
 | SEC-01 | in part (meaning) | `SEC-01` |
 | SEC-02 | in part (meaning) | `SEC-02` |
-| SEC-07 | stated | `SEC-07` |
-| DATA-03 | stated | `DATA-03` |
+| SEC-07 | in part (meaning) | `SEC-07` |
+| DATA-03 | in part (flow) | `DATA-03` |
 | DATA-14 | in part (meaning) | `DATA-14` |
 | PAY-01 | in part (project-facts) | `PAY-01` |
 | RES-02 | in part (flow) | `RES-02` |
 | CONC-03 | stated | `CONC-03` |
-| OBS-02 | stated | `OBS-02` |
+| OBS-02 | in part (flow) | `OBS-02` |
 | CON-01 | in part (meaning) | `CON-01` |
 | CON-02 | not stated (meaning) |  |
-| CON-03 | stated | `CON-03` |
+| CON-03 | in part (flow) | `CON-03` |
 | CODE-02 | stated | `CODE-02` |
 | CODE-03 | stated | `CODE-03` |
 | CODE-04 | stated | `CODE-04` |
-| CODE-05 | stated | `CODE-05.json`, `CODE-05.xml` |
+| CODE-05 | in part (flow) | `CODE-05.json`, `CODE-05.xml` |
 | CODE-06 | stated | `CODE-06` |
 | CODE-08 | stated | `CODE-08` |
 | CODE-09 | in part (whole-program) | `CODE-09` |
@@ -90,9 +93,33 @@ Stated forms that hold a finite list, or are wider than the words, for the same 
 | TEST-04 | stated | `TEST-04` |
 | BLD-07 | in part (meaning) | `BLD-07` |
 
-Of the 39: 26 stated, 12 in part, 1 not stated.
+Of the 39: 17 stated, 21 in part, 1 not stated.
 
 ## Stated in part
+
+**ARCH-10.** Only a gateway leaf or an entry leaf reaches a network function.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
+**ARCH-11.** An entry leaf reaches only serve functions, and only a gateway leaf reaches a dial function.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
+**ERR-08.** Leaf code and library code do not call `os.Exit`, `log.Fatal`, or `log.Panic` functions.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
+**CTX-01.** A function that takes a `context.Context` takes it as the first parameter, named `ctx`.
+
+- Reason: shape. A parameter of `context.Context`, or of an alias, or of an interface that embeds it, is stated. A type defined from it is another type, and is not found.
+
+**CTX-02.** A struct does not have a `context.Context` field.
+
+- Reason: shape. A field that holds `context.Context` through an alias, a pointer, a slice, a map, a type argument, or an embedded interface is stated. A type defined from it is another type, and is not found.
+
+**CTX-06.** Code uses the context forms of calls that can block: `http.NewRequestWithContext`, `QueryContext`, `ExecContext`, `BeginTx`, `DialContext`, `exec.CommandContext`.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
 
 **CTX-07.** Context values use an unexported key type and hold only request-scoped data, not optional parameters.
 
@@ -100,11 +127,27 @@ Of the 39: 26 stated, 12 in part, 1 not stated.
 
 **CTX-08.** A port method whose provider reaches a network or acquiring function takes `context.Context` as its first parameter.
 
-- Reason: whole-program. A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, and L's analyzers read one package at a time.
+- Reason: whole-program. A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, which the design of `rules.Unit` does not give.
+
+**HTTP-01.** An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`.
+
+- Reason: shape. The ban on the package-level functions, and each timeout set in a literal of `http.Server`, are stated. A timeout from a variable that is zero passes, and the check does not read that the entry serves through that server.
+
+**HTTP-02.** A gateway uses an `http.Client` with a non-zero `Timeout`, and does not call `http.Get`, `http.Post`, `http.Head`, `http.PostForm`, or `http.DefaultClient`.
+
+- Reason: shape. The ban on the package-level functions and on `http.DefaultClient`, and a `Timeout` set in a literal of `http.Client`, are stated. A variable that is zero passes, and so does a client built through a type defined from `http.Client`.
 
 **HTTP-09.** A gateway does not follow a redirect automatically, unless it checks the target against an allow-list.
 
 - Reason: meaning. That a client sets `CheckRedirect` is stated. Whether that function checks the target against an allow-list is for a person to judge.
+
+**HTTP-13.** Each entry route accepts only the methods that it lists, and answers others with 405.
+
+- Reason: shape. A route of `http.ServeMux` is stated. A handler with no mux has no route to read.
+
+**HTTP-17.** Each session cookie sets `Secure`, `HttpOnly`, and `SameSite` with the value `Strict` or `Lax`.
+
+- Reason: shape. A literal of `http.Cookie` is stated. A cookie that a handler writes as a header is not read.
 
 **SEC-01.** Source files, declaration files, and test fixtures hold no real secret, key, or password.
 
@@ -113,6 +156,18 @@ Of the 39: 26 stated, 12 in part, 1 not stated.
 **SEC-02.** A settings field that holds a credential has the tag `vulcan:"secret"`.
 
 - Reason: meaning. A settings field whose name shows a credential is stated. A credential under another name is not found, as the wishlist's note says.
+
+**SEC-07.** A SQL statement is a constant string, and each value goes in as a parameter.
+
+- Reason: meaning. A constant statement is stated. A comment removes the finding, and the wishlist's decision asks for a fixed allow-list in the same function. Whether a comment describes one is for a person to judge.
+
+**SEC-30.** Leaf code and library code do not import `unsafe` or `syscall`, do not use cgo, and do not call `reflect.Value.Call` or `reflect.Value.Method`.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
+**DATA-03.** SQL text does not hold `BEGIN`, `COMMIT`, or `ROLLBACK`.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
 
 **DATA-14.** Code uses `time.Time` for instants and `time.Duration` for periods, not integers or strings.
 
@@ -126,6 +181,14 @@ Of the 39: 26 stated, 12 in part, 1 not stated.
 
 - Reason: flow. A loop that calls `time.Sleep` is stated: it needs a condition, a growing wait, and a random value in its function. A retry in another form is not found, as the wishlist's note says, and that the wait grows or is random is read from the form only.
 
+**OBS-01.** Leaf code and library code log through `log/slog`, not through `log` or `fmt.Print` functions.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
+**OBS-02.** A log message text is constant, and variable data goes in attributes.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
 **API-04.** A production build exposes no debug or profiling route, and each old API version has an owner and an end date.
 
 - Reason: outside-source. The ban on the debug and profiling packages is stated, in every build. An owner and an end date for each old API version are not in the source.
@@ -134,13 +197,21 @@ Of the 39: 26 stated, 12 in part, 1 not stated.
 
 - Reason: meaning. That a clause exists is stated, on each port method that takes arguments and whose name does not show a read. Whether a method changes state, and whether a clause is enough, are for a person to judge.
 
+**CON-03.** A `return` in a function with `ensures` does not itself cause an effect, such as `return tx.Commit()`.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
+**CODE-05.** A struct that code marshals has a field tag on each marshaled field.
+
+- Reason: flow. The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.
+
 **CODE-09.** Near-duplicate functions become one function, in the leaf or in a library.
 
-- Reason: whole-program. Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, and L's analyzers read one package at a time.
+- Reason: whole-program. Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, which the design of `rules.Unit` does not give.
 
 **CODE-11.** Code does not use a deprecated function, and has no unused name.
 
-- Reason: whole-program. A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, and an unused method or field is not read.
+- Reason: whole-program. A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, which the design of `rules.Unit` does not give, and an unused method or field is not read.
 
 **BLD-07.** Each deployment-specific value comes from a flag or from the environment, and leaf code holds no address or hostname literal.
 

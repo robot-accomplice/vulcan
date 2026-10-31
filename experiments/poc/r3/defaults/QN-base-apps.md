@@ -2,25 +2,23 @@
 
 Plan-r3, section 4: a default that fires on a base application is counted under QN, and is not quietly removed. This draft removes none, and it turns none off. A later decision can change that, in writing.
 
-Measured on copies of `poc/app/vulcan` and `poc/app/golint`, with `init` and then the check of each arm, on the draft of `defaults v1` with the hash `sha256:4d47eceb52365d0cc00b2a21f2db656977dec6519c1bb4d0f678690892224d37`. The draft is not frozen, so this is not the QN measure of plan-r3, section 5. No session has judged these findings. The applications did not change.
+Measured on copies of `poc/app/vulcan` and `poc/app/golint`, with `init` and then the check of each arm, on the draft of `defaults v1` with the hash `sha256:14c3ca9a9ac1603d5227ff4275375f2fd38bded91be26887b921929972a6f427`. The draft is not frozen, so this is not the QN measure of plan-r3, section 5. No session has judged these findings here; `parity-r3.md`, section 5, read a sample. The applications did not change.
 
-V gives 284 findings and L gives 285. `TestDefaultsOnBase` checks that the same rules fire in both. The one difference by rule and part is that L has a finding that V does not: `CODE-08` on `lib/shop`, because `library.vulcan` of V has a comment and the Go files of L have no package comment. That is a difference of the two applications, not of the rule.
+V gives 284 findings and L gives 285. `TestDefaultsOnBase` checks that the arms agree by rule, part, and count. The one difference is that L has a finding that V does not: `CODE-08` on `lib/shop`, because `library.vulcan` of V has a comment and the Go files of L have no package comment. That is a difference of the two applications, not of the rule.
 
-Round 1 of this table held 49 findings, of `CTX-06` and `OBS-01`. The other rules below are new with the shape kinds of amendment 6, and `HTTP-01.timeouts` comes from the kind `literal` too.
-
-| Rule | V | L | Wanted rule |
-|---|---:|---:|---|
-| CODE-08 | 126 | 127 | Each port, topic, `external`, library, and exported name has a doc comment. |
-| CODE-09 | 10 | 10 | Near-duplicate functions become one function, in the leaf or in a library. |
-| CON-01 | 51 | 51 | A port method that changes state declares a `requires` for the limits of its arguments. |
-| CTX-06 | 46 | 46 | Code uses the context forms of calls that can block: `http.NewRequestWithContext`, `QueryContext`, `ExecContext`, `BeginTx`, `DialContext`, `exec.CommandContext`. |
-| CTX-08 | 32 | 32 | A port method whose provider reaches a network or acquiring function takes `context.Context` as its first parameter. |
-| ERR-01 | 6 | 6 | Code does not drop an `error` result. |
-| ERR-03 | 4 | 4 | Each `_ = f()` that discards an error has a comment that gives the reason. |
-| ERR-13 | 2 | 2 | Error strings start with a lower-case letter and do not end with punctuation. |
-| HTTP-01.timeouts | 3 | 3 | An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`. |
-| HTTP-09 | 1 | 1 | A gateway does not follow a redirect automatically, unless it checks the target against an allow-list. |
-| OBS-01 | 3 | 3 | Leaf code and library code log through `log/slog`, not through `log` or `fmt.Print` functions. |
+| Rule | V | L | Before the audit's fixes (V, L) | Wanted rule |
+|---|---:|---:|---|---|
+| CODE-08 | 126 | 127 | 126, 127 | Each port, topic, `external`, library, and exported name has a doc comment. |
+| CODE-09 | 10 | 10 | 10, 10 | Near-duplicate functions become one function, in the leaf or in a library. |
+| CON-01 | 51 | 51 | 51, 51 | A port method that changes state declares a `requires` for the limits of its arguments. |
+| CTX-06 | 46 | 46 | 46, 46 | Code uses the context forms of calls that can block: `http.NewRequestWithContext`, `QueryContext`, `ExecContext`, `BeginTx`, `DialContext`, `exec.CommandContext`. |
+| CTX-08 | 32 | 32 | 32, 32 | A port method whose provider reaches a network or acquiring function takes `context.Context` as its first parameter. |
+| ERR-01 | 6 | 6 | 6, 6 | Code does not drop an `error` result. |
+| ERR-03 | 4 | 4 | 4, 4 | Each `_ = f()` that discards an error has a comment that gives the reason. |
+| ERR-13 | 2 | 2 | 2, 2 | Error strings start with a lower-case letter and do not end with punctuation. |
+| HTTP-01.timeouts | 3 | 3 | 3, 3 | An entry leaf serves through an `http.Server` with `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` set, and does not call `http.ListenAndServe`, `http.ListenAndServeTLS`, or `http.Serve`. |
+| HTTP-09 | 1 | 1 | 1, 1 | A gateway does not follow a redirect automatically, unless it checks the target against an allow-list. |
+| OBS-01 | 3 | 3 | 3, 3 | Leaf code and library code log through `log/slog`, not through `log` or `fmt.Print` functions. |
 
 | Rule | Part | V | L |
 |---|---|---:|---:|
