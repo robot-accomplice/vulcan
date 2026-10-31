@@ -443,3 +443,215 @@ Of 284: 19 false by the text, 10 disputable, and 125 true only on a wide reading
 - `transitions`, beyond the 20 existing cases and 4 of mine, which hold contracts. No program of mine reached a difference there.
 - Whether a fresh session judges section 5 the same way. Plan-r3, section 5 asks a fresh session for QN. This is a sample for this audit, not that measure.
 - T1, T2, T3, and QN themselves. They run after the freeze.
+
+## Rerun
+
+Reviewed at commit 737b2c5 (branch main), with the fixes ac416e3 and 737b2c5, and plan-r3, sections 2, 5, and 9 (amendments 7 to 9). The same reviewer ran this. The sections above stay as they were at e2b1ab6.
+
+### Result
+
+**Step 3's gate (no open High finding) does not pass.** Two High findings are open, and both are new here: N1 and N2.
+
+| Severity | Open now | Which |
+|---|---:|---|
+| High | 2 | N1, N2 |
+| Medium | 2 | M6, M7 |
+| Low | 8 | M12 (rest), N3 to N9 |
+
+Of the 27 findings of the first audit, 17 are fixed by a result that I ran, 7 are listed as a limit and I hold the limit acceptable (M8, M11, M13, L6, L8, L9, L10), 1 is listed as a limit that is not a true limit for each rule it reaches (M12), and 2 are still open (M6, M7). M3 is in the 17 for port calls only. The contract form of the same count is N2. H3 is in the 17 for import paths inside the module. The nested module is N1.
+
+The 4 High findings of the first audit are fixed. H2 is fixed by the owner's choice: L now rejects each form of the first audit.
+
+### How I ran it
+
+- A fresh build of 737b2c5. No script was lost. I reran each case of `b1` to `b5`, `b7`, and `c2` with no change to its text, and I compared each result with the saved output. Of 377 rows, 75 changed.
+- I replaced `c3` with new runs, because its patch was for the old list. I fixed one fault of my own: the cases `ty15` to `ty17` of `b5` had no rules file because of my harness. `c1` holds the correct runs of those three.
+- I wrote 166 new cases for this rerun: 67 on H2, H3, H4, and M2; 71 on M3, M6, the widened types, and comments; 18 on nested modules, names in rules, and forms of main; 10 on defined types and generated text.
+- I rebuilt scratch tools with a changed list, and with a changed kind, from `git archive` of 737b2c5. A third scratch build holds five forms of the `CODE-09` count behind an environment variable.
+- `go test ./internal/rules ./poc/golint/... ./conformance` passes. The generators `gen_cases.py` and `gen_rule_cases.py`, run on a scratch copy, reproduce each archive under `testdata`.
+
+A row with the tag DIFF is not always a difference in the result. The rows that remain are: V and L reject with other codes (`w*`, `td*`, `sub1`, `lk2`), a form that one arm alone can have (`nm3`, `k9`, `g11`, `g12`, `key_*`), V's `warn` word that my reader does not parse (`ch1`, `ty18` to `ty20`), or a fault of my case (`du1`, `cfg4`, `x2`, `x3`, `y1`, `h7c`). `h_d16` and `h_d17` are a constructor that L reads and V does not, because it has no wire. They are as before. The rows where one arm passes and the other rejects, on a form that both can write, are the findings below.
+
+### The 27 findings
+
+| Finding | Result | Run | Note |
+|---|---|---|---|
+| H1 | Fixed | `lc2` to `lc5`, `re1`, `re5`, `re6`, `da3`, `da4`: V now rejects with L. `q1` to `q7`: comment forms agree | Both arms now scan the file that a person wrote (`shape.go`, `ScanComments`) |
+| H2 | Fixed, by amendment 7 | `w1` to `w5`, `w7` to `w9`: L VL0909. `w6`: VL0907 and VL0909. `lk2`: VL0909 | See "H2" below |
+| H3 | Fixed for an import path in the module | `td1`, `td2`, `t1`, `t2`, `t4`, `t5`, `t7`, `t8`, `t11`: VL0002. `t3`: the go command refuses | A nested module and `vendor` still pass: N1 |
+| H4 | Fixed | `cg`, `crash2`: V K0008, no panic. 15 broken programs with all defaults on: no panic in either arm | See "H4" below |
+| M1 | Fixed | `pp1`, `pp2`: V rejects at `component.vulcan` | |
+| M2 | Fixed | `bt1` to `bt3`, `bt5`, `bt6`, `as4`, `g1` to `g5`, `g7`, `g8`: K0901 and VL0901 | See "M2" below |
+| M3 | Fixed for port calls | `dp3` to `dp5`, `m3p3` to `m3p6`: both fire at 5 | The contract form is open: N2 |
+| M4 | Fixed | `de2`: V rejects | |
+| M5 | Fixed | `crash3`: a finding in both, no panic | |
+| M6 | **Open** | See "M6" below | 17 rules moved. The test is not applied the same way to the others |
+| M7 | **Open, narrower** | `ty5` to `ty9`: K0801 and VL0801. `ty22` to `ty24`: exit 0 in both | See "M7" below |
+| M8 | Limit, acceptable | Plan-r3, section 2 now says it. A changed effect list: `rules upgrade` and `rules diff` show it (`cn`). A changed kind: exit 3 becomes exit 0, and upgrade says "the source has not changed" (`co`) | `rules-file.md` says that `lists` does not cover the code of a kind or the model's lists. That matches the runs |
+| M9 | Fixed | No document holds the old reason. `rules-file.md`, calls 15 and 16, and amendment 9 name `rules.Unit` | |
+| M10 | Fixed, by amendment 8 | Plan-r3, sections 2 and 5 name `warn` and say that it does not count as enforced. Exit 0 in both | |
+| M11 | Method values fixed. Interface: limit, acceptable | `h_c1`, `h_c8`, `z14`, `z15` reject. `h_f6`, `h_f7`, `h_c2`, `h_o10` pass in both | To know which value an interface holds is flow. A match by name and signature is possible, and rejects an honest interface. The limit is true for an exact answer. Rules with a listed method moved to in part |
+| M12 | Alias, pointer, slice, type argument, embedded interface, named result fixed. **Defined type: listed, not a true limit for each rule** | `h_d1` to `h_d9`, `h_d12`, `h_d14` reject. `z10`, `z11`, `h_d10`, `h_d13`, `s1c`, `s1d` pass | See "M12" below |
+| M13 | Names fixed. Finite list: limit, acceptable | `h_o1`, `h_o2`, `h_o6` to `h_o9`, `h_c7`, `h7b` reject in both. `h_o5` (`tls.Client`) passes | A list can only hold names that someone tried. `rules-file.md` says this |
+| L1 | Fixed | `cfg4c`, `cfg5`, `cfg6`: the same result in both | |
+| L2 | Fixed | `nm1`, `nm2`: L reads the name | |
+| L3 | Fixed | `re4n`: both fire | |
+| L4 | Fixed | `k2`: both pass | The fix adds N5 |
+| L5 | Fixed | `cf`, `cl`: both refuse a model error, write with a rule's error, and write with a fault in the rules file. L refuses VL0909 | |
+| L6 | Words fixed. JSON: limit, acceptable | `cc`: "turned off" for `warn -> off`. `ce`: L's `-json` holds no `warn`, V's does | |
+| L7 | Fixed | A compare by rule, part, and text gives one row: `library shop has no doc comment`, in L. The pair `Products` and `Subscriptions` now reads the same | See "`TestDefaultsOnBase`" below |
+| L8 | Limit, acceptable | Each arm still sends 2 requests to a local proxy for a module that the cache lacks. `rules-file.md` now says so | |
+| L9 | Limit, acceptable | A check still passes with a changed hash. `rules-file.md` now says so | |
+| L10 | Limit, acceptable | `x1`: V exit 0, L VL0807 | Each arm rejects its own form when it is absent |
+
+### New findings
+
+#### N1. High. In L, a nested module or a vendored package passes every check
+
+- **Where:** `poc/golint/imports/imports.go:45` asks `m.InModule(p)`. A path with another module's name is not in the module. `layout.go` reads only what `./...` lists, and `go` does not list a directory with its own `go.mod`, or `vendor`.
+- **Case `t9`, rule `ERR-08`:** `go.mod` holds `require example.com/evil v0.0.0` and `replace example.com/evil => ./third`. `third/go.mod` is `module example.com/evil`, and `third/s.go` calls `os.Exit(1)`. A leaf calls `evil.X()`. **L exit 0. V exit 1, K0002.** `go build ./cmd/shop` and `go vet ./...` pass in L.
+- **Other runs:** `t13` (a deeper directory), `t14` (`net.Dial` in the nested module, so the model is passed too): L exit 0, V K0002. `t10` (`vendor/example.com/evil` with `modules.txt`): L exit 0, V K0209.
+- **A module outside the project passes in both** (`t12`), and that is N8. The difference is that V has no place for the code inside the project.
+- **Favors:** L passes more. This is the same escape as H3, by another path, so I give it the same severity.
+- **Smallest fix:** walk the module root in `layout.go`, and reject a `.go` file in a directory that no part holds, as V's K0002 does. This covers `testdata`, `_x`, `.x`, `vendor`, and a nested module, with one rule.
+
+#### N2. High. `CODE-09` counts V's lowered contract code, so the limit is at another place in each arm
+
+- **Where:** `internal/rules/shape.go:1779` (`tokens`) reads the lowered code in V. A `return` in a function with `ensures` is lowered to `{ var vulcan_t0 T; vulcan_t0 = e; if !(c) { vulcan_rt.Fail(...) }; return vulcan_t0 }`. `skipped` leaves out only the `if`. In L the same statement is `return e`. In L a `contract.Requires(c)` leaves an `ExprStmt` in the count, and in V the whole `if` is skipped.
+- **Case `m3e3`, limit 60, similarity 90:**
+
+  ```go
+  func A(x string) int
+      ensures x != ""
+  {
+      if x == "x" { return 1 }
+      if x == "x" { return 1 }
+      if x == "x" { return 1 }
+      return 0
+  }
+  ```
+
+  and a function `B` with the same form. L's form has `defer contract.Ensures(...)`. **V exit 1, K0810. L exit 0.**
+- **By form, the number of guards where each arm first fires:**
+
+  | Form | V | L |
+  |---|---:|---:|
+  | Port calls | 5 | 5 |
+  | `ensures` with returns | 3 | Above 7 (the last that I ran) |
+  | `requires` | Above 8 | 8 |
+  | `ensures` with `old` | 7 | Above 8 |
+
+- **Why I judge this differently:** M3 was Medium, because the case that I ran was near the limit, and it had one form. These cases show a factor of more than two in the place of the limit, on the ordinary form of a Stockroom function. `Pay` and `Ship` have this form. It has the root of H1, a rule that reads lowered code as if a person wrote it.
+- **Favors:** in V with `ensures` and `old`, L passes more. With `requires`, V passes more. A rule can land in U or in G because of this.
+- **Smallest fix:** count what a person wrote. Count a lowered return block as a `return`, and leave out each statement that holds only a contract call. A scratch form with this closes the `ensures` return and `requires` rows (`m3e3`, `m3e5`, `m3e7`, `m3r8`), and leaves the base applications at 10 and 10 with the same pairs. It does not yet close `old` (`m3o7`).
+
+#### Low
+
+| # | Finding | Case | Where | Favors | Smallest fix |
+|---|---|---|---|---|---|
+| N3 | `typeIn` reads a map key, and a container for `types`. So `PerRouteTimeout map[string]time.Duration` and `Deadline map[string]time.Time` fail `DATA-14`, which asks for `time.Time` and `time.Duration`. `more []context.Context` and `m map[string]context.Context` are treated as a context under `CTX-01` | `z1`, `z2`, `z6`, `z7` | `shape.go:653` | Neither | Do not walk a map key for `deny-types`. Use the exact type for `types` |
+| N4 | A `literal` rule reads the text of V's generated `vulcan_rt.Fail`. A function `local` or `dev` with a clause gives `"orders.local"`, which `BLD-07` rejects. A team's `deny-text ^ensures$` rejects each `ensures` | `bl1`, `bl2`, `bl3`: V rejects, L exit 0 | `shape.go:1118` | L passes more | Skip the arguments of a `vulcan_rt` call |
+| N5 | `at var` now skips V's temporaries, and still reads L's variable for `old`. A team's rule `at var deny-types int` rejects `o := contract.Old(n)` in L only | `k3`: was the same, now V exit 0, L VL0807 | `shape.go:533` | V passes more | Skip a variable whose value is a contract call |
+| N6 | After H4, the arms print other things for a project with a type error. Both fail. V also prints model codes and findings of parts that L skips: `e1` K0205, `e5` a rule break in a leaf that imports a broken library, `e8` a wire rule, `e9` a library rule. L's driver skips each package that depends on the broken one | `e1`, `e5`, `e8`, `e9`. Agree: `e2`, `e3`, `e4`, `e6`, `e7` | `internal/check/ruleset.go:181` | V's agent reads more per run | Document it. Equal text needs a change of L's driver or of V's stages |
+| N7 | VL0909 is on with `Strict: false` and with no rules file, but the analyzer's `Doc` says "in strict mode". A helper that main never calls adds an edge (`v14`), so a wire rule fires on code that does not run | `w24`, `v14` | `poc/golint/wiring/wiring.go:22` | L stricter | Correct `Doc`. Note the edge in `rules-file.md` |
+| N8 | A module outside the project passes in both arms, with a `replace`. The Limits table of `rules-file.md` does not list this | `t12`: exit 0 in both | `docs/poc/rules-file.md:93-103` | Neither | One row |
+| N9 | Call 22 says "No finding on the base applications changed", and does not name the other form or the source of the numbers. See "M3" below | | `docs/poc/rules-file.md:131` | Neither | One sentence |
+
+### H2: VL0909
+
+**Does it reject each unreadable form? Yes, of each form that I tried.** The first audit's eight no longer pass. These do not pass either: a conversion (`v3`), a method of the provider (`v4`), a package variable of a leaf (`v5`), a package variable of main (`v1`), a helper's result (`v7`, `v8`), the address taken (`v11`), a second value (`v15`), a type switch (`v18`), a type assertion (`v19`). Other routes are rejected by older checks: a variadic constructor (`v30`, VL0604), a generic constructor (`v31`), a setter (`v32`), a field (`v33`), a package variable of the leaf (`v34`, VL0116).
+
+**Does it reject a plain form or a valid program?** The forms that a Go team writes pass: a local variable, a chain of them, parentheses, a wire in an `if` init, a wire in a helper, the `run` idiom (`w20`, `w21`), and an app struct (`w22`). These valid programs are rejected: a package variable of main (`v1`), a conversion to the port type (`v3`), a provider whose address is taken for another reason (`v11`), and two branches that assign the same constructor (`w23`). `rules-file.md` lists the second-value form. These are the cost that amendment 7 accepts, and V has no equal.
+
+Amendment 7 is the owner's choice, so I do not rank it. The plan names the lean, and that is correct: it leans toward an empty U on wires.
+
+### H3: places
+
+| Place | L | V |
+|---|---|---|
+| `testdata`, in a leaf, a library, or the root | VL0002 | K0008 |
+| `_x` and `.x` | VL0002 | K0008 |
+| `vendor/sub`, by the module's path | The go command refuses | K0008 |
+| `vendor/example.com/evil`, with `modules.txt` | **Exit 0** (N1) | K0209 |
+| A nested module with a `replace` | **Exit 0** (N1) | K0002 |
+
+### H4: type errors
+
+V reads no package with a type error, and a type error in a test leaves the package without its tests. The change is small: V's model codes stay, and a rule's finding in that package stops. The case `crash6` had K0008 and K0802, and now has K0008. Compared with L, the exit is a failure in both, and the text differs as N6 says. There was no panic in 15 broken programs with all defaults on, in either arm.
+
+### M2: each form
+
+K0901 and VL0901 agree on each form that the build ignores: `//go:build` for another system, `ignore`, a word, the old `// +build`, a GOOS suffix, a GOARCH suffix, both, a test file, a library, a negated tag, `cgo`, and `import "C"` on this host. A file for this host is read, and its rule fires in both (`g6`, `bt4`, `bt7`). So a program can pass on one host and fail on another, the same in both arms. L's message is at the first file of the package, and V's is at the file itself. Two forms give other codes and the same failure: the only file of a leaf (`g9`, V K0901 and K0107, L a build error), and a file with another package name (`g14`, V K0004, L VL0901). A file named `_x` or `.x` passes in both, and is not built.
+
+### M3: which count
+
+The numbers below are for the base applications, with limit 60 and similarity 90, in scratch builds. Each row has the same pairs in both arms, unless it says otherwise.
+
+| Form | Pairs |
+|---|---:|
+| Each node, the form before the fixes | 10 |
+| The builder's form: a chain of names counts as a selector of one name | 10 |
+| Only a selection of a port field | 10 |
+| The builder's form, and the fix of N2 | 10 |
+| A chain of names is one token | 5 |
+| One token, and the fix of N2 | 4 in V, 5 in L |
+
+- **Was the form chosen for its reason, or to fit the base count?** I cannot see the intent. The form has a reason that does not need the count: it gives L's chain the same three nodes as V's `Ledger.Save`, so V's count for a port call does not change. But that reason does not choose between the rows: one token also equalizes port calls. The base count is the only thing in the record that separates them, and the record does not say that a form of 5 was tried. That is N9.
+- **Which count is right by the wanted text?** The text does not decide. `CODE-09` says "near-duplicate functions" and gives no number. The limit 60 and the similarity 90 are the builder's. At similarity 80, 85, 90, and 95 the builder's form gives 15, 12, 10, and 6 pairs. So 10 is a result of two parameters, and no test of a form. Five pairs that the one-token form removes are `CreateOrder` and `CreatePurchase`, `OrdersOf` and `PurchasesOf`, `Products` and `Subscriptions`, `createPurchase` and `receivePurchase`, `receive` and `refund`. A lower limit does not bring them back (40 gives 6), so the change is in similarity and not in scale. A reader can hold either view of those pairs.
+- **Is the limit at the same place in each arm?** For port calls, yes. For contracts, no: N2.
+
+### M6: the test for stated and in part
+
+The recount of `coverage.json` gives 26 stated, 30 in part, and 154 not stated, and the 17 moved rules are as the builder says.
+
+**The test is not applied the same way.** `rules-file.md:93` says: "A rule that a limit reaches is stated in part". Call 23 moves the rules with a method in their list. `SEC-07` moved because any comment removes the finding. These stay stated, and each is reached by the same reason. I ran each one, and each passes in both arms.
+
+| Reason | Rule | Case |
+|---|---|---|
+| A value in a variable (Limits table) | `ERR-13`, `HTTP-11`, `ERR-04`, `CTX-03` | `s2`, `s3`, `s8`, `s10` |
+| A type defined from a listed type (Limits table) | `ARCH-03`, `ERR-01` | `s1c`, `s1d`, `s4`, `s5` |
+| A finite list (Limits table) | `ARCH-19`, `CODE-02` | `s11` to `s14` |
+| Any comment, also an empty `//` (the reason of `SEC-07`) | `ARCH-06`, `ERR-03`, `CONC-03`, `CODE-04`, `CODE-08` | `s28`, `s6`, `s22`, `s16`, `s17` |
+
+`ARCH-03` through a defined pointer to a struct does fire (`s1b`, `s1e`), and by my reading of `carried` the reason is that a chain of struct fields under `sql.DB` or `sql.Rows` holds a listed type. A defined interface passes.
+
+**Recount by the sentence as written:** 13 stated, 43 in part, 154 not stated. The 13 are `ARCH-01`, `ARCH-02`, `ARCH-07`, `ARCH-21`, `ERR-09`, `HTTP-07`, `SEC-10`, `SEC-31`, `DATA-15`, `CODE-03`, `CODE-06`, `TEST-04`, `TEST-05`. Four of these have a form gap that no limit names: `s18` and `s19` (`TEST-05`), `s20` (`TEST-04`), `s21` (`SEC-10`), `s25` (`SEC-31`). If those count too, the result is 9 stated and 47 in part. Those are my reading, so I do not hold them as part of this finding.
+
+A reader can also hold another test: "constants only" and "no comment reading" are limits of each kind, so they do not change a status, and only a limit that the wanted text names does. By that test, some of the 17 moved rules would move back (`HTTP-01`, `HTTP-02`). Either test is coherent. The present list holds neither, and it leans toward a higher count of stated rules. **Favors:** neither arm. **Smallest fix:** write one test, and run it on each rule in `coverage.json`. No code changes.
+
+### M7: typing errors
+
+`ty5` to `ty9` are now faults. `rules-file.md:33` says "A name outside the project is not checked", and that holds (`ty1` to `ty3`, `ty25`). **A name inside the project is not checked either**, and the sentence implies that it is: `funcs shop/lib/money.Nope` (`ty22`), `type shop/lib/money.Recept` (`ty23`), `deny-types shop/lib/money.Recept` (`ty24`), each exit 0 in both. A field of a `literal` is the same (`ty29`, `ty30`). This is the case that matters for T1: a labeler's shapes name the project's parts. The check holds the package, so `ResolveTypes` can read these names as it reads a table's type. **Favors:** neither. **Smallest fix:** extend `ResolveTypes` to each name with the project's module path. Correct the sentence.
+
+### M12: a defined type
+
+`rules-file.md:98` gives the reason: "An underlying match would reject `time.Duration` under `DATA-14`". That holds for `DATA-14`. It does not reach the others. `type M float64` under `PAY-01` (`z11`) has no such case, because no standard type is defined from a float for money. `type C context.Context` under `CTX-02` (`z10`) and `type C net.Conn` under `ARCH-03` (`s1c`) are identical interfaces, so a match with `types.Identical` on the underlying type rejects them with no false alarm of that form. So this is listed as a limit, and it is a choice for each rule but `DATA-14`. `PAY-01`, `CTX-01`, and `CTX-02` are in part, so their status is honest. `ARCH-03` is M6. **Favors:** neither. **Smallest fix:** a parameter for an underlying match, on the rules where it is safe, or say that this is a choice.
+
+### Older cases `A09` and `P36`
+
+The change is proper. Each has a stub main with `web.New(place{})`, main's own type. Amendment 7 names that form, and `VL0909` is at that argument (17:17). Each case keeps its code (VL0112, VL0110), and adds one line to `want.txt`. Only these two archives hold the stub. `gen_cases.py` makes them. The V forms did not change.
+
+`git diff 1f8a7fe HEAD` shows no change under `poc/app`, `poc/acceptance`, or `poc/harness`. Each base application passes its check with no rules file, as before. **I could not check the seeded cases**, which are under the path that this audit may not read. A seeded case in L whose main has a form of VL0909 would now fail for that reason. T2 reads them, and it is run with the frozen tool, so its record can say so.
+
+### The `lists` line
+
+- Both arms write the same value, and it does not change between runs. V and L agree: `sha256:e28cae27...`.
+- A changed effect: exit changes, and both `rules upgrade` and `rules diff` say so (`cn`). An accept records it (`TestListsInUpgrade`).
+- With no `lists` line: a check passes, and `rules diff` prints `lists  here, and sha256:...`, with an empty value. A `lists` line in a rule is a fault. A source's own `lists` line does not reach the head.
+- A check does not read it, so a new tool can change a result with no word from the check itself. `rules-file.md` says what `lists` covers, and that holds.
+
+### `TestDefaultsOnBase`
+
+It now compares by rule, part, and count, and it adds one to V's count for `CODE-08 lib/shop`. My compare by text agrees: that one row is the only difference on the base applications (`library shop has no doc comment`), and V's `library.vulcan` has a comment where L's Go files have none. So the named difference is true, and it is a difference of the applications. If L's files gain a package comment, the test fails, and that is the right signal. The test does not read the text, so two other findings with the same count would pass. My compare by text is not in the repository. I accept this, and I do not list it as a finding.
+
+### Section 2 of the first audit
+
+Amendment 9 keeps the three rules at one package, and the documents now say why. The counts of 69, 2, and 0 for the wider forms in both arms do not depend on these fixes: I reran the 69 (`c1`), and did not rerun the prototype `wp`. The lean of a shared package stays, and plan-r3, section 5 now says it.
+
+### What I could not check
+
+- The sealed seeded cases, as above.
+- A Linux host, and a host with a C compiler, as before. So `g6`, `bt4`, and `bt7` hold for Windows, and `as4` holds with no C compiler.
+- A real `https` source, as before.
+- The builder's intent for M3. I read the record and ran the forms.
+- Each form of main that a Go program can have. I tried those above.
