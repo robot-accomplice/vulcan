@@ -51,6 +51,7 @@ type Decl struct {
 	Name      string
 	Commented bool
 	At        any
+	Part      string // the directory of a library; empty for what is in the system's declaration
 }
 
 var declarationAts = []string{"port-signature", "port-method", "field", "settings-field", "embedded", "param", "var", "doc", "library", "external", "config-entry", "wired-port"}
@@ -219,7 +220,7 @@ func (s *Set) resolveNames(r *Rule, u *Unit) []Problem {
 	var out []Problem
 	once := func(msg string) {
 		if _, dup := s.reported.LoadOrStore(msg, true); !dup {
-			out = append(out, Problem{r.Line, msg})
+			out = append(out, Problem{Line: r.Line, Msg: msg})
 		}
 	}
 	for _, key := range nameKeys {
@@ -323,7 +324,7 @@ func (s *Set) ResolveTypes(u *Unit) []Problem {
 		}
 		obj := u.Pkg.Scope().Lookup(name)
 		if obj == nil {
-			out = append(out, Problem{r.Line, fmt.Sprintf("rule %s: type names %s, which package %s does not declare", r.ID, name, dir)})
+			out = append(out, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s: type names %s, which package %s does not declare", r.ID, name, dir)})
 			continue
 		}
 		st, ok := obj.Type().Underlying().(*types.Struct)
@@ -333,7 +334,7 @@ func (s *Set) ResolveTypes(u *Unit) []Problem {
 			found = found || st.Field(i).Name() == field
 		}
 		if !found {
-			out = append(out, Problem{r.Line, fmt.Sprintf("rule %s: type %s has no field %s", r.ID, name, field)})
+			out = append(out, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s: type %s has no field %s", r.ID, name, field)})
 		}
 	}
 	return out
@@ -947,11 +948,11 @@ func (s *Set) CheckDecls(decls []Decl) []Finding {
 			for _, at := range r.Params["at"] {
 				switch {
 				case at == "doc" && (d.What == "external" || d.What == "library") && !d.Commented:
-					out = append(out, Finding{"0807", d.At, fmt.Sprintf("%s %s has no doc comment: %s", d.What, d.Name, r.tail()), r.Level == Warn})
+					out = append(out, r.finding("0807", d.At, fmt.Sprintf("%s %s has no doc comment: %s", d.What, d.Name, r.tail()), GroupDecls, d.Part, ""))
 				case at == d.What && slices.Contains(r.Params["require"], "comment") && !d.Commented:
-					out = append(out, Finding{"0807", d.At, fmt.Sprintf("the %s %s has no comment that gives the reason: %s", d.What, d.Name, r.tail()), r.Level == Warn})
+					out = append(out, r.finding("0807", d.At, fmt.Sprintf("the %s %s has no comment that gives the reason: %s", d.What, d.Name, r.tail()), GroupDecls, d.Part, ""))
 				case at == d.What && slices.Contains(r.Params["deny-names"], d.Name):
-					out = append(out, Finding{"0807", d.At, fmt.Sprintf("the %s has the name %s: %s", d.What, d.Name, r.tail()), r.Level == Warn})
+					out = append(out, r.finding("0807", d.At, fmt.Sprintf("the %s has the name %s: %s", d.What, d.Name, r.tail()), GroupDecls, d.Part, ""))
 				}
 			}
 		}
@@ -972,7 +973,7 @@ func wiredPorts(r *Rule, parts map[string]Part, wires []Edge) []Finding {
 			}
 			p := m.Sig.Params()
 			if p.Len() == 0 || types.TypeString(p.At(0).Type(), nil) != "context.Context" {
-				out = append(out, Finding{"0807", e.At, fmt.Sprintf("port method %s of %s has no context.Context as its first parameter, and %s provides it: %s", m.Name, e.From, e.To, r.tail()), r.Level == Warn})
+				out = append(out, r.finding("0807", e.At, fmt.Sprintf("port method %s of %s has no context.Context as its first parameter, and %s provides it: %s", m.Name, e.From, e.To, r.tail()), GroupWires, e.From, ""))
 			}
 		}
 	}

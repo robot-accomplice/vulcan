@@ -13,7 +13,7 @@ import (
 
 // RulesTool gives the commands init and rules their Vulcan parts.
 func RulesTool() rules.Tool {
-	return rules.Tool{Name: "vulcan", FindRoot: FindRoot, Scaffold: scaffold, Edges: edges}
+	return rules.Tool{Name: "vulcan", FindRoot: FindRoot, Scaffold: scaffold, Edges: edges, Findings: findings}
 }
 
 // scaffold writes go.mod and system.vulcan, each only when the project lacks it.
@@ -57,6 +57,25 @@ func systemName(module string) string {
 		return s
 	}
 	return "App"
+}
+
+// findings gives what rules baseline writes: each rule finding, with tests. It refuses a model error
+// and a fault in the rules, because the file holds only rule findings.
+func findings(root string) ([]rules.Entry, error) {
+	r, err := checkWith(root, true, true)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range r.Diags.Items {
+		if d.Severity == diag.Error && (!strings.HasPrefix(d.Code, "K08") || d.Code == "K0801") {
+			return nil, fmt.Errorf("the project has errors; fix them first: %s %s %s", d.Pos, d.Code, d.Message)
+		}
+	}
+	var out []rules.Entry
+	for _, f := range r.Findings {
+		out = append(out, f.Entry())
+	}
+	return out, nil
 }
 
 // edges gives what rules lock writes. It runs the check, and refuses a project with an error that

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -151,14 +152,19 @@ func (p *Project) scan() error {
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if full != p.Root && (strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" || name == "vendor") {
+			// The go command skips these names at any depth. It lists vendor at any depth too, so a
+			// part can be named vendor, and only the root's is left out.
+			if full != p.Root && (strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" || (name == "vendor" && filepath.Dir(full) == p.Root)) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if strings.HasSuffix(name, ".go") {
 			rel, _ := filepath.Rel(p.Root, full)
-			goFiles = append(goFiles, filepath.ToSlash(rel))
+			// A Go file in a directory named vendor passes unless something imports it, as in L.
+			if !slices.Contains(strings.Split(filepath.ToSlash(rel), "/"), "vendor") {
+				goFiles = append(goFiles, filepath.ToSlash(rel))
+			}
 			return nil
 		}
 		if !strings.HasSuffix(name, ".vulcan") {
@@ -177,8 +183,11 @@ func (p *Project) scan() error {
 	if err != nil {
 		return err
 	}
-	for _, rel := range rules.ForeignRoots(p.Root, ".vulcan/build", ".vulcan/bin") {
-		p.Diags.Errorf(diag.Pos{File: rel, Line: 1, Col: 1}, "K0002", "%s", rules.ForeignRootMessage(rel))
+	for _, f := range rules.ForeignRoots(p.Root) {
+		p.Diags.Errorf(diag.Pos{File: f.File, Line: f.Line, Col: 1}, "K0002", "%s", f.Msg)
+		// The go command would read these in a way that differs by host, so the check stops here,
+		// as vulcan-lint does.
+		p.Fatal = true
 	}
 	var keys []string
 	for k := range dirs {

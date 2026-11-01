@@ -44,11 +44,15 @@ type Result struct {
 	Diags *diag.List
 	OK    bool
 	Edges []rules.Edge // the current wires and the imports of libraries
+	// Findings holds each rule finding, old or new.
+	Findings []rules.Finding
 }
 
 // Check runs every stage up to and including the Go build of main. With tests, it also
 // type-checks the test files.
-func Check(root string, tests bool) (*Result, error) {
+func Check(root string, tests bool) (*Result, error) { return checkWith(root, tests, false) }
+
+func checkWith(root string, tests, noBaseline bool) (*Result, error) {
 	p, err := project.Load(root)
 	if err != nil {
 		return nil, err
@@ -87,11 +91,13 @@ func Check(root string, tests bool) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.NoBaseline = noBaseline
 	c.Rules()
 	c.Contracts()
 	c.Strict()
 	plan := c.Wiring()
 	r.Edges = c.ApplyRules(plan)
+	r.Findings = c.Findings
 	if !p.Diags.HasErrors() {
 		if err := link.Write(p, plan); err != nil {
 			return nil, err

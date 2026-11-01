@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/robot-accomplice/vulcan/internal/rules"
 	"github.com/robot-accomplice/vulcan/poc/harness/record"
 )
 
@@ -26,6 +28,9 @@ import (
 //   - Enforced by V: the compiler (vulcan check) rejects every seeded case of the rule in arm V.
 //   - Enforced by L (round 2): the linter (vulcan-lint ./...) rejects every seeded case of the rule
 //     in arm L. Arm P has no check beyond the build, so it gives no label.
+//   - With a rules file beside a workspace (plan-r3, section 5): a workspace is rejected only by a
+//     finding that its baseline does not hold, each item records what fired, and a label needs a
+//     session's decision that a rule that fired matches the team rule (fired.go).
 //
 // A seeded case or a reference solution is an overlay: a directory whose files replace or add
 // files of the arm's workspace; a file .delete in it lists workspace paths to remove, one a line.
@@ -40,6 +45,9 @@ type Validation struct {
 	EnforcedByL map[string]bool `json:"enforced_by_l,omitempty"`
 	ShapeCounts map[string]int  `json:"shape_counts"` // "<rule>/<arm>" -> shapes
 	Problems    int             `json:"problems"`
+	// NoLabels says why this run writes no enforced label: a workspace has a rules file, and a
+	// session has not decided which rule that fired matches which team rule.
+	NoLabels string `json:"no_labels,omitempty"`
 }
 
 // Item is one validated workspace.
@@ -51,6 +59,10 @@ type Item struct {
 	Rejected bool     `json:"rejected_by_check,omitempty"` // by vulcan check in V, by vulcan-lint in L
 	Problem  string   `json:"problem,omitempty"`
 	Also     []string `json:"also_fired,omitempty"` // other rules that a seeded case breaks
+	// With a rules file: the new findings, and whether a rule that fired matches the team rule.
+	HasRules bool    `json:"has_rules,omitempty"`
+	Fired    []Fired `json:"fired,omitempty"`
+	Matched  bool    `json:"matched,omitempty"`
 }
 
 // Templates names the workspace of each arm.
@@ -142,15 +154,22 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 		for _, it := range results {
 			if it.Kind == "seeded" && it.Arm == arm && strings.HasPrefix(it.ID, rule+"/") {
 				cases++
-				enforced = enforced && it.Rejected
+				if it.HasRules {
+					enforced = enforced && it.Rejected && it.Matched
+				} else {
+					enforced = enforced && it.Rejected
+				}
 			}
 		}
 		return enforced && cases > 0
 	}
+	v.NoLabels = g.noLabels(results)
 	for _, r := range g.Meta.Rules {
-		v.EnforcedByV[r.ID] = enforcedBy(record.ArmV, r.ID)
-		if v.EnforcedByL != nil {
-			v.EnforcedByL[r.ID] = enforcedBy(record.ArmL, r.ID)
+		if v.NoLabels == "" {
+			v.EnforcedByV[r.ID] = enforcedBy(record.ArmV, r.ID)
+			if v.EnforcedByL != nil {
+				v.EnforcedByL[r.ID] = enforcedBy(record.ArmL, r.ID)
+			}
 		}
 		for _, arm := range arms {
 			if v.ShapeCounts[r.ID+"/"+arm] < 2 && len(g.Only) == 0 {
@@ -164,6 +183,34 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 		}
 	}
 	return v, nil
+}
+
+// noLabels says why a run with a rules file cannot write an enforced label, or "".
+func (g *Grader) noLabels(items []Item) string {
+	withRules := false
+	var missing []string
+	for _, it := range items {
+		withRules = withRules || it.HasRules
+		if it.Kind != "seeded" {
+			continue
+		}
+		team, _, _ := strings.Cut(it.ID, "/")
+		for _, f := range it.Fired {
+			if _, ok := g.Match[team][f.Rule]; !ok && !slices.Contains(missing, team+" and "+f.Rule) {
+				missing = append(missing, team+" and "+f.Rule)
+			}
+		}
+	}
+	switch {
+	case !withRules:
+		return ""
+	case g.Match == nil:
+		return "a workspace has a rules file, and no match file was given: a label needs a session's decision on each rule that fired (plan-r3, section 5). Export the pairs with -export-judge, and give the decisions with -match"
+	case len(missing) > 0:
+		slices.Sort(missing)
+		return "the match file has no decision on: " + strings.Join(missing, "; ")
+	}
+	return ""
 }
 
 func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task, rule string) Item {
@@ -197,6 +244,17 @@ func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task,
 		out, err := cmd.CombinedOutput()
 		it.Rejected = err != nil
 		_ = os.WriteFile(filepath.Join(dir, "check.log"), out, 0o644)
+		if fileExists(filepath.Join(ws, rules.FileName)) {
+			it.HasRules = true
+			if it.Rejected {
+				it.Fired = parseFired(out, ws)
+			}
+			if rule != "" {
+				for _, f := range it.Fired {
+					it.Matched = it.Matched || g.Match[rule][f.Rule]
+				}
+			}
+		}
 	}
 	r := &record.Run{Task: task, Arm: it.Arm}
 	if err := g.Grade(dir, r); err != nil {
@@ -232,7 +290,9 @@ func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task,
 			}
 		}
 		if !caught && checked(it.Arm) && it.Rejected && method == "test" {
-			caught = true // the arm's check rejects it, so it never passes the check
+			// The arm's check rejects it, so it never passes the check. With a rules file, a match
+			// must also say that the rule that fired is this one, once a session has decided.
+			caught = !it.HasRules || g.Match == nil || it.Matched
 		}
 		it.OK = caught
 		if !caught {
@@ -335,6 +395,9 @@ func (v *Validation) Summary() string {
 	for _, k := range kinds {
 		fmt.Fprintf(&b, "%s: %d ok, %d with a problem\n", k, counts[k][0], counts[k][1])
 	}
+	if v.NoLabels != "" {
+		fmt.Fprintf(&b, "no enforced label: %s\n", v.NoLabels)
+	}
 	label := func(arm string, m map[string]bool) {
 		var enforced []string
 		for id, e := range m {
@@ -345,11 +408,13 @@ func (v *Validation) Summary() string {
 		sort.Strings(enforced)
 		fmt.Fprintf(&b, "enforced by %s: %d of %d rules (%s)\n", arm, len(enforced), len(m), strings.Join(enforced, ", "))
 	}
-	if v.EnforcedByL != nil {
+	if v.EnforcedByL != nil && v.NoLabels == "" {
 		label(record.ArmL, v.EnforcedByL)
 	}
-	label(record.ArmV, v.EnforcedByV)
-	if v.EnforcedByL != nil {
+	if v.NoLabels == "" {
+		label(record.ArmV, v.EnforcedByV)
+	}
+	if v.EnforcedByL != nil && v.NoLabels == "" {
 		sets := map[string][]string{}
 		for id := range v.EnforcedByV {
 			s := record.Rule{EnforcedByL: v.EnforcedByL[id], EnforcedByV: v.EnforcedByV[id]}.Set()
@@ -364,6 +429,20 @@ func (v *Validation) Summary() string {
 		if !it.OK {
 			fmt.Fprintf(&b, "PROBLEM %s %s %s: %s\n", it.Kind, it.ID, it.Arm, it.Problem)
 		}
+	}
+	for _, it := range v.Items {
+		if !it.HasRules || len(it.Fired) == 0 {
+			continue
+		}
+		var names []string
+		for _, f := range it.Fired {
+			names = append(names, f.Rule+" ("+f.Part+")")
+		}
+		status := "rejected"
+		if it.Kind == "seeded" && v.NoLabels == "" && !it.Matched {
+			status = "rejected only by an unrelated rule, so it does not count"
+		}
+		fmt.Fprintf(&b, "fired %s %s %s, %s: %s\n", it.Kind, it.ID, it.Arm, status, strings.Join(names, ", "))
 	}
 	for _, it := range v.Items {
 		if len(it.Also) > 0 {

@@ -1,6 +1,7 @@
 N10, ne4: a nested module under testdata in a leaf
 -- want.txt --
 error api/orders/testdata/evil/go.mod:1:1 K0002
+error go.mod:7:1 K0002
 -- api/billing/billing.vulcan --
 package billing
 

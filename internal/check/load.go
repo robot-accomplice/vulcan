@@ -18,6 +18,7 @@ import (
 	"github.com/robot-accomplice/vulcan/internal/gen"
 	"github.com/robot-accomplice/vulcan/internal/lower"
 	"github.com/robot-accomplice/vulcan/internal/project"
+	"github.com/robot-accomplice/vulcan/internal/rules"
 )
 
 // Checker holds the loaded packages of one check.
@@ -27,6 +28,11 @@ type Checker struct {
 	Plain map[string]*packages.Package // by import path, without test files
 	Full  map[string]*packages.Package // by import path, with test files when loaded
 	D     *diag.List
+
+	// NoBaseline reads every finding as new, for the command rules baseline. Findings holds each
+	// rule finding, old or new.
+	NoBaseline bool
+	Findings   []rules.Finding
 
 	badPorts map[string]bool
 	scope    *types.Package // the scope of system.vulcan values // ports with a K0112 type, whose method set is not checked

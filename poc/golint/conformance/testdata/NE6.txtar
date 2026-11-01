@@ -1,6 +1,7 @@
-N10, ne6: a nested module under vendor, which L's go command refuses
+N10, ne6: a nested module under vendor
 -- want.txt --
-broken
+error go.mod:7:1 VL0002
+error vendor/evil/go.mod:1:1 VL0002
 -- api/billing/billing.go --
 package billing
 

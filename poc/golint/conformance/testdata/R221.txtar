@@ -1,6 +1,7 @@
 N10, ne2: a nested module under _x
 -- want.txt --
 error _x/evil/go.mod:1:1 VL0002
+error go.mod:7:1 VL0002
 -- _x/evil/go.mod --
 module example.com/evil
 

@@ -64,7 +64,8 @@ Vulcan's syntax, or a hole that Go closes.
 
 | Analyzer | Code | K-code | What it rejects |
 |---|---|---|---|
-| A1 `layout` | VL0002 | K0002 | A package that the manifest does not list, or a package (or part) inside a leaf; a `go.mod` below the root, in any directory, or a root `vendor/modules.txt` |
+| Before the driver | VL0002 | K0002 | A `replace` in the root `go.mod` or `go.work` with a target inside the project, a root `go.work`, a `go.mod` below the root, or a root `vendor/modules.txt`. The command stops there |
+| A1 `layout` | VL0002 | K0002 | A package that the manifest does not list, or a package (or part) inside a leaf |
 | | VL0003 | K0003 | A part with no package; a library outside `lib/`, or another kind in it; `Main` not `package main`, or `package main` not `Main`; the manifest as a part |
 | | VL0004 | K0004 | A package name that is not its directory; an external test package |
 | | VL0110 | K0110 | The manifest imports a package (as `system.vulcan` importing a leaf) |
@@ -122,6 +123,7 @@ Vulcan's syntax, or a hole that Go closes.
 | | VL0803 | K0803 | A rule of kind `only-in` |
 | | VL0804 | K0804 | A rule of kind `depends`, by kind, part, or package |
 | | VL0805 | K0805 | A rule of kind `transitions` |
+| | VL0811 | K0811 | A warning, which fails nothing: a stale entry of `rules.baseline` |
 | | VL0806 | K0806 | A rule of kind `depends` with `map locked`: a dependency that `rules.lock` does not hold |
 | | VL0807 | K0807 | A rule of kind `declaration` |
 | | VL0808 | K0808 | A rule of kind `call-form` |
@@ -149,7 +151,7 @@ real command. All pass.
 | A6 | A15, A15b, A15c, A15d, A15e, N09, N09b |
 | A7 | C02, C06, C07, C17, H4, H4b, L4, M2 |
 | A8 | C09, C10, C11, L3, M1a, M1b, M1c |
-| A2, A5, A9 | `R01` to `R65`, `R70` to `R137`, `R140` to `R185`, `R190` to `R217`, `R220` to `R249`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
+| A2, A5, A9 | `R01` to `R65`, `R70` to `R137`, `R140` to `R185`, `R190` to `R217`, `R220` to `R249`, `R260` to `R293`, `H6a` to `H6c`, `H7a`, `H7b`: written for both arms by `gen_rule_cases.py`, with the same rules file and the same code. `TestRuleCasesAgree` checks that each lists the same codes in both |
 
 Two cases map to another code in Go: P11 (a leaf that `system.vulcan` does not list, K0003) is
 VL0002, because Go has no component file, so an unlisted package is the same mistake as P10; A02

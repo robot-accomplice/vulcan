@@ -65,9 +65,8 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	if u.Manifest {
 		problems(pass, u, set)
-		for _, f := range set.CheckDecls(manifestDecls(pass)) {
-			emit(pass, f.At.(token.Pos), f)
-		}
+		stale(pass, u, set.StaleParts(partsOf(u.M)))
+		publish(pass, u, set, set.CheckDecls(manifestDecls(pass)), rules.Scope{Group: rules.GroupDecls, Part: ""}, true)
 		return nil, nil
 	}
 	if u.Part == nil {
@@ -75,14 +74,10 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	parts := partsOf(u.M)
 	if u.Part.Kind == model.Main {
-		for _, f := range set.CheckWires(parts, wires(pass, u)) {
-			emit(pass, f.At.(token.Pos), f)
-		}
+		publish(pass, u, set, set.CheckWires(parts, wires(pass, u)), rules.Scope{Group: rules.GroupWires, Part: "*"}, true)
 		return nil, nil
 	}
-	for _, f := range set.CheckDecls(libraryDecl(pass, u)) {
-		emit(pass, f.At.(token.Pos), f)
-	}
+	publish(pass, u, set, set.CheckDecls(libraryDecl(pass, u)), rules.Scope{Group: rules.GroupDecls, Part: u.Dir}, u.Part.Kind == model.Library)
 	unit := &rules.Unit{
 		Part: parts[u.Part.Dir], Module: u.M.Module, Parts: parts, Fset: pass.Fset, Files: pass.Files, Info: pass.TypesInfo,
 		IsTest: func(f *ast.File) bool { return model.IsTest(pass, f) },
@@ -92,10 +87,55 @@ func run(pass *analysis.Pass) (any, error) {
 		},
 	}
 	reportProblems(pass, u, set.ResolveTypes(unit))
-	for _, f := range set.CheckUnit(unit) {
+	publish(pass, u, set, set.CheckUnit(unit), rules.Scope{Group: rules.GroupCode, Part: u.Dir}, !unit.TestsAbsent)
+	return nil, nil
+}
+
+// DumpEnv names a file that a run of the command writes each rule finding to, and reads no baseline.
+// The command rules baseline sets it.
+const DumpEnv = "VULCAN_LINT_FINDINGS"
+
+var dumpMu sync.Mutex
+
+// publish classifies the findings of one pass against the baseline, and reports them.
+func publish(pass *analysis.Pass, u *model.Unit, set *rules.Set, all []rules.Finding, scope rules.Scope, complete bool) {
+	if file := os.Getenv(DumpEnv); file != "" {
+		dump(pass, file, all)
+		for _, f := range all {
+			emit(pass, f.At.(token.Pos), f)
+		}
+		return
+	}
+	out, ps := set.Classify(all, scope, complete)
+	for _, f := range out {
 		emit(pass, f.At.(token.Pos), f)
 	}
-	return nil, nil
+	stale(pass, u, ps)
+}
+
+func dump(pass *analysis.Pass, file string, all []rules.Finding) {
+	dumpMu.Lock()
+	defer dumpMu.Unlock()
+	w, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer w.Close()
+	for _, f := range all {
+		// The place, so that the driver's two reads of a package, with and without its tests, count
+		// one finding once.
+		fmt.Fprintf(w, "%s\t%s\n", pass.Fset.Position(f.At.(token.Pos)), f.Entry().Line(1))
+	}
+}
+
+// stale prints each stale entry of the baseline. It fails nothing.
+func stale(pass *analysis.Pass, u *model.Unit, ps []rules.Problem) {
+	for _, p := range ps {
+		line := fmt.Sprintf("%s:%d:1: warning VL0811 %s", filepath.Join(u.M.Root, p.File), p.Line, p.Msg)
+		if _, dup := warned.LoadOrStore(line, true); !dup {
+			fmt.Fprintln(os.Stderr, line)
+		}
+	}
 }
 
 var warned sync.Map
@@ -197,7 +237,7 @@ func libraryDecl(pass *analysis.Pass, u *model.Unit) []rules.Decl {
 	if u.Part.Kind != model.Library || rules.IsRuntimeLib(u.Dir) {
 		return nil
 	}
-	d := rules.Decl{What: "library", Name: path.Base(u.Dir), At: token.NoPos}
+	d := rules.Decl{What: "library", Name: path.Base(u.Dir), At: token.NoPos, Part: u.Dir}
 	for _, f := range pass.Files {
 		if model.IsTest(pass, f) {
 			continue
@@ -288,17 +328,84 @@ func reportProblems(pass *analysis.Pass, u *model.Unit, probs []rules.Problem) {
 	if len(probs) == 0 {
 		return
 	}
-	file := filepath.Join(u.M.Root, rules.FileName)
+	files := map[string]*token.File{}
+	for _, p := range probs {
+		name := p.File
+		if name == "" {
+			name = rules.FileName
+		}
+		tf := files[name]
+		if tf == nil {
+			file := filepath.Join(u.M.Root, name)
+			b, err := os.ReadFile(file)
+			if err != nil {
+				continue
+			}
+			tf = pass.Fset.AddFile(file, -1, len(b)+1)
+			tf.SetLinesForContent(b)
+			files[name] = tf
+		}
+		model.Report(pass, tf.LineStart(min(max(p.Line, 1), tf.LineCount())), "VL0801", "%s", p.Msg)
+	}
+}
+
+// Findings gives what rules baseline writes: each rule finding of the module. It runs this command
+// with no baseline, and refuses a model error or a fault in the rules.
+func Findings(root string) ([]rules.Entry, error) {
+	dir, err := os.MkdirTemp("", "vulcan-lint-findings")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	file := filepath.Join(dir, "findings")
+	self, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command(self, "./...")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), DumpEnv+"="+file)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		found := false
+		for _, line := range strings.Split(string(out), "\n") {
+			m := diagLine.FindStringSubmatch(line)
+			if m == nil {
+				continue
+			}
+			found = true
+			if !strings.HasPrefix(m[1], "08") || m[1] == "0801" {
+				return nil, fmt.Errorf("the project has errors; fix them first: %s", strings.TrimSpace(line))
+			}
+		}
+		if !found {
+			return nil, errBuild
+		}
+	}
 	b, err := os.ReadFile(file)
 	if err != nil {
-		return
+		return nil, nil // no finding
 	}
-	tf := pass.Fset.AddFile(file, -1, len(b)+1)
-	tf.SetLinesForContent(b)
-	for _, p := range probs {
-		line := min(max(p.Line, 1), tf.LineCount())
-		model.Report(pass, tf.LineStart(line), "VL0801", "%s", p.Msg)
+	seen := map[string]bool{}
+	var entries []rules.Entry
+	for _, line := range strings.Split(string(b), "\n") {
+		if line == "" || seen[line] {
+			continue
+		}
+		seen[line] = true
+		f := strings.SplitN(line, "\t", 7)
+		if len(f) != 7 {
+			continue
+		}
+		undash := func(s string) string {
+			if s == "-" {
+				return ""
+			}
+			return s
+		}
+		entries = append(entries, rules.Entry{Rule: f[2], Group: f[3], Part: undash(f[4]), Symbol: undash(f[5]), Text: f[6]})
 	}
+	return entries, nil
 }
 
 // Edges gives what rules lock writes: the wires of main, and the imports of libraries. It refuses a

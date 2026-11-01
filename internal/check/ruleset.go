@@ -152,7 +152,7 @@ func (c *Checker) decls() []rules.Decl {
 		}
 	}
 	for _, lib := range c.P.Libs {
-		d := rules.Decl{What: "library", Name: lib.GoName, At: diag.Pos{File: lib.Dir, Line: 0}}
+		d := rules.Decl{What: "library", Name: lib.GoName, At: diag.Pos{File: lib.Dir, Line: 0}, Part: lib.Dir}
 		if lib.LibSrc != nil && lib.Lib != nil {
 			pos := lib.LibSrc.Pos(lib.Lib.Pos)
 			d.Commented, d.At = rules.ScanComments(lib.LibSrc.Src).Near(pos.Line), pos
@@ -179,6 +179,7 @@ func partKind(pkg *project.Package) string {
 // rules.vulcan and, when a rule needs it, rules.lock, and nothing else. It returns the current
 // wires and the imports of libraries, which rules lock writes.
 func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
+	c.Findings = nil
 	parts := map[string]rules.Part{}
 	all := append(append([]*project.Package{}, c.P.Leaves...), c.P.Libs...)
 	for _, pkg := range all {
@@ -204,10 +205,28 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 	if set == nil {
 		return edges
 	}
-	set.Resolve(parts, c.P.Module)
-	for _, p := range set.Probs {
-		c.D.Errorf(diag.Pos{File: rules.FileName, Line: p.Line, Col: 1}, "K0801", "%s", p.Msg)
+	if c.NoBaseline {
+		set.Baseline = nil
 	}
+	set.Resolve(parts, c.P.Module)
+	fault := func(p rules.Problem) {
+		file := p.File
+		if file == "" {
+			file = rules.FileName
+		}
+		c.D.Errorf(diag.Pos{File: file, Line: p.Line, Col: 1}, "K0801", "%s", p.Msg)
+	}
+	for _, p := range set.Probs {
+		fault(p)
+	}
+	stale := func(ps []rules.Problem) {
+		for _, p := range ps {
+			c.D.Warnf(diag.Pos{File: p.File, Line: p.Line, Col: 1}, "K0811", "%s", p.Msg)
+		}
+	}
+	stale(set.StaleParts(parts))
+	// One finding for each place, as Diags keeps one: V's twin of a method can repeat a place.
+	seen := map[string]bool{}
 	report := func(pos diag.Pos, f rules.Finding) {
 		if f.Warn {
 			c.D.Warnf(pos, "K"+f.Code, "%s", f.Msg)
@@ -215,12 +234,25 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 			c.D.Errorf(pos, "K"+f.Code, "%s", f.Msg)
 		}
 	}
-	for _, f := range set.CheckWires(parts, wires) {
-		report(f.At.(diag.Pos), f)
+	collect := func(all []rules.Finding, pos func(rules.Finding) diag.Pos, scope rules.Scope, complete bool) {
+		var kept []rules.Finding
+		for _, f := range all {
+			key := pos(f).String() + f.Code + f.Text
+			if !seen[key] {
+				seen[key] = true
+				kept = append(kept, f)
+			}
+		}
+		c.Findings = append(c.Findings, kept...)
+		out, ps := set.Classify(kept, scope, complete)
+		for _, f := range out {
+			report(pos(f), f)
+		}
+		stale(ps)
 	}
-	for _, f := range set.CheckDecls(c.decls()) {
-		report(f.At.(diag.Pos), f)
-	}
+	declared := func(f rules.Finding) diag.Pos { return f.At.(diag.Pos) }
+	collect(set.CheckWires(parts, wires), declared, rules.Scope{Group: rules.GroupWires, Part: "*"}, true)
+	collect(set.CheckDecls(c.decls()), declared, rules.Scope{Group: rules.GroupDecls, Part: "*"}, true)
 	for _, pkg := range all {
 		gp := c.Full[pkg.ImportPath]
 		// As L's driver does, a rule does not read a package with a type error. A type error in a
@@ -249,11 +281,9 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 			}
 		}
 		for _, p := range set.ResolveTypes(u) {
-			c.D.Errorf(diag.Pos{File: rules.FileName, Line: p.Line, Col: 1}, "K0801", "%s", p.Msg)
+			fault(p)
 		}
-		for _, f := range set.CheckUnit(u) {
-			report(c.Pos(f.At.(token.Pos)), f)
-		}
+		collect(set.CheckUnit(u), func(f rules.Finding) diag.Pos { return c.Pos(f.At.(token.Pos)) }, rules.Scope{Group: rules.GroupCode, Part: pkg.Dir}, !u.TestsAbsent)
 	}
 	return edges
 }

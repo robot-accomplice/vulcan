@@ -39,7 +39,6 @@ func run(pass *analysis.Pass) (any, error) {
 	ignored(pass, u, first)
 	if u.Manifest {
 		manifest(pass, u)
-		unlisted(pass, u)
 		return nil, nil
 	}
 	m := u.M
@@ -88,22 +87,6 @@ func ignored(pass *analysis.Pass, u *model.Unit, first *ast.File) {
 			continue // VL0126 rejects a file that is not Go
 		}
 		model.Report(pass, first.Package, "VL0901", "the build ignores %s (a build constraint or a file name for another system); every file of a package is built, so remove the constraint", filepath.ToSlash(rel))
-	}
-}
-
-// unlisted reports what brings code in past every check, the same as V's K0002: a go.mod below the
-// root, in any directory, and a root vendor/modules.txt. A file that nothing imports in a directory
-// that ./... skips stays accepted, in both arms, and imports.go rejects an import of one.
-func unlisted(pass *analysis.Pass, u *model.Unit) {
-	for _, rel := range rules.ForeignRoots(u.M.Root, ".vulcan/build", ".vulcan/bin") {
-		full := filepath.Join(u.M.Root, filepath.FromSlash(rel))
-		b, err := os.ReadFile(full)
-		if err != nil {
-			continue
-		}
-		tf := pass.Fset.AddFile(full, -1, len(b)+1)
-		tf.SetLinesForContent(b)
-		model.Report(pass, tf.Pos(0), "VL0002", "%s", rules.ForeignRootMessage(rel))
 	}
 }
 

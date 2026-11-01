@@ -37,8 +37,8 @@ var Config = Settings{
 `
 
 // Tool gives the commands init and rules their parts in vulcan-lint.
-func Tool(edges func(string) ([]rules.Edge, error)) rules.Tool {
-	return rules.Tool{Name: "vulcan-lint", FindRoot: findRoot, Scaffold: write, Edges: edges}
+func Tool(edges func(string) ([]rules.Edge, error), findings func(string) ([]rules.Entry, error)) rules.Tool {
+	return rules.Tool{Name: "vulcan-lint", FindRoot: findRoot, Scaffold: write, Edges: edges, Findings: findings}
 }
 
 func findRoot(dir string) (string, error) {

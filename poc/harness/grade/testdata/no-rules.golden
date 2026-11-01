@@ -1,0 +1,29 @@
+base base L ok=true rejected=false also=[]
+base base P ok=true rejected=false also=[]
+base base V ok=true rejected=false also=[]
+reference DEMO L ok=true rejected=false also=[]
+reference DEMO P ok=true rejected=false also=[]
+reference DEMO V ok=true rejected=false also=[]
+seeded RD/inventory L ok=true rejected=true also=[]
+seeded RD/inventory P ok=true rejected=false also=[]
+seeded RD/inventory V ok=true rejected=true also=[]
+seeded RD/orders L ok=true rejected=true also=[]
+seeded RD/orders P ok=true rejected=false also=[]
+seeded RD/orders V ok=true rejected=true also=[]
+shapes RT L ok=false rejected=false also=[]
+shapes RT P ok=false rejected=false also=[]
+shapes RT V ok=false rejected=false also=[]
+--
+base: 3 ok, 0 with a problem
+reference: 3 ok, 0 with a problem
+seeded: 6 ok, 0 with a problem
+shapes: 0 ok, 3 with a problem
+enforced by L: 1 of 2 rules (RD)
+enforced by V: 1 of 2 rules (RD)
+set S: 1 (RD)
+set G: 0 ()
+set U: 0 ()
+set N: 1 (RT)
+PROBLEM shapes RT P: 0 seeded shapes; at least 2 are needed
+PROBLEM shapes RT L: 0 seeded shapes; at least 2 are needed
+PROBLEM shapes RT V: 0 seeded shapes; at least 2 are needed

@@ -89,6 +89,8 @@ in `bin/claude`, and a Go toolchain in `go/`, of at least the version of `go.mod
 ```bash
 harness tools -linux                           # vulcan, fakepay, fakeagent for the sandbox
 harness validate -material MATERIAL -out DIR -write-labels   # arms P, L, V: enforced_by_l and enforced_by_v, and the sets
+harness validate -material MATERIAL -out DIR -export-judge FILE   # with a rules file: the pairs that a fresh judge decides
+harness validate -material MATERIAL -out DIR -match FILE -write-labels   # with a rules file: a label needs the judge's decisions
 harness schedule -tasks T01,...,T24 -ord-tasks T25,...,T32 -arms P,L,V -runs 3 -ord-runs 5 -retest 0.1 -seed SEED > schedule.json
 harness evaluate -schedule schedule.json -material PUBLIC -no-grade -out RUNS -model M -base-url URL -token-file F     -sandbox Ubuntu-22.04 -review -prices prices.json
 harness gradeall -material MATERIAL -out RUNS

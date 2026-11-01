@@ -1,5 +1,6 @@
 N1, t14: a nested module that dials
 -- want.txt --
+error go.mod:7:1 VL0002
 error third/go.mod:1:1 VL0002
 -- api/billing/billing.go --
 package billing

@@ -437,6 +437,178 @@ func TestTransitionsOnStockroom(t *testing.T) {
 	}
 }
 
+// TestBaselineCommands runs rules baseline on a copy of each base application. A check and a build then
+// pass with each finding printed as old; a new finding fails both arms; a stale entry fails nothing;
+// and rules diff shows the size.
+func TestBaselineCommands(t *testing.T) {
+	keys := map[string][]string{}
+	for _, arm := range arms(t) {
+		t.Run(arm.name, func(t *testing.T) {
+			if c, out := run(t, arm.dir, arm.bin, "init"); c != 0 {
+				t.Fatal(out)
+			}
+			if c, _ := run(t, arm.dir, arm.bin, arm.check...); c == 0 {
+				t.Fatal("the defaults fire on the base application, and the check passes")
+			}
+			if c, out := run(t, arm.dir, arm.bin, "rules", "baseline"); c != 0 {
+				t.Fatalf("rules baseline: %s", out)
+			}
+			c, out := run(t, arm.dir, arm.bin, arm.check...)
+			if c != 0 || !strings.Contains(out, "old finding") {
+				t.Fatalf("a check with a baseline: exit %d\n%s", c, out)
+			}
+			if arm.name == "V" {
+				if c, out := run(t, arm.dir, arm.bin, "build"); c != 0 {
+					t.Errorf("vulcan build with only old findings: %s", out)
+				}
+			}
+			_, diff := run(t, arm.dir, arm.bin, "rules", "diff")
+			if !regexp.MustCompile(`rules\.baseline holds \d+ findings, in \d+ keys`).MatchString(diff) {
+				t.Errorf("rules diff does not show the baseline: %s", diff)
+			}
+			b, err := os.ReadFile(filepath.Join(arm.dir, "rules.baseline"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, line := range strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n") {
+				if line != "" && !strings.HasPrefix(line, "#") {
+					keys[arm.name] = append(keys[arm.name], line)
+				}
+			}
+			// A new finding fails. It is an exported name with no comment in a leaf.
+			name, text := "api/orders/newone.vulcan", "package orders\n\nfunc NewOne() {}\n"
+			if arm.name == "L" {
+				name = "api/orders/newone.go"
+			}
+			if err := os.WriteFile(filepath.Join(arm.dir, filepath.FromSlash(name)), []byte(text), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			c, out = run(t, arm.dir, arm.bin, arm.check...)
+			if c == 0 || !regexp.MustCompile(`(K|VL)0807`).MatchString(out) {
+				t.Errorf("a new finding passes: exit %d\n%s", c, out)
+			}
+			if arm.name == "V" {
+				if c, _ := run(t, arm.dir, arm.bin, "build"); c == 0 {
+					t.Errorf("vulcan build passes with a new finding")
+				}
+			}
+			if err := os.Remove(filepath.Join(arm.dir, filepath.FromSlash(name))); err != nil {
+				t.Fatal(err)
+			}
+			// A stale entry fails nothing.
+			if err := os.WriteFile(filepath.Join(arm.dir, "rules.baseline"), append(b, []byte("1\tCODE-08\tcode\tapi/orders\tGone\tthe exported name Gone has no doc comment\n")...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			c, out = run(t, arm.dir, arm.bin, arm.check...)
+			if c != 0 || !regexp.MustCompile(`(K|VL)0811`).MatchString(out) {
+				t.Errorf("a stale entry: exit %d\n%s", c, out)
+			}
+			// No baseline: as before.
+			if err := os.Remove(filepath.Join(arm.dir, "rules.baseline")); err != nil {
+				t.Fatal(err)
+			}
+			if c, _ := run(t, arm.dir, arm.bin, arm.check...); c == 0 {
+				t.Errorf("with no baseline, the check passes")
+			}
+		})
+	}
+	only := func(a, b []string) []string {
+		var out []string
+		for _, k := range a {
+			if !slices.Contains(b, k) {
+				out = append(out, k)
+			}
+		}
+		return out
+	}
+	t.Logf("only V: %q\nonly L: %q", only(keys["V"], keys["L"]), only(keys["L"], keys["V"]))
+	for _, k := range only(keys["V"], keys["L"]) {
+		if !knownKeyDifference(k) {
+			t.Errorf("a key in V only: %q", k)
+		}
+	}
+	for _, k := range only(keys["L"], keys["V"]) {
+		if !knownKeyDifference(k) {
+			t.Errorf("a key in L only: %q", k)
+		}
+	}
+}
+
+// knownKeyDifference names what differs on the base applications because the applications differ:
+// V's startup is L's Serve, and L's lib/shop has no package comment.
+func knownKeyDifference(k string) bool {
+	return strings.Contains(k, "library shop has no doc comment") || strings.Contains(k, "\tstartup\t") || strings.Contains(k, "\tServe\t")
+}
+
+// TestBaselineKeysAgree writes a baseline in each arm for forms that one arm has alone: a lowered
+// return and a clause in V, contract calls in L, a port declared in another file, a wire, and a
+// library. The files must be the same.
+func TestBaselineKeysAgree(t *testing.T) {
+	vulcan := buildVulcan(t)
+	base := lintest.Read(t, filepath.Join("testdata", "base.txtar"))
+	for _, id := range []string{"R01", "R70", "R85", "R86", "R82", "R130", "R140", "R147", "R149", "R183", "R243", "R290", "R291", "R292", "R293"} {
+		t.Run(id, func(t *testing.T) {
+			ldir := lintest.Write(t, base, lintest.Read(t, filepath.Join("testdata", id+".txtar")))
+			varch := lintest.Read(t, filepath.Join("..", "..", "..", "conformance", id+".txtar"))
+			vdir := t.TempDir()
+			for _, f := range varch.Files {
+				p := filepath.Join(vdir, filepath.FromSlash(f.Name))
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, f.Data, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(vdir, "go.mod"), []byte("module shop\n\ngo 1.26\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var got [2]string
+			for i, a := range []struct{ dir, bin string }{{vdir, vulcan}, {ldir, lintBin}} {
+				if c, out := run(t, a.dir, a.bin, "rules", "baseline"); c != 0 {
+					t.Fatalf("rules baseline: %s", out)
+				}
+				b, err := os.ReadFile(filepath.Join(a.dir, "rules.baseline"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				got[i] = strings.ReplaceAll(string(b), "\r\n", "\n")
+			}
+			if got[0] != got[1] {
+				t.Errorf("the keys differ:\nV:\n%s\nL:\n%s", got[0], got[1])
+			}
+			if !strings.Contains(got[0], "\t") {
+				t.Errorf("no finding in the baseline:\n%s", got[0])
+			}
+		})
+	}
+}
+
+// TestBaselineRefusesModelError checks that a model check never goes in the file.
+func TestBaselineRefusesModelError(t *testing.T) {
+	for _, arm := range arms(t) {
+		t.Run(arm.name, func(t *testing.T) {
+			if c, out := run(t, arm.dir, arm.bin, "init"); c != 0 {
+				t.Fatal(out)
+			}
+			name := "api/orders/extra.vulcan"
+			if arm.name == "L" {
+				name = "api/orders/extra.go"
+			}
+			text := "package orders\n\nimport \"stockroom/api/billing\"\n\nvar _ = billing.Ledger{}\n"
+			if err := os.WriteFile(filepath.Join(arm.dir, filepath.FromSlash(name)), []byte(text), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if c, out := run(t, arm.dir, arm.bin, "rules", "baseline"); c == 0 {
+				t.Errorf("rules baseline passes with a model error: %s", out)
+			}
+			if _, err := os.Stat(filepath.Join(arm.dir, "rules.baseline")); err == nil {
+				t.Errorf("rules baseline wrote a file with a model error")
+			}
+		})
+	}
+}
+
 // TestScaffoldMatchesWorkspace keeps the files of vulcan-lint init equal to the workspace's.
 func TestScaffoldMatchesWorkspace(t *testing.T) {
 	for file, src := range map[string]string{"schema.go.txt": "arch/schema.go", "contract.go.txt": "lib/contract/contract.go"} {

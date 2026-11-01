@@ -52,6 +52,7 @@ type Tool struct {
 	FindRoot func(dir string) (string, error)          // the root of a project, from a directory in it
 	Scaffold func(root string, stdout io.Writer) error // creates what the project lacks
 	Edges    func(root string) ([]Edge, error)         // the current wires and imports, for the lock
+	Findings func(root string) ([]Entry, error)        // each current rule finding, for the baseline
 }
 
 // IsDefaults reports whether an origin is a built-in ruleset.
@@ -219,7 +220,7 @@ func writeFiles(root, rulesText string, origin []byte) error {
 // Rules is the command rules diff|upgrade|lock.
 func (t Tool) Rules(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintf(stderr, "%s rules: the commands are rules diff, rules upgrade, and rules lock\n", t.Name)
+		fmt.Fprintf(stderr, "%s rules: the commands are rules diff, rules upgrade, rules lock, and rules baseline\n", t.Name)
 		return 2
 	}
 	switch args[0] {
@@ -229,8 +230,10 @@ func (t Tool) Rules(args []string, stdout, stderr io.Writer) int {
 		return t.upgrade(args[1:], stdout, stderr)
 	case "lock":
 		return t.lock(args[1:], stdout, stderr)
+	case "baseline":
+		return t.baseline(args[1:], stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "%s rules: unknown command %q; the commands are rules diff, rules upgrade, and rules lock\n", t.Name, args[0])
+	fmt.Fprintf(stderr, "%s rules: unknown command %q; the commands are rules diff, rules upgrade, rules lock, and rules baseline\n", t.Name, args[0])
 	return 2
 }
 
@@ -346,6 +349,37 @@ func (t Tool) diff(args []string, stdout, stderr io.Writer) int {
 	if n == 0 {
 		fmt.Fprintln(stdout, "the rules are the same as their origin")
 	}
+	if base, _ := ReadBaseline(root); base != nil {
+		findings, keys := base.Size()
+		fmt.Fprintf(stdout, "%s holds %d findings, in %d keys: a check does not fail on these\n", BaselineName, findings, keys)
+	} else {
+		fmt.Fprintf(stdout, "no %s\n", BaselineName)
+	}
+	return 0
+}
+
+// baseline writes each current rule finding to the file. It refuses a project with a model error or a
+// fault in its rules, because no model check goes in the file.
+func (t Tool) baseline(args []string, stdout, stderr io.Writer) int {
+	root, ok := t.rootOf(args, stderr)
+	if !ok {
+		return 1
+	}
+	if _, err := os.Stat(filepath.Join(root, FileName)); err != nil {
+		fmt.Fprintf(stderr, "%s rules baseline: no %s in %s; run the command init\n", t.Name, FileName, root)
+		return 1
+	}
+	entries, err := t.Findings(root)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s rules baseline: %v\n", t.Name, err)
+		return 1
+	}
+	n, err := WriteBaseline(root, entries)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s rules baseline: %v\n", t.Name, err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "wrote %s: %d findings\n", BaselineName, n)
 	return 0
 }
 

@@ -843,7 +843,7 @@ def rawfiles(files):
 
 
 def at_mod(path):
-    return both_at(path + "/go.mod", path + "/go.mod", "module", "0002")
+    return {"v": [("go.mod", "replace", "0002", 0), (path + "/go.mod", "module", "0002", 0)], "l": [("go.mod", "replace", "0002", 0), (path + "/go.mod", "module", "0002", 0)]}
 
 
 NE_RULES = rules(ERR08, rule("A", "only-in", effect="network", **{"in": "gateway entry"}))
@@ -860,7 +860,7 @@ CASES += [
     ("R221", "N10, ne2: a nested module under _x", NE_RULES, nested("_x/evil"), at_mod("_x/evil")),
     ("R222", "N10, ne3: a nested module under .x", NE_RULES, nested(".x/evil"), at_mod(".x/evil")),
     ("R223", "N10, ne4: a nested module under testdata in a leaf", NE_RULES, nested("api/orders/testdata/evil"), at_mod("api/orders/testdata/evil")),
-    ("R224", "N10, fx10: a nested module under testdata that nothing imports", None, rawfiles({"testdata/evil/go.mod": EVIL_MOD, "testdata/evil/x.go": "package x\n"}), at_mod("testdata/evil")),
+    ("R224", "N10, fx10: a nested module under testdata that nothing imports", None, rawfiles({"testdata/evil/go.mod": EVIL_MOD, "testdata/evil/x.go": "package x\n"}), both_at("testdata/evil/go.mod", "testdata/evil/go.mod", "module", "0002")),
     # N14: a Go file in a directory that go ./... skips passes, when nothing imports it
     ("R225", "N14, fx1: testdata at the root", None, FX("testdata/x.go"), NO),
     ("R226", "N14, fx2: testdata in a leaf", None, FX("api/orders/testdata/x.go"), NO),
@@ -893,19 +893,19 @@ CASES += [
 def rerun_arm_cases():
     out = []
     L, V = "l", "v"
-    out.append((L, "LT3", "N1, t9: a nested module with a replace", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("third/go.mod", "module", "0002", 0)]))
-    out.append((V, "VT3", "N1, t9: a nested module with a replace", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("third/go.mod", "module", "0002", 0), ("third/s.go", "package", "0002", 0)]))
-    out.append((V, "VT4", "N14, t10: a vendored package", {"go.mod": VENDOR_MOD, "vendor/modules.txt": MODULES, "vendor/example.com/evil/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("vendor/modules.txt", "#", "0002", 0), ("api/orders/extra.vulcan", '"example.com/evil"', "0209", 0)]))
+    out.append((L, "LT3", "N1, t9: a nested module with a replace", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("go.mod", "replace", "0002", 0), ("third/go.mod", "module", "0002", 0)]))
+    out.append((V, "VT3", "N1, t9: a nested module with a replace", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("go.mod", "replace", "0002", 0), ("third/go.mod", "module", "0002", 0), ("third/s.go", "package", "0002", 0)]))
+    out.append((V, "VT4", "N14, t10: a vendored package", {"go.mod": VENDOR_MOD, "vendor/modules.txt": MODULES, "vendor/example.com/evil/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("vendor/modules.txt", "#", "0002", 0)]))
     out.append((L, "LT4", "N1, t10: a vendored package", {"go.mod": VENDOR_MOD, "vendor/modules.txt": MODULES, "vendor/example.com/evil/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("vendor/modules.txt", "#", "0002", 0)]))
-    out.append((L, "LT5", "N1, t13: a nested module in a deeper directory", {"go.mod": NESTED_GOMOD.replace("./third", "./a/b/third"), "a/b/third/go.mod": EVIL_MOD, "a/b/third/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("a/b/third/go.mod", "module", "0002", 0)]))
-    out.append((V, "VT5", "N1, t13: a nested module in a deeper directory", {"go.mod": NESTED_GOMOD.replace("./third", "./a/b/third"), "a/b/third/go.mod": EVIL_MOD, "a/b/third/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("a/b/third/go.mod", "module", "0002", 0), ("a/b/third/s.go", "package", "0002", 0)]))
-    out.append((L, "LT6", "N1, t14: a nested module that dials", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_NET, "api/orders/extra.go": EVIL_USE}, [("third/go.mod", "module", "0002", 0)]))
-    out.append((V, "VT6", "N1, t14: a nested module that dials", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_NET, "api/orders/extra.vulcan": EVIL_USE}, [("third/go.mod", "module", "0002", 0), ("third/s.go", "package", "0002", 0)]))
+    out.append((L, "LT5", "N1, t13: a nested module in a deeper directory", {"go.mod": NESTED_GOMOD.replace("./third", "./a/b/third"), "a/b/third/go.mod": EVIL_MOD, "a/b/third/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("go.mod", "replace", "0002", 0), ("a/b/third/go.mod", "module", "0002", 0)]))
+    out.append((V, "VT5", "N1, t13: a nested module in a deeper directory", {"go.mod": NESTED_GOMOD.replace("./third", "./a/b/third"), "a/b/third/go.mod": EVIL_MOD, "a/b/third/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("go.mod", "replace", "0002", 0), ("a/b/third/go.mod", "module", "0002", 0), ("a/b/third/s.go", "package", "0002", 0)]))
+    out.append((L, "LT6", "N1, t14: a nested module that dials", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_NET, "api/orders/extra.go": EVIL_USE}, [("go.mod", "replace", "0002", 0), ("third/go.mod", "module", "0002", 0)]))
+    out.append((V, "VT6", "N1, t14: a nested module that dials", {"go.mod": NESTED_GOMOD, "third/go.mod": EVIL_MOD, "third/s.go": EVIL_NET, "api/orders/extra.vulcan": EVIL_USE}, [("go.mod", "replace", "0002", 0), ("third/go.mod", "module", "0002", 0), ("third/s.go", "package", "0002", 0)]))
     out.append((L, "LT7", "N14: a Go file under testdata that nothing imports passes", {"api/orders/testdata/x.go": "package x\n"}, []))
     out.append((L, "LT8", "N1: a Go file under a directory that starts with _", {"_x/s.go": PLAIN_S, "api/orders/extra.go": 'package orders\n\nimport "shop/_x"\n\nvar _ = sub.X\n'}, [("api/orders/extra.go", '"shop/_x"', "0002", 0)]))
     out.append((L, "LT9", "N14: a Go file under a directory that starts with a dot, which nothing imports, passes", {".x/s.go": PLAIN_S}, []))
-    out.append((L, "NE6", "N10, ne6: a nested module under vendor, which L's go command refuses", {"go.mod": NESTED_GOMOD.replace("./third", "./vendor/evil"), "vendor/evil/go.mod": EVIL_MOD, "vendor/evil/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, "broken"))
-    out.append((V, "NE6", "N10, ne6: a nested module under vendor", {"go.mod": NESTED_GOMOD.replace("./third", "./vendor/evil"), "vendor/evil/go.mod": EVIL_MOD, "vendor/evil/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("vendor/evil/go.mod", "module", "0002", 0)]))
+    out.append((L, "NE6", "N10, ne6: a nested module under vendor", {"go.mod": NESTED_GOMOD.replace("./third", "./vendor/evil"), "vendor/evil/go.mod": EVIL_MOD, "vendor/evil/s.go": EVIL_S, "api/orders/extra.go": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("go.mod", "replace", "0002", 0), ("vendor/evil/go.mod", "module", "0002", 0)]))
+    out.append((V, "NE6", "N10, ne6: a nested module under vendor", {"go.mod": NESTED_GOMOD.replace("./third", "./vendor/evil"), "vendor/evil/go.mod": EVIL_MOD, "vendor/evil/s.go": EVIL_S, "api/orders/extra.vulcan": EVIL_USE, "rules.vulcan": rules(ERR08)}, [("go.mod", "replace", "0002", 0), ("vendor/evil/go.mod", "module", "0002", 0)]))
     out.append((L, "FX9", "fx9: a nested module in a plain directory, not imported", {"third/go.mod": EVIL_MOD, "third/x.go": "package x\n"}, [("third/go.mod", "module", "0002", 0)]))
     out.append((V, "FX9", "fx9: a nested module in a plain directory, not imported", {"third/go.mod": EVIL_MOD, "third/x.go": "package x\n"}, [("third/go.mod", "module", "0002", 0), ("third/x.go", "package", "0002", 0)]))
     out.append((L, "FX16", "fx16: a directory named Testdata, which go lists", {"api/orders/Testdata/x.go": "package x\n"}, [("api/orders/Testdata/x.go", "x\n", "0002", 0)]))
@@ -913,6 +913,105 @@ def rerun_arm_cases():
     out.append((L, "FX17", "fx17: a directory named node_modules, which go lists", {"node_modules/x.go": "package x\n"}, [("node_modules/x.go", "x\n", "0002", 0)]))
     out.append((V, "FX17", "fx17: a directory named node_modules, which go lists", {"node_modules/x.go": "package x\n"}, [("node_modules/x.go", "package", "0002", 0)]))
     out.append((L, "LW12", "N7: a helper that main never calls still adds an edge", {"cmd/shop/main.go": L_BASE["cmd/shop/main.go"].replace("func main() {", "func unused() *billing.Payer { return billing.NewPayer(store.Open()) }\n\nfunc main() {").replace("\tkeeper := store.Open()\n\tpayer := billing.NewPayer(keeper)\n", "\tpayer := unused()\n"), "rules.vulcan": rules(rule("D", "depends", **{"from": "leaf"}, deny="gateway", via="wire"))}, [("cmd/shop/main.go", "store.Open())", "0804", 0), ("cmd/shop/main.go", "(payer)", "0909", 1)]))
+    return out
+
+
+# The third rerun, parity-r3.md: what brings code in, read in both arms; and the baseline.
+def replaced(target, modname="go.mod"):
+    gomod = NESTED_GOMOD.replace("./third", "./" + target)
+    return join(rawfiles({"go.mod": gomod, f"{target}/{modname}": EVIL_MOD, f"{target}/s.go": EVIL_S}), code("api/orders/extra", EVIL_USE))
+
+
+def replace_line():
+    return ("go.mod", "replace", "0002", 0)
+
+
+def foreign(v_more=(), l_more=()):
+    return {"v": [replace_line(), *v_more], "l": [replace_line(), *l_more]}
+
+
+MOD_AT = lambda path: (path, "module", "0002", 0)
+WORK = "go 1.27.3\n\nuse .\n"
+WORK_REPLACE = "go 1.27.3\n\nuse .\n\nreplace example.com/evil => ./third\n"
+LIB_VENDOR = {"v": {"lib/vendor/library.vulcan": "// vendor holds things.\nlibrary vendor {\n}\n", "lib/vendor/v.vulcan": "package vendor\n\n// X is a thing.\nconst X = 1\n",
+                    "system.vulcan": V_BASE["system.vulcan"]},
+              "l": {"lib/vendor/v.go": "// Package vendor holds things.\npackage vendor\n\n// X is a thing.\nconst X = 1\n",
+                    "arch/arch.go": L_BASE["arch/arch.go"].replace('Library("lib/money"),', 'Library("lib/money"),\n\t\tLibrary("lib/vendor"),')}}
+
+
+def bl(*entries):
+    return "".join("\t".join([str(n), rid, group, part or "-", symbol or "-", text]) + "\n" for n, rid, group, part, symbol, text in entries)
+
+
+def with_baseline(change, *entries):
+    out = join(change, rawfiles({"rules.baseline": "# a baseline\n" + bl(*entries)}))
+    return out
+
+
+GETENV_T = "api/orders uses os.Getenv, which a rule forbids here"
+FB = rule("F", "forbid-call", funcs="os.Getenv", **{"in": "leaf"})
+TWO = extra("orders", 'func readIt() string { return os.Getenv("X") }\n\nfunc readTwo() string { return os.Getenv("Y") }\n', "os")
+SHIFT = extra("orders", '// A comment that moved the code down.\n//\n// And another line.\nfunc other() {}\n\nvar _ = other\n\nfunc readIt() string { return os.Getenv("X") }\n', "os")
+RENAMED = extra("orders", 'func readThat() string { return os.Getenv("X") }\n', "os")
+MOVED_FILE = code("api/orders/elsewhere", 'package orders\n\nimport "os"\n\nfunc readIt() string { return os.Getenv("X") }\n')
+ENTRY1 = (1, "F", "code", "api/orders", "readIt", GETENV_T)
+NET_T = "api/orders uses net/http.Get, which has the effect network, allowed only in gateway, entry"
+GATE = rule("O", "only-in", effect="network", **{"in": "gateway entry"})
+HTTPGET = extra("orders", 'func dialIt() { _, _ = http.Get("x") }\n', "net/http")
+WIRED = rule("X", "declaration", at="wired-port", to="gateway")
+WIRED_T = "port method Save of api/billing has no context.Context as its first parameter, and api/store provides it"
+PORTM = rule("X", "declaration", at="port-method", require="requires", **{"in": "api/billing"})
+PORTM_T = "port method Ledger.Save has no requires clause for the limits of its arguments"
+RET = rule("X", "code-form", form="return-effect", funcs="(*database/sql.Tx).Commit")
+RET_T = "a return in a function with ensures calls (*database/sql.Tx).Commit, so the effect happens before the ensures runs"
+RETF = ensured("orders", "commitIt(t *sql.Tx) error", "t != nil", "\treturn t.Commit()\n", imports="database/sql")
+LIBNAME = rule("X", "declaration", at="library", deny_names="money")
+LIBNAME_T = "the library has the name money"
+BADBASE = rawfiles({"rules.baseline": "this is not a line of the file\n"})
+
+CASES += [
+    # N16, N18: a replace inside the project, whatever its directory
+    ("R260", "N16, d2: a replace into .vulcan/build", NE_RULES, replaced(".vulcan/build/evil"), foreign()),
+    ("R261", "N18, d1: a replace into .vulcan/bin", NE_RULES, replaced(".vulcan/bin/evil"), foreign()),
+    ("R262", "N18, d4: a replace into x/.git", NE_RULES, replaced("x/.git/evil"), foreign(v_more=[MOD_AT("x/.git/evil/go.mod")], l_more=[MOD_AT("x/.git/evil/go.mod")])),
+    ("R263", "N18, gi: a replace into .git", NE_RULES, replaced(".git/evil"), foreign()),
+    ("R264", "N16, d5: a replace into .vulcan", NE_RULES, replaced(".vulcan/evil"), foreign(v_more=[MOD_AT(".vulcan/evil/go.mod")], l_more=[MOD_AT(".vulcan/evil/go.mod")])),
+    ("R265", "N16, u2: GO.MOD under testdata", NE_RULES, replaced("testdata/evil", "GO.MOD"), foreign(v_more=[MOD_AT("testdata/evil/GO.MOD")], l_more=[MOD_AT("testdata/evil/GO.MOD")])),
+    ("R266", "N16, u3: Go.Mod under _x", NE_RULES, replaced("_x/evil", "Go.Mod"), foreign(v_more=[MOD_AT("_x/evil/Go.Mod")], l_more=[MOD_AT("_x/evil/Go.Mod")])),
+    ("R267", "N18, go.work: a root go.work fails in both", None, rawfiles({"go.work": WORK}), both_at("go.work", "go.work", "go 1.27.3", "0002")),
+    ("R268", "N18, go.work: a replace in it, into the project", None, rawfiles({"go.work": WORK_REPLACE, "third/go.mod": EVIL_MOD}), {"v": [("go.work", "go 1.27.3", "0002", 0), ("go.work", "replace", "0002", 0), MOD_AT("third/go.mod")], "l": [("go.work", "go 1.27.3", "0002", 0), ("go.work", "replace", "0002", 0), MOD_AT("third/go.mod")]}),
+    ("R269", "N16, u4: vendor/MODULES.TXT", None, rawfiles({"vendor/MODULES.TXT": MODULES}), both_at("vendor/MODULES.TXT", "vendor/MODULES.TXT", "#", "0002")),
+    ("R270", "N16, u5: VENDOR/modules.txt", None, rawfiles({"VENDOR/modules.txt": MODULES}), both_at("VENDOR/modules.txt", "VENDOR/modules.txt", "#", "0002")),
+    ("R271", "A replace to a path outside the project stays a limit", None, rawfiles({"go.mod": "module shop\n\ngo 1.26.0\n\nrequire example.com/nope v0.0.0\n\nreplace example.com/nope => ../nope\n"}), NO),
+    # N22
+    ("R272", "N22: a part can be named vendor", rules(rule("X", "declaration", at="library", deny_names="vendor")), LIB_VENDOR, {"v": [("lib/vendor/library.vulcan", "vendor {", "0807", 0)], "l": [("lib/vendor/v.go", "package vendor", "0807", 0)]}),
+    # The baseline
+    ("R280", "Baseline: a finding that it holds prints as old, and passes", rules(FB), with_baseline(GETENV, ENTRY1), e("api/orders/extra", "Getenv", "w0802")),
+    ("R281", "Baseline: a rule with no baseline fails, as before", rules(FB), GETENV, e("api/orders/extra", "Getenv", "0802")),
+    ("R282", "Baseline: one more finding of a key is new", rules(FB), with_baseline(extra("orders", 'func readIt() string {\n\t_ = os.Getenv("X")\n\treturn os.Getenv("Y")\n}\n', "os"), ENTRY1), {"v": [("api/orders/extra.vulcan", 'Getenv("X")', "w0802", 0), ("api/orders/extra.vulcan", 'Getenv("Y")', "0802", 0)], "l": [("api/orders/extra.go", 'Getenv("X")', "w0802", 0), ("api/orders/extra.go", 'Getenv("Y")', "0802", 0)]}),
+    ("R283", "Baseline: an edit above a finding leaves it old", rules(FB), with_baseline(SHIFT, ENTRY1), e("api/orders/extra", "Getenv", "w0802")),
+    ("R284", "Baseline: a rename makes the finding new, and the entry stale", rules(FB), with_baseline(RENAMED, ENTRY1), both(e("api/orders/extra", "Getenv", "0802"), both_at("rules.baseline", "rules.baseline", "1\tF", "w0811"))),
+    ("R285", "Baseline: a function moved to another file of its part stays old", rules(FB), with_baseline(MOVED_FILE, ENTRY1), e("api/orders/elsewhere", "Getenv", "w0802")),
+    ("R286", "Baseline: a function in another part is new", rules(rule("F", "forbid-call", funcs="os.Getenv")), with_baseline(extra("billing", 'func readIt() string { return os.Getenv("X") }\n', "os"), ENTRY1), both(e("api/billing/extra", "Getenv", "0802"), both_at("rules.baseline", "rules.baseline", "1\tF", "w0811"))),
+    ("R287", "Baseline: a model check on the same line stays an error", rules(GATE), with_baseline(HTTPGET, (1, "O", "code", "api/orders", "dialIt", NET_T)), both(e("api/orders/extra", "Get", "w0803"), e("api/orders/extra", "Get", "0205"))),
+    ("R288", "Baseline: a stale entry is reported, and fails nothing", rules(FB), with_baseline(NO, ENTRY1), both_at("rules.baseline", "rules.baseline", "1\tF", "w0811")),
+    ("R289", "Baseline: a line that it cannot read is a fault", rules(FB), BADBASE, both_at("rules.baseline", "rules.baseline", "this", "0801")),
+    ("R290", "Baseline: a wire's finding, which each arm makes in its own form", rules(WIRED), with_baseline(NO, (1, "X", "wires", "api/billing", "", WIRED_T)), {"v": [("system.vulcan", "Billing.Ledger:", "w0807", 0)], "l": [("cmd/shop/main.go", "(keeper)", "w0807", 1)]}),
+    ("R291", "Baseline: a port's finding, which each arm declares in its own form", rules(PORTM), with_baseline(NO, (1, "X", "code", "api/billing", "", PORTM_T)), {"v": [("api/billing/component.vulcan", "Save(id", "w0807", 0)], "l": [("api/billing/ports.go", "Save(id", "w0807", 0)]}),
+    ("R292", "Baseline: a return in a function with ensures, which V lowers", rules(RET), with_baseline(RETF, (1, "X", "code", "api/orders", "commitIt", RET_T)), ef("orders", "t.Commit()", "w0810")),
+    ("R293", "Baseline: a library's finding, which each arm declares in its own form", rules(LIBNAME), with_baseline(NO, (1, "X", "decls", "lib/money", "", LIBNAME_T)), {"v": [("lib/money/library.vulcan", "money {", "w0807", 0)], "l": [("lib/money/money.go", "package money", "w0807", 0)]}),
+]
+
+
+def third_arm_cases():
+    out = []
+    L, V = "l", "v"
+    cases = [
+        ("U1", "N16, u1: third/GO.MOD", {"go.mod": NESTED_GOMOD, "third/GO.MOD": EVIL_MOD, "third/s.go": EVIL_S}, [("go.mod", "replace", "0002", 0), ("third/GO.MOD", "module", "0002", 0)], [("third/s.go", "package", "0002", 0)]),
+    ]
+    for id_, desc, files, both_w, v_w in cases:
+        out.append((L, id_, desc, {**files, "api/orders/extra.go": EVIL_USE}, both_w))
+        out.append((V, id_, desc, {**files, "api/orders/extra.vulcan": EVIL_USE}, both_w + v_w))
     return out
 
 def pos(text, snippet, offset):
@@ -962,7 +1061,7 @@ def main():
         lf.update(l_files)
         (V_DIR / f"{id_}.txtar").write_text(archive(desc, vf, wants["v"], "K", vf), encoding="utf-8", newline="\n")
         (L_DIR / f"{id_}.txtar").write_text(archive(desc, lf, wants["l"], "VL", {**L_FROM_BASE, **lf}), encoding="utf-8", newline="\n")
-    for arm, id_, desc, files, wants in arm_cases() + rerun_arm_cases():
+    for arm, id_, desc, files, wants in arm_cases() + rerun_arm_cases() + third_arm_cases():
         base = dict(V_BASE if arm == "v" else L_ALL)
         base.update(files)
         prefix = "K" if arm == "v" else "VL"

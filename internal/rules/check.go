@@ -6,12 +6,13 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/mod/modfile"
 )
 
 // The kinds of a part. "leaf" is a plain leaf: not a gateway and not an entry.
@@ -45,7 +46,16 @@ type Finding struct {
 	Code string // the digits: 0802 is K0802 in V and VL0802 in L
 	At   any    // a token.Pos, or the At of an Edge
 	Msg  string
-	Warn bool // the rule has level warn: it reports, and the check still passes
+	Warn bool // the rule has level warn, or the baseline holds it: it reports, and the check passes
+
+	Rule, Group, Part, Symbol string // the key of the finding (baseline.go)
+	Text                      string // Msg with no reason of the rule
+	Old                       bool   // the baseline holds it
+}
+
+// finding makes a finding of a rule.
+func (r *Rule) finding(code string, at any, msg, group, part, symbol string) Finding {
+	return Finding{Code: code, At: at, Msg: msg, Warn: r.Level == Warn, Rule: r.ID, Group: group, Part: part, Symbol: symbol, Text: strings.TrimSuffix(msg, ": "+r.tail())}
 }
 
 // Set is what a check reads: the rules that are on, and the lock.
@@ -53,7 +63,9 @@ type Set struct {
 	File  *File
 	Lock  map[string]bool // "wire a -> b" and "import a -> b"
 	Probs []Problem
-	on    []*Rule
+	// Baseline is the file of accepted findings, or nil.
+	Baseline *Baseline
+	on       []*Rule
 
 	reported sync.Map // the messages of ResolveTypes that an arm has: a package reads each name once
 }
@@ -67,6 +79,9 @@ func Load(root string) *Set {
 	}
 	s := &Set{}
 	s.File, s.Probs = ParseProject(b)
+	base, probs := ReadBaseline(root)
+	s.Baseline = base
+	s.Probs = append(s.Probs, probs...)
 	for _, r := range s.File.Rules {
 		if r.Level == Error || r.Level == Warn {
 			s.on = append(s.on, r)
@@ -76,7 +91,7 @@ func Load(root string) *Set {
 		if r.Kind == "depends" && len(r.Params["map"]) > 0 {
 			lock, err := ReadLock(root)
 			if err != nil {
-				s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s reads the locked map, but %s; run the command rules lock", r.ID, err)})
+				s.Probs = append(s.Probs, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s reads the locked map, but %s; run the command rules lock", r.ID, err)})
 				continue
 			}
 			s.Lock = lock
@@ -99,9 +114,9 @@ func (s *Set) Resolve(parts map[string]Part, module string) {
 					switch {
 					case !ok || IsRuntimeLib(dir):
 					case parts[dir].Dir == "":
-						s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, and %s is not a part of the project", r.ID, key, name, dir)})
+						s.Probs = append(s.Probs, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s: %s names %s, and %s is not a part of the project", r.ID, key, name, dir)})
 					case parts[dir].Kind == "main":
-						s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, in main, which no rule reads", r.ID, key, name)})
+						s.Probs = append(s.Probs, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s: %s names %s, in main, which no rule reads", r.ID, key, name)})
 					}
 				}
 			}
@@ -112,14 +127,14 @@ func (s *Set) Resolve(parts map[string]Part, module string) {
 			}
 			for _, v := range r.Params[key] {
 				if strings.Contains(v, "/") && parts[v].Dir == "" {
-					s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, which is not a part of the project", r.ID, key, v)})
+					s.Probs = append(s.Probs, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s: %s names %s, which is not a part of the project", r.ID, key, v)})
 				}
 			}
 		}
 		if r.Kind == "depends" {
 			for _, v := range r.Params["allow"] {
 				if strings.Contains(v, "/") && parts[v].Dir == "" {
-					s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: allow names %s, which is not a part of the project", r.ID, v)})
+					s.Probs = append(s.Probs, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s: allow names %s, which is not a part of the project", r.ID, v)})
 				}
 			}
 		}
@@ -127,7 +142,7 @@ func (s *Set) Resolve(parts map[string]Part, module string) {
 			if t := r.Params["type"]; len(t) == 1 {
 				dir, _, _ := strings.Cut(t[0], ".")
 				if parts[dir].Dir == "" {
-					s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: type names the directory %s, which is not a part of the project", r.ID, dir)})
+					s.Probs = append(s.Probs, Problem{Line: r.Line, Msg: fmt.Sprintf("rule %s: type names the directory %s, which is not a part of the project", r.ID, dir)})
 				}
 			}
 		}
@@ -181,10 +196,11 @@ func (s *Set) CheckUnit(u *Unit) []Finding {
 	var cur *Rule
 	add := func(code string, at token.Pos, format string, args ...any) {
 		msg := fmt.Sprintf(format, args...)
-		key := fmt.Sprint(code, at, msg)
+		// By the place in the source: V's twin of a method holds the same places as the method.
+		key := fmt.Sprint(code, u.Fset.Position(at), msg)
 		if !seen[key] {
 			seen[key] = true
-			out = append(out, Finding{code, at, msg, cur.Level == Warn})
+			out = append(out, cur.finding(code, at, msg, GroupCode, u.Part.Dir, u.symbolAt(at)))
 		}
 	}
 	for _, r := range s.on {
@@ -363,6 +379,22 @@ func edgeDenied(r *Rule, to Part) bool {
 	return selected(r.Params["deny"], to)
 }
 
+// symbolAt names the function that holds a place, with no receiver. A place outside a function has no
+// symbol: its text names it.
+func (u *Unit) symbolAt(at token.Pos) string {
+	for _, f := range u.Files {
+		if at < f.Pos() || at > f.End() {
+			continue
+		}
+		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok && at >= fd.Pos() && at <= fd.End() {
+				return fd.Name.Name
+			}
+		}
+	}
+	return ""
+}
+
 // CheckWires applies the depends rules to the wires of a project.
 func (s *Set) CheckWires(parts map[string]Part, wires []Edge) []Finding {
 	if s == nil {
@@ -379,7 +411,7 @@ func (s *Set) CheckWires(parts map[string]Part, wires []Edge) []Finding {
 		for _, e := range wires {
 			if len(r.Params["map"]) > 0 {
 				if s.Lock != nil && !s.Lock[e.key()] {
-					out = append(out, Finding{"0806", e.At, newDep(e) + ": " + r.tail(), r.Level == Warn})
+					out = append(out, r.finding("0806", e.At, newDep(e)+": "+r.tail(), GroupWires, e.From, ""))
 				}
 				continue
 			}
@@ -388,7 +420,7 @@ func (s *Set) CheckWires(parts map[string]Part, wires []Edge) []Finding {
 				continue
 			}
 			if selected(r.Params["from"], from) && !selected(r.Params["except"], from) && (len(r.Params["deny"])+len(r.Params["allow"]) > 0) && edgeDenied(r, to) {
-				out = append(out, Finding{"0804", e.At, fmt.Sprintf("a wire makes %s (%s) depend on %s (%s), which a rule forbids: %s", e.From, from.Kind, e.To, to.Kind, r.tail()), r.Level == Warn})
+				out = append(out, r.finding("0804", e.At, fmt.Sprintf("a wire makes %s (%s) depend on %s (%s), which a rule forbids: %s", e.From, from.Kind, e.To, to.Kind, r.tail()), GroupWires, e.From, ""))
 			}
 		}
 	}
@@ -401,12 +433,50 @@ func newDep(e Edge) string {
 
 func (e Edge) key() string { return e.Via + " " + e.From + " -> " + e.To }
 
-// ForeignRoots lists what brings code into a project past every check, in any directory, also one
-// that go ./... and V's walk skip: a go.mod below the root, and a root vendor/modules.txt. A file
-// that nothing imports in such a directory is no such thing: the build does not read it. skip names
-// directories, relative to the root, that the tool itself writes.
-func ForeignRoots(root string, skip ...string) []string {
-	var out []string
+// Foreign is one thing that can bring code into a project past every check.
+type Foreign struct {
+	File string // relative to the root, with slashes
+	Line int
+	Msg  string
+}
+
+// ForeignRoots reads what brings code in: each replace of the root go.mod and of a root go.work with
+// a target inside the project, whatever its directory or the case of its file names, and a root
+// go.work itself, which changes what the go command builds. This needs no list of directories.
+//
+// The walk stays for a go.mod that nothing replaces, in any directory, and for a root
+// vendor/modules.txt. A go.mod that nothing replaces brings in nothing. It stays a fault because V's
+// K0002 rejects a Go file in a plain directory, and go ./... does not list a nested module, so
+// without the walk L would pass that file. The walk leaves out .git and what vulcan writes at the root,
+// the same in both arms. A replace into one of those is still read above.
+func ForeignRoots(root string) []Foreign {
+	var out []Foreign
+	inside := func(target string) bool {
+		abs := target
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Join(root, filepath.FromSlash(target))
+		}
+		rel, err := filepath.Rel(root, abs)
+		return err == nil && rel != ".." && !strings.HasPrefix(filepath.ToSlash(rel), "../")
+	}
+	replaces := func(name string, reps []*modfile.Replace) {
+		for _, rep := range reps {
+			if rep.New.Version == "" && inside(rep.New.Path) {
+				out = append(out, Foreign{name, rep.Syntax.Start.Line, fmt.Sprintf("%s replaces %s with %s, a directory inside the project, so it brings in code that no rule reads; move the code into a part, or use a module from outside", name, rep.Old.Path, rep.New.Path)})
+			}
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(root, "go.mod")); err == nil {
+		if f, err := modfile.Parse("go.mod", b, nil); err == nil {
+			replaces("go.mod", f.Replace)
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(root, "go.work")); err == nil {
+		out = append(out, Foreign{"go.work", 1, "go.work changes what the go command builds, so the check may read other code than a build does; remove it from the project"})
+		if f, err := modfile.ParseWork("go.work", b, nil); err == nil {
+			replaces("go.work", f.Replace)
+		}
+	}
 	_ = filepath.WalkDir(root, func(full string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -417,26 +487,28 @@ func ForeignRoots(root string, skip ...string) []string {
 		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if d.Name() == ".git" || slices.Contains(skip, rel) {
+			if rel == ".git" || rel == ".vulcan/build" || rel == ".vulcan/bin" {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if (d.Name() == "go.mod" && rel != "go.mod") || rel == "vendor/modules.txt" {
-			out = append(out, rel)
+		// By any case: a file system that ignores case reads GO.MOD as go.mod. It is the same fault
+		// on one that does not, so a program has one result on each host.
+		switch {
+		case strings.EqualFold(d.Name(), "go.mod") && rel != "go.mod":
+			out = append(out, Foreign{rel, 1, fmt.Sprintf("%s makes another module inside the project, so a replace can bring in code that no rule reads; move its code into a part, or use the module from outside", rel)})
+		case strings.EqualFold(rel, "vendor/modules.txt"):
+			out = append(out, Foreign{rel, 1, fmt.Sprintf("%s means that the project builds from vendored code, which no rule reads; remove the vendor directory, and build from the module cache", rel)})
 		}
 		return nil
 	})
-	slices.Sort(out)
+	slices.SortFunc(out, func(a, b Foreign) int {
+		if c := strings.Compare(a.File, b.File); c != 0 {
+			return c
+		}
+		return a.Line - b.Line
+	})
 	return out
-}
-
-// ForeignRootMessage is the message for a path of ForeignRoots, the same in both arms.
-func ForeignRootMessage(rel string) string {
-	if path.Base(rel) == "go.mod" {
-		return fmt.Sprintf("%s makes another module inside the project, so a replace can bring in code that no rule reads; move its code into a part, or use the module from outside", rel)
-	}
-	return fmt.Sprintf("%s means that the project builds from vendored code, which no rule reads; remove the vendor directory, and build from the module cache", rel)
 }
 
 // IsForeign reports whether a file name is an assembly file or an object file.

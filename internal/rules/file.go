@@ -42,6 +42,7 @@ type Rule struct {
 
 // Problem is a rules file that the check cannot read.
 type Problem struct {
+	File string `json:",omitempty"` // the rules file when it is empty
 	Line int
 	Msg  string
 }
@@ -96,7 +97,7 @@ func Parse(b []byte) (*File, []Problem) {
 	f := &File{originLine: -1, hashLine: -1, lines: strings.Split(string(Normalize(b)), "\n")}
 	var probs []Problem
 	bad := func(line int, format string, args ...any) {
-		probs = append(probs, Problem{line + 1, fmt.Sprintf(format, args...)})
+		probs = append(probs, Problem{Line: line + 1, Msg: fmt.Sprintf(format, args...)})
 	}
 	var r *Rule
 	seen := map[string]bool{}
@@ -173,7 +174,7 @@ func Parse(b []byte) (*File, []Problem) {
 func ParseProject(b []byte) (*File, []Problem) {
 	f, probs := Parse(b)
 	if f.Origin == "" {
-		probs = append(probs, Problem{1, "the head of the rules file names its origin: origin defaults v1, or origin SOURCE and hash sha256:..."})
+		probs = append(probs, Problem{Line: 1, Msg: "the head of the rules file names its origin: origin defaults v1, or origin SOURCE and hash sha256:..."})
 	}
 	return f, probs
 }
@@ -306,6 +307,20 @@ func (f *File) Find(id string) *Rule {
 		}
 	}
 	return nil
+}
+
+// TextOf gives the text of a rule for a reader: the comment above it, which holds the wanted text in
+// defaults v1, and its reason.
+func (f *File) TextOf(id string) string {
+	r := f.Find(id)
+	if r == nil {
+		return ""
+	}
+	var words []string
+	for _, line := range f.lines[r.start : r.Line-1] {
+		words = append(words, strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "#")))
+	}
+	return strings.TrimSpace(strings.Join(append(words, r.Reason), " "))
 }
 
 // block is the text of a rule, with the comments right above it.

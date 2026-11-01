@@ -32,6 +32,7 @@ Usage:
 	vulcan rules upgrade [--rules SOURCE] [--accept HASH] [dir]
 	                                      show the difference from a newer ruleset; with --accept, apply it
 	vulcan rules lock [dir]               write the current dependencies to rules.lock
+	vulcan rules baseline [dir]           write each current rule finding to rules.baseline
 	vulcan guide                          print the primer: what Vulcan adds to Go
 
 The project root is the directory that holds system.vulcan; dir defaults to the current one.

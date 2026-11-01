@@ -613,6 +613,8 @@ func cmdValidate(args []string) error {
 	write := fs.Bool("write-labels", false, "write enforced_by_v, and enforced_by_l with arm L, into meta.json")
 	arms := fs.String("arms", "P,L,V", "the arms: P,L,V in round 2, G,V in round 1")
 	only := fs.String("only", "", "comma-separated prefixes of items to check: reference/T03, seeded/R05, base")
+	match := fs.String("match", "", "with a rules file: a judge's file, with a decision on each pair of a team rule and a rule that fired")
+	exportJudge := fs.String("export-judge", "", "with a rules file: write the pairs that a fresh judge decides, with no arm named and no set sizes")
 	fs.Parse(args)
 	metaPath := filepath.Join(*material, "meta.json")
 	meta, err := record.LoadMeta(metaPath)
@@ -631,6 +633,11 @@ func cmdValidate(args []string) error {
 	if *only != "" {
 		g.Only = strings.Split(*only, ",")
 	}
+	if *match != "" {
+		if g.Match, err = grade.ReadMatches(*match); err != nil {
+			return err
+		}
+	}
 	v, err := g.Validate(tmpl, *out, *jobs)
 	if err != nil {
 		return err
@@ -639,7 +646,15 @@ func cmdValidate(args []string) error {
 		return err
 	}
 	fmt.Print(v.Summary())
-	if *write {
+	if *exportJudge != "" {
+		if err := v.ExportJudge(meta).Save(*exportJudge); err != nil {
+			return err
+		}
+	}
+	if *write && v.NoLabels != "" {
+		fmt.Printf("wrote no labels: %s\n", v.NoLabels)
+	}
+	if *write && v.NoLabels == "" {
 		for i := range meta.Rules {
 			meta.Rules[i].EnforcedByV = v.EnforcedByV[meta.Rules[i].ID]
 			if v.EnforcedByL != nil {

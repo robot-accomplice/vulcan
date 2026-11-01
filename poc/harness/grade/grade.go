@@ -27,6 +27,8 @@ import (
 
 // Grader grades runs.
 type Grader struct {
+	// Match holds a session's decisions on a rule that fired, with a rules file (fired.go).
+	Match    Matches
 	Repo     string // the root of the vulcan repository, for the test module
 	Material string // the unsealed hidden material
 	ToolDir  string // the directory of the vulcan command

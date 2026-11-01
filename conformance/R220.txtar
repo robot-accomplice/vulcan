@@ -1,5 +1,6 @@
 N10, ne1: a nested module under testdata
 -- want.txt --
+error go.mod:7:1 K0002
 error testdata/evil/go.mod:1:1 K0002
 -- api/billing/billing.vulcan --
 package billing
