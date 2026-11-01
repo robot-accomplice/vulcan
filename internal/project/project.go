@@ -17,6 +17,7 @@ import (
 	"github.com/robot-accomplice/vulcan/internal/decl"
 	"github.com/robot-accomplice/vulcan/internal/diag"
 	"github.com/robot-accomplice/vulcan/internal/lex"
+	"github.com/robot-accomplice/vulcan/internal/rules"
 )
 
 // Release names the release in K0009 messages.
@@ -175,6 +176,9 @@ func (p *Project) scan() error {
 	})
 	if err != nil {
 		return err
+	}
+	for _, rel := range rules.ForeignRoots(p.Root, ".vulcan/build", ".vulcan/bin") {
+		p.Diags.Errorf(diag.Pos{File: rel, Line: 1, Col: 1}, "K0002", "%s", rules.ForeignRootMessage(rel))
 	}
 	var keys []string
 	for k := range dirs {

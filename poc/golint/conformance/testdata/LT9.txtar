@@ -1,6 +1,6 @@
-N1: a Go file under a directory that starts with a dot
+N14: a Go file under a directory that starts with a dot, which nothing imports, passes
 -- want.txt --
-error .x/s.go:1:1 VL0002
+accept
 -- .x/s.go --
 package sub
 

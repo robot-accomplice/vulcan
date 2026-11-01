@@ -8,12 +8,14 @@ This list is a result of plan-r3, section 4: it says what the rule kinds cannot 
 
 **Looser test (beside it):** only a limit that the wanted text names changes a status.
 
-| Status | Strict | Looser |
-|---|---:|---:|
-| Stated by the kinds | 9 | 41 |
-| Stated in part | 47 | 15 |
-| Not stated | 154 | 154 |
-| Total | 210 | 210 |
+| Status | Strict | Looser, the builder's reading | Looser, the auditor's reading |
+|---|---:|---:|---:|
+| Stated by the kinds | 8 | 41 | 34 |
+| Stated in part | 48 | 15 | 22 |
+| Not stated | 154 | 154 | 154 |
+| Total | 210 | 210 | 210 |
+
+The two readings differ on what "names" means. The builder holds that "gives the reason", "a comment defends", "a non-zero `Timeout`", and "serves through" do not name what the limit reaches. The auditor holds that they do, for `ARCH-06`, `ERR-03`, `CODE-02`, `CODE-04`, `CONC-03`, `HTTP-02`, and `HTTP-01`. Another reader can reach another number.
 
 The rest of this file reads the strict test, and each row of the list of 39 gives both. A wanted rule's text does not change under either test.
 
@@ -51,7 +53,7 @@ Stated forms that hold a finite list, or are wider than the words, for the same 
 | Reason | Wanted rules |
 |---|---:|
 | shape | 11 |
-| flow | 18 |
+| flow | 19 |
 | meaning | 13 |
 | project-facts | 1 |
 | outside-source | 1 |
@@ -176,6 +178,10 @@ Of the 39, by the strict test: 4 stated, 34 in part, 1 not stated. By the looser
 **HTTP-02.** A gateway uses an `http.Client` with a non-zero `Timeout`, and does not call `http.Get`, `http.Post`, `http.Head`, `http.PostForm`, or `http.DefaultClient`.
 
 - Reason: shape. The ban on the package-level functions and on `http.DefaultClient`, and a `Timeout` set in a literal of `http.Client`, are stated. A variable that is zero passes, and so does a client built through a type defined from `http.Client`. Looser test: stated.
+
+**HTTP-07.** An entry leaf registers routes on its own `http.ServeMux`, not on `http.DefaultServeMux`.
+
+- Reason: flow. A route on the default mux in an entry leaf is stated. A route through a library passes this rule (case R249), and `ARCH-19` and K0211 reject it there when they are on. Looser test: stated.
 
 **HTTP-09.** A gateway does not follow a redirect automatically, unless it checks the target against an allow-list.
 

@@ -1,7 +1,6 @@
 H3: code under testdata at the root of the module
 -- want.txt --
 error api/orders/extra.go:3:8 VL0002
-error testdata/sub/s.go:1:1 VL0002
 -- api/billing/billing.go --
 package billing
 

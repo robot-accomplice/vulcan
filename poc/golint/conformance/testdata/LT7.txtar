@@ -1,6 +1,6 @@
-N1: a Go file under testdata that nothing imports, which V ignores
+N14: a Go file under testdata that nothing imports passes
 -- want.txt --
-error api/orders/testdata/x.go:1:1 VL0002
+accept
 -- api/billing/billing.go --
 package billing
 

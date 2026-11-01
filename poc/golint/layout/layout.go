@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,6 +44,9 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	m := u.M
 	if u.Part == nil {
+		if slices.Contains(strings.Split(u.Dir, "/"), "vendor") {
+			return nil, nil // go lists it, and V's walk skips it: it passes unless something imports it
+		}
 		for _, d := range m.Dirs() {
 			if p := m.ByDir[d]; p.IsLeaf() && strings.HasPrefix(u.Dir, d+"/") {
 				model.Report(pass, first.Name.Pos(), "VL0002", "package %s is inside leaf %s; a leaf is one package, with no packages inside it", u.Dir, d)
@@ -87,55 +91,20 @@ func ignored(pass *analysis.Pass, u *model.Unit, first *ast.File) {
 	}
 }
 
-// unlisted rejects a Go file in a directory that no part holds and that ./... does not list: under
-// testdata, vendor, a name that starts with _ or ., or a directory with its own go.mod. No analyzer
-// reads such a file, and the build can still use it. It is what V's K0002 says of a Go file.
+// unlisted reports what brings code in past every check, the same as V's K0002: a go.mod below the
+// root, in any directory, and a root vendor/modules.txt. A file that nothing imports in a directory
+// that ./... skips stays accepted, in both arms, and imports.go rejects an import of one.
 func unlisted(pass *analysis.Pass, u *model.Unit) {
-	root := u.M.Root
-	_ = filepath.WalkDir(root, func(full string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if d.Name() == ".git" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(d.Name(), ".go") {
-			return nil
-		}
-		rel, err := filepath.Rel(root, filepath.Dir(full))
-		if err != nil {
-			return nil
-		}
-		rel = filepath.ToSlash(rel)
-		if rel == "." || !hidden(root, rel) {
-			return nil
-		}
+	for _, rel := range rules.ForeignRoots(u.M.Root, ".vulcan/build", ".vulcan/bin") {
+		full := filepath.Join(u.M.Root, filepath.FromSlash(rel))
 		b, err := os.ReadFile(full)
 		if err != nil {
-			return nil
+			continue
 		}
 		tf := pass.Fset.AddFile(full, -1, len(b)+1)
 		tf.SetLinesForContent(b)
-		model.Report(pass, tf.Pos(0), "VL0002", "%s is a Go file in a directory that no part holds, and go ./... does not list it, so no rule reads it; move it into a part of the manifest (%s)", path.Join(rel, d.Name()), model.ManifestDir)
-		return nil
-	})
-}
-
-// hidden reports a directory that ./... does not list.
-func hidden(root, rel string) bool {
-	parts := strings.Split(rel, "/")
-	for i, p := range parts {
-		if p == "testdata" || p == "vendor" || strings.HasPrefix(p, "_") || strings.HasPrefix(p, ".") {
-			return true
-		}
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(strings.Join(parts[:i+1], "/")), "go.mod")); err == nil {
-			return true
-		}
+		model.Report(pass, tf.Pos(0), "VL0002", "%s", rules.ForeignRootMessage(rel))
 	}
-	return false
 }
 
 // manifest checks the manifest itself, at its own positions.

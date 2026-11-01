@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -93,8 +94,15 @@ func (s *Set) Resolve(parts map[string]Part, module string) {
 				continue
 			}
 			for _, name := range r.Params[key] {
-				if dir, _, _, ok := projectName(name, module); ok && parts[dir].Dir == "" && !IsRuntimeLib(dir) {
-					s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, and %s is not a part of the project", r.ID, key, name, dir)})
+				for _, one := range projectNames(name, module) {
+					dir, _, _, ok := projectName(one, module)
+					switch {
+					case !ok || IsRuntimeLib(dir):
+					case parts[dir].Dir == "":
+						s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, and %s is not a part of the project", r.ID, key, name, dir)})
+					case parts[dir].Kind == "main":
+						s.Probs = append(s.Probs, Problem{r.Line, fmt.Sprintf("rule %s: %s names %s, in main, which no rule reads", r.ID, key, name)})
+					}
 				}
 			}
 		}
@@ -213,7 +221,7 @@ type addFunc func(code string, at token.Pos, format string, args ...any)
 func usedName(obj types.Object) string {
 	switch o := obj.(type) {
 	case *types.Func:
-		return o.FullName()
+		return portName(o.FullName())
 	case *types.Var:
 		if o.Pkg() != nil && o.Parent() == o.Pkg().Scope() {
 			return o.Pkg().Path() + "." + o.Name()
@@ -392,6 +400,44 @@ func newDep(e Edge) string {
 }
 
 func (e Edge) key() string { return e.Via + " " + e.From + " -> " + e.To }
+
+// ForeignRoots lists what brings code into a project past every check, in any directory, also one
+// that go ./... and V's walk skip: a go.mod below the root, and a root vendor/modules.txt. A file
+// that nothing imports in such a directory is no such thing: the build does not read it. skip names
+// directories, relative to the root, that the tool itself writes.
+func ForeignRoots(root string, skip ...string) []string {
+	var out []string
+	_ = filepath.WalkDir(root, func(full string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, err := filepath.Rel(root, full)
+		if err != nil {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if d.Name() == ".git" || slices.Contains(skip, rel) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if (d.Name() == "go.mod" && rel != "go.mod") || rel == "vendor/modules.txt" {
+			out = append(out, rel)
+		}
+		return nil
+	})
+	slices.Sort(out)
+	return out
+}
+
+// ForeignRootMessage is the message for a path of ForeignRoots, the same in both arms.
+func ForeignRootMessage(rel string) string {
+	if path.Base(rel) == "go.mod" {
+		return fmt.Sprintf("%s makes another module inside the project, so a replace can bring in code that no rule reads; move its code into a part, or use the module from outside", rel)
+	}
+	return fmt.Sprintf("%s means that the project builds from vendored code, which no rule reads; remove the vendor directory, and build from the module cache", rel)
+}
 
 // IsForeign reports whether a file name is an assembly file or an object file.
 func IsForeign(name string) bool {

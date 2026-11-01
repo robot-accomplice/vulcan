@@ -1,5 +1,6 @@
 N1, t13: a nested module in a deeper directory
 -- want.txt --
+error a/b/third/go.mod:1:1 K0002
 error a/b/third/s.go:1:1 K0002
 -- a/b/third/go.mod --
 module example.com/evil

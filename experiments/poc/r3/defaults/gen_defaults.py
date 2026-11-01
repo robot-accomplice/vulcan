@@ -184,6 +184,7 @@ MOVED.update({
     "TEST-04": ("flow", "A branch or a loop in the body of a test is stated. A branch in a helper of a test file passes (case R215)."),
     "SEC-10": ("shape", "An import of the four packages is stated. `crypto.MD5` of package `crypto` passes (case R216)."),
     "SEC-31": ("flow", "A call of `gob.NewDecoder` in an entry leaf or a gateway is stated. A decode through a library passes (case R217)."),
+    "HTTP-07": ("flow", "A route on the default mux in an entry leaf is stated. A route through a library passes this rule (case R249), and `ARCH-19` and K0211 reject it there when they are on."),
 })
 
 # The looser test: only a limit that the wanted text names changes a status. A limit of each kind
@@ -207,6 +208,10 @@ LOOSE_IN_PART = {
     "CODE-11": "It names each unused name.",
     "BLD-07": "It names each deployment-specific value.",
 }
+
+# The auditor's reading of the looser test (parity-r3.md, section "Second rerun"): these also name what
+# the limit reaches, so they stay in part. The builder's reading holds them as stated.
+AUDITOR_LOOSE_IN_PART = {"ARCH-06", "ERR-03", "CODE-02", "CODE-04", "CONC-03", "HTTP-02", "HTTP-01"}
 
 # Each other wanted rule: why no kind states it.
 REASONS = {
@@ -336,6 +341,9 @@ def main():
             row["loose_status"] = "partly" if i in LOOSE_IN_PART else "stated"
             if i in LOOSE_IN_PART:
                 row["loose_because"] = LOOSE_IN_PART[i]
+            row["auditor_loose_status"] = "partly" if i in LOOSE_IN_PART or i in AUDITOR_LOOSE_IN_PART else "stated"
+        else:
+            row["auditor_loose_status"] = row["status"]
         coverage.append(row)
     for rid, kind, level, ps, reason, source in PLAN_RULES:
         blocks.append(block(rid, kind, level, ps, reason, source))
@@ -345,16 +353,18 @@ def main():
 
     n = lambda st: sum(1 for c in coverage if c["status"] == st)
     nl = lambda st: sum(1 for c in coverage if c["loose_status"] == st)
+    na = lambda st: sum(1 for c in coverage if c["auditor_loose_status"] == st)
     md = ["# What `defaults v1` cannot state", "",
           "Draft, not frozen. `gen_defaults.py` writes this file from the wishlist and `coverage.json`. The wanted text is the wishlist's.", "",
           "This list is a result of plan-r3, section 4: it says what the rule kinds cannot state.", "",
           "**Strict test (the main count):** a rule that a limit reaches is stated in part.", "",
           "**Looser test (beside it):** only a limit that the wanted text names changes a status.", "",
-          "| Status | Strict | Looser |", "|---|---:|---:|",
-          f"| Stated by the kinds | {n('stated')} | {nl('stated')} |",
-          f"| Stated in part | {n('partly')} | {nl('partly')} |",
-          f"| Not stated | {n('not-stated')} | {nl('not-stated')} |",
-          f"| Total | {len(coverage)} | {len(coverage)} |", "",
+          "| Status | Strict | Looser, the builder's reading | Looser, the auditor's reading |", "|---|---:|---:|---:|",
+          f"| Stated by the kinds | {n('stated')} | {nl('stated')} | {na('stated')} |",
+          f"| Stated in part | {n('partly')} | {nl('partly')} | {na('partly')} |",
+          f"| Not stated | {n('not-stated')} | {nl('not-stated')} | {na('not-stated')} |",
+          f"| Total | {len(coverage)} | {len(coverage)} | {len(coverage)} |", "",
+          "The two readings differ on what \"names\" means. The builder holds that \"gives the reason\", \"a comment defends\", \"a non-zero `Timeout`\", and \"serves through\" do not name what the limit reaches. The auditor holds that they do, for `ARCH-06`, `ERR-03`, `CODE-02`, `CODE-04`, `CONC-03`, `HTTP-02`, and `HTTP-01`. Another reader can reach another number.", "",
           "The rest of this file reads the strict test, and each row of the list of 39 gives both. A wanted rule's text does not change under either test.", "",
           "Each row of `coverage.json` holds `status` by the strict test and `loose_status` by the looser one.", "",
           "`defaults v1` also holds the 4 dependency rules of plan-r3, section 3 (`DEP-LIBRARY`, `DEP-GATEWAY`, `DEP-ENTRY`, and `DEP-LOCK`, which is off). The wishlist does not ask for them.", "",

@@ -7,7 +7,8 @@
     "ARCH-01"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-02",
@@ -16,7 +17,8 @@
     "ARCH-02"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-03",
@@ -26,7 +28,8 @@
    ],
    "reason": "shape",
    "not_stated_part": "A type defined from a listed type passes: it is another type.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-04",
@@ -34,7 +37,8 @@
    "entries": [],
    "reason": "model",
    "note": "K0123 and VL0123, in strict mode.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-05",
@@ -42,7 +46,8 @@
    "entries": [],
    "reason": "declaration",
    "note": "`init` writes `strict: true` in the project that it creates. That is a template, not a rule, and a team can change it.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-06",
@@ -52,7 +57,8 @@
    ],
    "reason": "meaning",
    "not_stated_part": "Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "ARCH-07",
@@ -61,7 +67,8 @@
     "ARCH-07"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-08",
@@ -69,7 +76,8 @@
    "entries": [],
    "reason": "model",
    "note": "K0111. In L, constructor injection cannot build a cycle.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-09",
@@ -77,7 +85,8 @@
    "entries": [],
    "reason": "model",
    "note": "K0112 and VL0112.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-10",
@@ -87,7 +96,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-11",
@@ -97,7 +107,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-12",
@@ -105,42 +116,48 @@
    "entries": [],
    "reason": "model",
    "note": "K0207 and VL0207.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-13",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-14",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-15",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-16",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-17",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-18",
@@ -148,7 +165,8 @@
    "entries": [],
    "reason": "model",
    "note": "K0210 and VL0210, in strict mode.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-19",
@@ -158,14 +176,16 @@
    ],
    "reason": "shape",
    "not_stated_part": "A name that the list does not hold passes.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-20",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-21",
@@ -174,35 +194,40 @@
     "ARCH-21"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ARCH-22",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-23",
    "status": "not-stated",
    "entries": [],
    "reason": "declaration",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-24",
    "status": "not-stated",
    "entries": [],
    "reason": "declaration",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ARCH-25",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-01",
@@ -212,14 +237,16 @@
    ],
    "reason": "shape",
    "not_stated_part": "A type defined from a listed type passes: it is another type.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ERR-02",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-03",
@@ -229,7 +256,8 @@
    ],
    "reason": "meaning",
    "not_stated_part": "Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "ERR-04",
@@ -239,28 +267,32 @@
    ],
    "reason": "flow",
    "not_stated_part": "A value in a variable passes: the kind reads a constant.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ERR-05",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-06",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-07",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-08",
@@ -270,7 +302,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ERR-09",
@@ -279,28 +312,32 @@
     "ERR-09"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ERR-10",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-11",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-12",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-13",
@@ -310,21 +347,24 @@
    ],
    "reason": "flow",
    "not_stated_part": "A value in a variable passes: the kind reads a constant.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "ERR-14",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "ERR-15",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CTX-01",
@@ -334,7 +374,8 @@
    ],
    "reason": "shape",
    "not_stated_part": "A parameter of `context.Context`, or of an alias, or of an interface that embeds it, is stated. A type defined from it is another type, and is not found.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CTX-02",
@@ -344,7 +385,8 @@
    ],
    "reason": "shape",
    "not_stated_part": "A field that holds `context.Context` through an alias, a pointer, a slice, a map, a type argument, or an embedded interface is stated. A type defined from it is another type, and is not found.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CTX-03",
@@ -354,21 +396,24 @@
    ],
    "reason": "flow",
    "not_stated_part": "A value in a variable passes: the kind reads a constant.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CTX-04",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CTX-05",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CTX-06",
@@ -378,7 +423,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CTX-07",
@@ -389,7 +435,8 @@
    "reason": "meaning",
    "not_stated_part": "The unexported key type is stated. Whether a value holds only request-scoped data is for a person to judge.",
    "loose_status": "partly",
-   "loose_because": "It names request-scoped data."
+   "loose_because": "It names request-scoped data.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "CTX-08",
@@ -400,14 +447,16 @@
    "reason": "whole-program",
    "not_stated_part": "A port that a gateway provides is stated. A plain leaf that reaches a network or an acquiring function itself, and a provider that reaches one through its own ports, need what a provider reaches, which the design of `rules.Unit` does not give.",
    "loose_status": "partly",
-   "loose_because": "It names each provider that reaches a network or an acquiring function."
+   "loose_because": "It names each provider that reaches a network or an acquiring function.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "CTX-09",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-01",
@@ -418,7 +467,8 @@
    ],
    "reason": "shape",
    "not_stated_part": "The ban on the package-level functions, and each timeout set in a literal of `http.Server`, are stated. A timeout from a variable that is zero passes, and the check does not read that the entry serves through that server.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "HTTP-02",
@@ -429,51 +479,59 @@
    ],
    "reason": "shape",
    "not_stated_part": "The ban on the package-level functions and on `http.DefaultClient`, and a `Timeout` set in a literal of `http.Client`, are stated. A variable that is zero passes, and so does a client built through a type defined from `http.Client`.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "HTTP-03",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-04",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-05",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-06",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-07",
-   "status": "stated",
+   "status": "partly",
    "entries": [
     "HTTP-07"
    ],
-   "reason": null,
-   "loose_status": "stated"
+   "reason": "flow",
+   "not_stated_part": "A route on the default mux in an entry leaf is stated. A route through a library passes this rule (case R249), and `ARCH-19` and K0211 reject it there when they are on.",
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "HTTP-08",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-09",
@@ -484,14 +542,16 @@
    "reason": "meaning",
    "not_stated_part": "That a client sets `CheckRedirect` is stated. Whether that function checks the target against an allow-list is for a person to judge.",
    "loose_status": "partly",
-   "loose_because": "It names the check against an allow-list."
+   "loose_because": "It names the check against an allow-list.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "HTTP-10",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-11",
@@ -501,14 +561,16 @@
    ],
    "reason": "flow",
    "not_stated_part": "A value in a variable passes: the kind reads a constant.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "HTTP-12",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-13",
@@ -519,28 +581,32 @@
    "reason": "shape",
    "not_stated_part": "A route of `http.ServeMux` is stated. A handler with no mux has no route to read.",
    "loose_status": "partly",
-   "loose_because": "It names each entry route."
+   "loose_because": "It names each entry route.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "HTTP-14",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-15",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-16",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-17",
@@ -551,35 +617,40 @@
    "reason": "shape",
    "not_stated_part": "A literal of `http.Cookie` is stated. A cookie that a handler writes as a header is not read.",
    "loose_status": "partly",
-   "loose_because": "It names each session cookie."
+   "loose_because": "It names each session cookie.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "HTTP-18",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-19",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-20",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "HTTP-21",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-01",
@@ -590,7 +661,8 @@
    "reason": "meaning",
    "not_stated_part": "A string in the code that has the form of a key, or that a name marks as a secret, is stated. Declaration files and fixtures are not read, and only a person can say that a value is real.",
    "loose_status": "partly",
-   "loose_because": "It names declaration files and test fixtures."
+   "loose_because": "It names declaration files and test fixtures.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "SEC-02",
@@ -601,35 +673,40 @@
    "reason": "meaning",
    "not_stated_part": "A settings field whose name shows a credential is stated. A credential under another name is not found, as the wishlist's note says.",
    "loose_status": "partly",
-   "loose_because": "It names each field that holds a credential."
+   "loose_because": "It names each field that holds a credential.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "SEC-03",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-04",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-05",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-06",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-07",
@@ -639,21 +716,24 @@
    ],
    "reason": "meaning",
    "not_stated_part": "A constant statement is stated. A comment removes the finding, and the wishlist's decision asks for a fixed allow-list in the same function. Whether a comment describes one is for a person to judge.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "SEC-08",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-09",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-10",
@@ -663,140 +743,160 @@
    ],
    "reason": "shape",
    "not_stated_part": "An import of the four packages is stated. `crypto.MD5` of package `crypto` passes (case R216).",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "SEC-11",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-12",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-13",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-14",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-15",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-16",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-17",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-18",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-19",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-20",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-21",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-22",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-23",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-24",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-25",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-26",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-27",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-28",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-29",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-30",
@@ -807,7 +907,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "SEC-31",
@@ -817,42 +918,48 @@
    ],
    "reason": "flow",
    "not_stated_part": "A call of `gob.NewDecoder` in an entry leaf or a gateway is stated. A decode through a library passes (case R217).",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "SEC-32",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-33",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "SEC-34",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-01",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-02",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-03",
@@ -862,77 +969,88 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "DATA-04",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-05",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-06",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-07",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-08",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-09",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-10",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-11",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-12",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-13",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "DATA-14",
@@ -943,7 +1061,8 @@
    "reason": "meaning",
    "not_stated_part": "A value whose name shows a time or a period is stated. A value under another name is not found, as the wishlist's note says.",
    "loose_status": "partly",
-   "loose_because": "It names instants and periods, under any name."
+   "loose_because": "It names instants and periods, under any name.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "DATA-15",
@@ -952,7 +1071,8 @@
     "DATA-15"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "PAY-01",
@@ -963,105 +1083,120 @@
    "reason": "project-facts",
    "not_stated_part": "A float whose name shows money is stated. The name of the project's money type would give a stronger check, as the wishlist's note says.",
    "loose_status": "partly",
-   "loose_because": "It names each money amount, under any name."
+   "loose_because": "It names each money amount, under any name.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "PAY-02",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-03",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-04",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-05",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-06",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-07",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-08",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-09",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-10",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-11",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-12",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-13",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-14",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-15",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-16",
@@ -1069,14 +1204,16 @@
    "entries": [],
    "reason": "project-facts",
    "note": "The kind `transitions` states this once a team names its status field and its table. A default cannot name them.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-17",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-18",
@@ -1084,84 +1221,96 @@
    "entries": [],
    "reason": "project-facts",
    "note": "Which containers hold money is a project fact, and the config key is a declaration.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-19",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-20",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "PAY-21",
    "status": "not-stated",
    "entries": [],
    "reason": "project-facts",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "MSG-01",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "MSG-02",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "MSG-03",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "MSG-04",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "MSG-05",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "MSG-06",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "MSG-07",
    "status": "not-stated",
    "entries": [],
    "reason": "deferred",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "RES-01",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "RES-02",
@@ -1172,56 +1321,64 @@
    "reason": "flow",
    "not_stated_part": "A loop that calls `time.Sleep` is stated: it needs a condition, a growing wait, and a random value in its function. A retry in another form is not found, as the wishlist's note says, and that the wait grows or is random is read from the form only.",
    "loose_status": "partly",
-   "loose_because": "It names a limit, backoff, and jitter of each retry loop."
+   "loose_because": "It names a limit, backoff, and jitter of each retry loop.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "RES-03",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "RES-04",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "RES-05",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "RES-06",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "RES-07",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CONC-01",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CONC-02",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CONC-03",
@@ -1231,35 +1388,40 @@
    ],
    "reason": "meaning",
    "not_stated_part": "Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "CONC-04",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CONC-05",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CONC-06",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CONC-07",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "OBS-01",
@@ -1269,7 +1431,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "OBS-02",
@@ -1279,63 +1442,72 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "OBS-03",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "OBS-04",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "OBS-05",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "OBS-06",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "OBS-07",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "API-01",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "API-02",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "API-03",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "API-04",
@@ -1346,28 +1518,32 @@
    "reason": "outside-source",
    "not_stated_part": "The ban on the debug and profiling packages is stated, in every build. An owner and an end date for each old API version are not in the source.",
    "loose_status": "partly",
-   "loose_because": "It names an owner and an end date for each old API version."
+   "loose_because": "It names an owner and an end date for each old API version.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "API-05",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "API-06",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "API-07",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CON-01",
@@ -1378,7 +1554,8 @@
    "reason": "meaning",
    "not_stated_part": "That a clause exists is stated, on each port method that takes arguments and whose name does not show a read. Whether a method changes state, and whether a clause is enough, are for a person to judge.",
    "loose_status": "partly",
-   "loose_because": "It names a method that changes state."
+   "loose_because": "It names a method that changes state.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "CON-02",
@@ -1386,7 +1563,8 @@
    "entries": [],
    "reason": "meaning",
    "note": "Moved from shape. Which rule must stop an effect is what the code means. A kind can read a clause, not its purpose.",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CON-03",
@@ -1396,21 +1574,24 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CON-04",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CODE-01",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CODE-02",
@@ -1420,7 +1601,8 @@
    ],
    "reason": "shape",
    "not_stated_part": "A name that the list does not hold passes.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "CODE-03",
@@ -1429,7 +1611,8 @@
     "CODE-03"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CODE-04",
@@ -1439,7 +1622,8 @@
    ],
    "reason": "meaning",
    "not_stated_part": "Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "CODE-05",
@@ -1450,7 +1634,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "The listed functions and methods are stated. A call through a local interface or a generic constraint with the same method is not found: which value it holds is flow, and no kind follows flow.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CODE-06",
@@ -1459,14 +1644,16 @@
     "CODE-06"
    ],
    "reason": null,
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CODE-07",
    "status": "not-stated",
    "entries": [],
    "reason": "flow",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CODE-08",
@@ -1476,7 +1663,8 @@
    ],
    "reason": "meaning",
    "not_stated_part": "Any comment removes the finding, also an empty `//`. Whether it gives a reason is for a person to judge.",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "CODE-09",
@@ -1487,14 +1675,16 @@
    "reason": "whole-program",
    "not_stated_part": "Near-duplicates in one package are stated. A duplicate in another package needs a view of the whole module, which the design of `rules.Unit` does not give.",
    "loose_status": "partly",
-   "loose_because": "It names a function in a leaf or in a library, so another package too."
+   "loose_because": "It names a function in a leaf or in a library, so another package too.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "CODE-10",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "CODE-11",
@@ -1506,28 +1696,32 @@
    "reason": "whole-program",
    "not_stated_part": "A use of a deprecated function, and an unexported name at package level that nothing uses, are stated. An unused exported name needs a view of the whole module, which the design of `rules.Unit` does not give, and an unused method or field is not read.",
    "loose_status": "partly",
-   "loose_because": "It names each unused name."
+   "loose_because": "It names each unused name.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "TEST-01",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-02",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-03",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-04",
@@ -1537,7 +1731,8 @@
    ],
    "reason": "flow",
    "not_stated_part": "A branch or a loop in the body of a test is stated. A branch in a helper of a test file passes (case R215).",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "TEST-05",
@@ -1547,91 +1742,104 @@
    ],
    "reason": "flow",
    "not_stated_part": "A call of `time.Sleep` in a test file is stated. A test that reaches it through a helper in a code file passes (case R214).",
-   "loose_status": "stated"
+   "loose_status": "stated",
+   "auditor_loose_status": "stated"
   },
   {
    "id": "TEST-06",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-07",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-08",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-09",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-10",
    "status": "not-stated",
    "entries": [],
    "reason": "meaning",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "TEST-11",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-01",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-02",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-03",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-04",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-05",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-06",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-07",
@@ -1642,21 +1850,24 @@
    "reason": "meaning",
    "not_stated_part": "An address or a host name in a string of a leaf is stated. Whether any other value is specific to a deployment is for a person to judge.",
    "loose_status": "partly",
-   "loose_because": "It names each deployment-specific value."
+   "loose_because": "It names each deployment-specific value.",
+   "auditor_loose_status": "partly"
   },
   {
    "id": "BLD-08",
    "status": "not-stated",
    "entries": [],
    "reason": "outside-source",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   },
   {
    "id": "BLD-09",
    "status": "not-stated",
    "entries": [],
    "reason": "run-time",
-   "loose_status": "not-stated"
+   "loose_status": "not-stated",
+   "auditor_loose_status": "not-stated"
   }
  ]
 }

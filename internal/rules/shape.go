@@ -179,6 +179,15 @@ func (r *Rule) checkDeclaration(bad func(string, ...any)) {
 // nameKeys are the parameters that hold names of Go functions, values, and types.
 var nameKeys = []string{"funcs", "deferred-ok", "deny-types", "types", "param-type", "type"}
 
+// projectNames gives the names of the project in a word of a rule: a container such as
+// map[string]shop/lib/money.Order holds one or more.
+func projectNames(word, module string) []string {
+	if strings.HasPrefix(word, "(") || !(strings.Contains(word, "map[") || strings.Contains(word, "chan ")) {
+		return []string{word}
+	}
+	return regexp.MustCompile(regexp.QuoteMeta(module)+`/[\w/.-]+`).FindAllString(word, -1)
+}
+
 // projectName splits a name of the project, such as (*shop/lib/money.Order).Total, into its
 // directory, its name in the package, and a member. ok is false for a name outside the project.
 func projectName(name, module string) (dir, base, member string, ok bool) {
@@ -217,23 +226,36 @@ func (s *Set) resolveNames(r *Rule, u *Unit) []Problem {
 		if key == "type" && r.Kind != "literal" {
 			continue
 		}
-		for _, name := range r.Params[key] {
-			dir, base, member, ok := projectName(name, u.Module)
-			if !ok || dir != u.Part.Dir || (strings.HasSuffix(name, "*") && member == "" && !strings.HasPrefix(name, "(")) {
-				continue
-			}
-			obj := u.Pkg.Scope().Lookup(base)
-			if obj == nil {
-				if !u.TestsAbsent {
-					once(fmt.Sprintf("rule %s: %s names %s, which package %s does not declare", r.ID, key, name, dir))
+		for _, word := range r.Params[key] {
+			for _, name := range projectNames(word, u.Module) {
+				dir, base, member, ok := projectName(name, u.Module)
+				if !ok || dir != u.Part.Dir || IsRuntimeLib(dir) {
+					continue
 				}
-				continue
-			}
-			if member == "" || strings.HasSuffix(member, "*") {
-				continue
-			}
-			if o, _, _ := types.LookupFieldOrMethod(types.NewPointer(obj.Type()), false, u.Pkg, member); o == nil {
-				once(fmt.Sprintf("rule %s: %s names %s, and type %s has no %s", r.ID, key, name, base, member))
+				if strings.HasSuffix(name, "*") && member == "" && !strings.HasPrefix(name, "(") {
+					found := slices.ContainsFunc(u.Pkg.Scope().Names(), func(n string) bool { return strings.HasPrefix(n, base) })
+					if !found && !u.TestsAbsent {
+						once(fmt.Sprintf("rule %s: %s names %s, and package %s declares no name with that prefix", r.ID, key, name, dir))
+					}
+					continue
+				}
+				obj := u.Pkg.Scope().Lookup(base)
+				if obj == nil {
+					if !u.TestsAbsent {
+						once(fmt.Sprintf("rule %s: %s names %s, which package %s does not declare", r.ID, key, name, dir))
+					}
+					continue
+				}
+				if member == "" || strings.HasSuffix(member, "*") {
+					continue
+				}
+				t := obj.Type()
+				if !types.IsInterface(t) {
+					t = types.NewPointer(t) // a method set of T and *T; a pointer to an interface has none
+				}
+				if o, _, _ := types.LookupFieldOrMethod(t, false, u.Pkg, member); o == nil {
+					once(fmt.Sprintf("rule %s: %s names %s, and type %s has no %s", r.ID, key, name, base, member))
+				}
 			}
 		}
 	}
@@ -483,7 +505,7 @@ func carried(t types.Type, deny []string, seen map[types.Type]bool) string {
 	}
 	seen[t] = true
 	t = types.Unalias(t)
-	if s := types.TypeString(t, nil); slices.Contains(deny, s) {
+	if s := typeString(t); slices.Contains(deny, s) {
 		return s
 	}
 	switch x := t.Underlying().(type) {
@@ -755,6 +777,12 @@ func (u *Unit) declared(r *Rule, at string, add addFunc) {
 	}
 }
 
+// portName writes V's generated type of a port as its name, vulcan_Ledger as Ledger, so that a rule
+// names a port the same in both arms.
+func portName(s string) string { return strings.ReplaceAll(s, ".vulcan_", ".") }
+
+func typeString(t types.Type) string { return portName(types.TypeString(t, nil)) }
+
 // typeIs names a listed type that t is itself: through an alias or an embedded interface, and not
 // through a container. A parameter of []context.Context is no context.
 func typeIs(t types.Type, list []string) string {
@@ -762,7 +790,7 @@ func typeIs(t types.Type, list []string) string {
 		return ""
 	}
 	t = types.Unalias(t)
-	if s := types.TypeString(t, nil); slices.Contains(list, s) {
+	if s := typeString(t); slices.Contains(list, s) {
 		return s
 	}
 	var iface *types.Interface
@@ -791,7 +819,7 @@ func typeIn(t types.Type, list []string, seen map[types.Type]bool) string {
 	}
 	seen[t] = true
 	t = types.Unalias(t)
-	if s := types.TypeString(t, nil); slices.Contains(list, s) {
+	if s := typeString(t); slices.Contains(list, s) {
 		return s
 	}
 	switch x := t.(type) {
@@ -986,7 +1014,7 @@ func (u *Unit) callForm(r *Rule, add addFunc) {
 				return true
 			}
 			fn := calledFunc(u.Info, c)
-			if fn == nil || !matches(funcs, fn.FullName()) {
+			if fn == nil || !matches(funcs, portName(fn.FullName())) {
 				return true
 			}
 			i := argIndex(r, sig)
@@ -2019,6 +2047,10 @@ func (u *Unit) retries(f *ast.File, report reportFunc) {
 // counts as the literal, and V's lowered return counts as a return.
 func (u *Unit) tokens(fd *ast.FuncDecl) []string {
 	var out []string
+	recv := ""
+	if fd.Recv != nil && len(fd.Recv.List) == 1 && len(fd.Recv.List[0].Names) == 1 {
+		recv = fd.Recv.List[0].Names[0].Name
+	}
 	var walk func(ast.Node)
 	walk = func(root ast.Node) {
 		ast.Inspect(root, func(n ast.Node) bool {
@@ -2029,6 +2061,8 @@ func (u *Unit) tokens(fd *ast.FuncDecl) []string {
 				return false
 			}
 			switch x := n.(type) {
+			case *ast.EmptyStmt:
+				return false // a person writes none; V's lowering leaves one at the end of a function
 			case *ast.BlockStmt:
 				if values, ok := u.loweredReturn(x); ok {
 					out = append(out, "*ast.ReturnStmt")
@@ -2046,6 +2080,15 @@ func (u *Unit) tokens(fd *ast.FuncDecl) []string {
 					return false
 				}
 			case *ast.SelectorExpr:
+				// A method on the function's own receiver counts as a name, so that p.save(x) and
+				// save(x) are the same size: a helper that uses a port is a method in L, and can be
+				// a plain function in V.
+				if id, ok := x.X.(*ast.Ident); ok && id.Name == recv {
+					if sel := u.Info.Selections[x]; sel != nil && sel.Kind() == types.MethodVal {
+						out = append(out, "*ast.Ident")
+						return false
+					}
+				}
 				// A chain of names counts as a selector of one name, so that L's p.ledger.Save and
 				// V's Ledger.Save count the same.
 				if isNameChain(x) {

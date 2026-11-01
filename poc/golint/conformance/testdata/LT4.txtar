@@ -1,6 +1,6 @@
 N1, t10: a vendored package
 -- want.txt --
-error vendor/example.com/evil/s.go:1:1 VL0002
+error vendor/modules.txt:1:1 VL0002
 -- api/billing/billing.go --
 package billing
 

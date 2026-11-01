@@ -57,4 +57,12 @@ V gives 284 findings and L gives 285. `TestDefaultsOnBase` checks that the arms 
 | OBS-01 | api/events | 1 | 1 |
 | OBS-01 | api/web | 2 | 2 |
 
+## How to read the row of `CODE-09`
+
+The form of this count was selected by its result on these applications. The builder first built a form that gave 5 pairs here, saw the fall from 10, and changed to a form that gave 10, because the coordinating session's brief said not to reduce findings on a base application unless a fix required it. So on these applications this rule counts as tuned: its count here is not a measure on code that was not used to shape it. The fixes after that one changed the form for other reasons (`rules-file.md`, call 22), and the count stayed at 10.
+
+The tuning does not reach the blind tests: no text or result of T1 or T2 went into it. On QN of other code, the form stays, and it is a selected form.
+
+**How the limit 60 and the similarity 90 were first chosen.** The builder wrote them at the first build of the kind, before any run of this rule on an application, and after reading the code of these applications. No record gives a reason for them. The similarity 90 is the default of `duplicate_similarity` in the spec (section 9). The spec's `duplicate_min_tokens` is 50 tokens. The 60 is not that value and counts other units, the nodes of the syntax tree. Neither number was changed after a run. The builder cannot say more than this.
+
 `CTX-08` reports at the wires: `system.vulcan` in V, and the main package in L. No rule at level `warn` fires. No other rule of the draft fires on these applications. A rule that a model check already enforces could not fire here, because both applications pass their model checks. The rules that read test files, such as `TEST-04`, have nothing to read, because `poc/app` holds no test files of its own.

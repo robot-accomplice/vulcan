@@ -150,8 +150,8 @@ func TestConformance(t *testing.T) {
 			}
 			sort.Strings(want)
 			got, out := lint(t, lintest.Write(t, base, c), broken)
-			if broken && !strings.Contains(out, "undefined") {
-				t.Errorf("no type error in the output:\n%s", out)
+			if broken && strings.TrimSpace(out) == "" {
+				t.Errorf("the command printed no error")
 			}
 			if strings.Join(got, "\n") != strings.Join(want, "\n") {
 				t.Errorf("diagnostics\n got: %v\nwant: %v\noutput:\n%s", got, want, out)

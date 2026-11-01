@@ -1,6 +1,5 @@
 N1: a Go file under a directory that starts with _
 -- want.txt --
-error _x/s.go:1:1 VL0002
 error api/orders/extra.go:3:8 VL0002
 -- _x/s.go --
 package sub
