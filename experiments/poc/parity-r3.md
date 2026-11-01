@@ -802,3 +802,151 @@ Smallest fix: a sentence in `QN-base-apps.md` beside the row, and the words "the
 - A Linux host, a host with a C compiler, and a real `https` source, as before.
 - How the limit 60 and the similarity 90 were first chosen. The record does not say.
 - Each form of a lowered statement. I tried 26 forms and each function of the base applications.
+
+## Third rerun
+
+Reviewed at commit 02f2464 (branch main), with the fixes a5177bb and the upgrade 02f2464. The same reviewer ran this. The sections above stay as they were at 17ccad3. This rerun is narrow, as the owner asked: the changes, each existing case script for a regression, and the separate question on `harness validate`.
+
+### Result
+
+**Step 3's gate (no open High finding) does not pass.** N10, N11, and N14 are fixed. Two High findings are open, and both are new here. N16 is a parity finding: the same escape, by a directory that the new rule skips, in L only. N17 is the separate question: it is not a parity difference in the rule kinds, it is in the harness, and it would invalidate the labels of T1. By the wording of the gate it is an open High. Whether it blocks step 3 or the start of step 5 is the owner's call. N16 alone keeps the gate closed.
+
+| Severity | Open now | Which |
+|---|---:|---|
+| High | 2 | N16, N17 |
+| Medium | 1 | N18 |
+| Low | 4 | N19, N20, N21, N22 |
+
+### How I ran it
+
+- A fresh build of 02f2464. I reran `b1` to `b5`, `b7`, `c1`, `c2`, `a1` to `a3`, and `a5` to `a9` with no change to their text, and compared them with the saved output of the second rerun. Of 613 rows, 43 changed. Each change is one of the fixes below, and none is a regression.
+- I wrote 47 new cases in `a10` and `a11`, and I ran `harness validate` on the demo material.
+- **WSL gives a Linux host**, with Go 1.27.3 and a C compiler. Earlier sections list that as not checked. I ran 35 cases there, the ones that can differ by host.
+- `go test ./internal/rules ./poc/harness/... ./poc/golint/... ./conformance` passes, with `-parallel 2` for `conformance`.
+
+### Results for each finding
+
+| Finding | Result | Run |
+|---|---|---|
+| N10 | Fixed for each directory but two | `ne1` to `ne5`: K0002 and VL0002. `ne6`: V K0002, L a build error. On Linux the same. The rest is N16 and N18 |
+| N14 | Fixed | `fx1` to `fx8`, `fx12`, `fx15`: exit 0 in both. `fx10`: both reject the `go.mod`. `fx16`, `fx17`: both reject |
+| N1 | Holds | `t9`, `t13`, `t14`: K0002, VL0002. `t10`: V K0002 and K0209, L VL0002. On Linux the same |
+| N11 | Fixed for the receiver | `m3d10` to `m3d15`, `m3h3` to `m3h9`, `m3s*`, `m3c*`: the same in both. The rest is N21 |
+| N12 | Fixed | `m2`, `m4`, `m7`: K0801 and VL0801. `m9`, `m14`: exit 0 in both. `m11`, `r5`: a port by name fires in both, in the same files. `r6`, `r7`: a typing error in it is a fault in both. `r9`: `return-effect` reads a port by name in both. `m12`, `r1`: at a field, L only, as `rules-file.md` says. The rest is N20 |
+| N13 | Fixed | The recount below |
+| N15 | Fixed | `f_void`, `Shrink`: the same tokens. The probe: 26 of 26 forms are the same |
+| N9 | Fixed | Call 22 names the coordinating session. `QN-base-apps.md` has the note. "In each arm" is now true: see below. The spec's numbers that the note gives are right: `duplicate_similarity` 90 and `duplicate_min_tokens` 50 (`docs/spec.md:1959-1960`). I cannot check what the note says of the builder's order of work |
+
+### The rule of `go.mod`, attacked
+
+`rules.ForeignRoots` is a walk by name, and a `replace` is what brings the code in. So I attacked the walk.
+
+| Attack | Windows, V | Windows, L | Linux |
+|---|---|---|---|
+| `go.mod` in `third`, `testdata`, `_x`, `.x`, `vendor` | K0002 | VL0002, or a build error for `vendor` | The same |
+| **`.vulcan/build/evil`** (`d2`) | K0008, because each check empties it | **Exit 0, and `go build` passes** | The same |
+| **`.vulcan/bin/evil`** (`d1`) | **Exit 0, and `vulcan build` passes** | **Exit 0, and `go build` passes** | The same |
+| **`x/.git/evil`** (`d4`) | **Exit 0, and `vulcan build` passes** | **Exit 0, and `go build` passes** | The same |
+| **`.git/evil` in a real repository** (`gi`) | **Exit 0** | **Exit 0, and `go build` passes** | Not run |
+| `.vulcan/evil` (`d5`) | K0002 | VL0002 | Not run |
+| **`third/GO.MOD`** (`u1`) | K0002, for the `.go` file | **Exit 0, and `go build` passes** | Both reject |
+| **`testdata/evil/GO.MOD`, `_x/evil/Go.Mod`** (`u2`, `u3`) | **Exit 0, and it builds** | **Exit 0, and it builds** | Both reject |
+| **`vendor/MODULES.TXT`** (`u4`) | K0209 | **Exit 0, and `go build` passes** | Both reject |
+| `VENDOR/modules.txt` (`u5`) | K0002, K0209 | VL0002 | Both reject |
+| `vendor` with no `modules.txt` (`u6`, `u7`), `vendor` in a leaf (`u8`) | K0209 | A go command error | Not run |
+| A replace to a directory with no `go.mod` | K0002, K0008 | A go command error | Not run |
+| A replace to a path outside the project (`t12`) | Exit 0 | Exit 0 | Listed in the Limits table |
+| A junction in the project to a module outside | Exit 0 | Exit 0 | N19 |
+| `go.work` with `use` or `replace` of a module outside, `GOWORK` not set | K0209 | **Exit 0** | N19 |
+| The same, `GOWORK=off`, as `harness` sets it (`grade.go:150`) | K0209 | A go command error | Not run |
+
+**`vendor` in a path.** The builder's `layout` leaves a package alone when `vendor` is in its path. That leaves no escape that I can find. An import of `lib/vendor/sub`, `api/orders/vendor/sub`, or of `sub` resolved in a leaf's `vendor` fails in both (`p1` to `p4`: K0008 in V, a go command error in L). An unimported package passes in both, also a `main` and a package with a type error (`p6`, `p7`), and it is not built. A part named `vendor` is not left alone: L reads it (`p5`). V skips that name, so it gives K0008. That is N22.
+
+### New findings
+
+#### N16. High. In L alone, a nested module under `.vulcan/build` passes every check, and on a case-insensitive host so does `GO.MOD`
+
+- **Where:** `internal/rules/check.go`, `ForeignRoots`, called from `poc/golint/layout/layout.go`, `unlisted`, with `.vulcan/build` and `.vulcan/bin` to skip. L has no use for those directories. The name is compared with `d.Name() == "go.mod"` and `rel == "vendor/modules.txt"`, exactly.
+- **Case `d2`, rules `ERR-08` and `ARCH-10`:** `go.mod` holds `require example.com/evil v0.0.0` and `replace example.com/evil => ./.vulcan/build/evil`. `.vulcan/build/evil/go.mod` is `module example.com/evil`, and `s.go` there calls `os.Exit(1)` and `net.Dial`. A leaf calls `evil.X()`. **L exit 0, and `go build ./cmd/shop` passes. V exit 1, K0008.**
+- **Case `u1`, on Windows:** `third/GO.MOD` in place of `go.mod`. **L exit 0, and `go build` passes. V K0002.** `u4`: `vendor/MODULES.TXT`, L exit 0, V K0209. On Linux the go command does not read these names, and both reject. The harness can run on either: `.harness` holds `harness.exe` and Linux tools.
+- **Why High:** it is the escape of H3, N1, and N10: code inside the project that leaves the model and each rule, with exit 0, in one arm. I gave those High, so I give this High. A form this unusual is unlikely in a run. That was true of N1 and N10 too.
+- **Favors:** L passes more. A rule can land in U because of it.
+- **Smallest fix:** read the `replace` lines of the root `go.mod`, and of a root `go.work`, and reject a relative target inside the root, in both arms. That closes each row above that the walk misses, by what actually brings the code in, and it needs no list of directories. Keep the walk for a `go.mod` that nothing replaces, if that is wanted. Compare the name of `modules.txt` with `strings.EqualFold`.
+
+#### N17. High. With `defaults v1` on the base applications, each seeded case counts as rejected, and each base and reference fails
+
+This is the separate question. It is not a difference in the rule kinds, and it is in both arms.
+
+- **Where:** `poc/harness/grade/validate.go:198`, `it.Rejected = err != nil`, reads only the exit code of the check. `:215` and `:220` require `!it.Rejected` of a base and a reference. `:145`, `enforced = enforced && it.Rejected`, makes the label. `:235`, `caught = true` when the check rejects a seeded case of a test rule. `cmdValidate` writes the labels with `-write-labels` before it returns its error for the problems (`poc/harness/cmd/harness/main.go`).
+- **What the code does:** plan-r3 adds the rules file beside the applications, and section 6 says that `harness validate` runs on the templates that `init` makes. The base applications give 284 and 285 findings. So each workspace exits non-zero before any seeded change is read.
+- **Run:** scratch copies of the repository, the demo material, and two harmless seeded shapes of the behavior rule `RT`. Each adds one documented function that breaks nothing.
+
+  | | No rules file | `defaults v1` from `init` |
+  |---|---|---|
+  | Base, L and V | Pass | **Fail** |
+  | Reference, L and V | Pass | **Fail** |
+  | `RT`, harmless shapes, L and V | Not rejected, and the item fails | **Rejected, and the item passes** |
+  | `enforced by L`, `enforced by V` | `RD` | **`RD`, `RT`** |
+  | `set S`, `set N` | `RD`; `RT` | **`RD`, `RT`; none** |
+
+  The command does report the base and the reference as problems, and it exits 1. So a reader who reads the summary sees that something is wrong. The set line and the labels are wrong all the same.
+- **The arms differ too.** With defaults on, the base in L has `builds true` and its holdout passes. In V it has `builds false`, and the holdout does not run, because `vulcan build` runs the check. So the reference has acceptance `{Passed:0 Failed:1}` in V and `{Passed:2 Failed:0}` in L. An agent's run in step 8 has the same difference.
+- **Why High:** it makes the main measure of T1 meaningless. Each rule with a seeded shape lands in S, and N is empty. So the gate of section 5, at least 8 in S and 4 in N, would read 8 for a reason that has nothing to do with the rules, and would fail on N for the same reason. The failure of the base would show this, but no text in the plan says what to do instead.
+- **Favors:** neither arm in S. V has the worse grading.
+- **Smallest fix.** The design is the owner's. Each of these answers it, at another cost:
+  - Compare with the base: a workspace is rejected only by a diagnostic that the base of its arm does not have. This keeps the plan's "rules file beside the applications". It needs a stable key for a diagnostic, without a line number. It does not stop a seeded case that breaks an unrelated default by the way, such as an exported name with no comment (CODE-08). So a label should also name the rule that fired.
+  - Turn off, in the template, each default that fires on the base, by a decision that is written down, as plan-r3, section 4 allows. Then the exit code means what it did. This changes what T1 can enforce.
+  - Label with the rules file that the rule under test needs, and no other. Then a seeded case is read against that rule alone.
+
+  V's build needs an answer in each: `Grade` must get a binary from a project with findings, or each base finding must be off.
+
+#### N18. Medium. In both arms, a nested module under `.git` or `.vulcan/bin` passes every check
+
+- **Where:** `ForeignRoots` skips each directory named `.git`, at any depth, and `.vulcan/bin`. So `rules-file.md:88`, "It fails in each directory", does not hold.
+- **Cases:** `gi` (`.git/evil` in a real repository), `d4` (`x/.git/evil`), `d1` (`.vulcan/bin/evil`): exit 0 in both, and each arm builds. `u2`, `u3` on Windows: `GO.MOD` under `testdata` or `_x`, the same.
+- **Severity:** a hole in both arms, so Medium, as M11 and M12 were. It is no difference between the arms, and it can change no set but N.
+- **Smallest fix:** the fix of N16 closes it.
+
+#### Low
+
+| # | Finding | Case | Where | Favors | Smallest fix |
+|---|---|---|---|---|---|
+| N19 | The Limits row names "a `replace` to a path outside". A junction in the project to a module outside passes in both. A `go.work` in the project with a module outside passes in L when `GOWORK` is not set, and V gives K0209, because V sets it off. `harness` sets it off, so a run does not reach this | Junction, `go.work` runs | `docs/poc/rules-file.md:118`, `internal/check/load.go:38` | L, outside the harness | Say so in the row. Have L report a root `go.work` |
+| N20 | `rules-file.md` says that a port rule "`at field` ... can fire in L only". `at param` does too, on L's constructor (`r2`) | `r2`: V exit 0, L VL0807 | `docs/poc/rules-file.md:33` | V | Add `at param` |
+| N21 | The fix of N11 reads the receiver by name. A local copy of it is a selector, so `q := p; q.save(x)` still counts more in L: L fires at 10, V at 16. A plain function in L that takes the value is the same | `m3q10` to `m3q14` | `shape.go`, `tokens` | V, near the limit | List it |
+| N22 | V skips a directory by its name at any depth, so a part named `vendor`, as `lib/vendor`, cannot exist in V: K0008. L reads it | `p5` | `internal/project/project.go:153` | L | Skip by name at the root only, or say so |
+
+### N11: the similarity counts
+
+The builder's claim holds. Each row has the same pairs in both arms.
+
+| Similarity (limit 60) | V | L |
+|---:|---:|---:|
+| 80 | 13 | 13 |
+| 85 | 12 | 12 |
+| 90 | 10 | 10 |
+| 95 | 6 | 6 |
+| 100 | 4 | 4 |
+
+At similarity 90, the limits 30, 40, 50, 60, 70, 80, and 100 give 34, 12, 10, 10, 8, 7, and 6 in each arm, with the same pairs. By the probe, 121 of V's 131 functions have the same token list in L. The other 10 are constructors, which hold port parameters in L, and names that only one arm has at that place: wrappers in `ports.go`, and `startup` against `Serve`, each 112 tokens. `Handler` and `Refund` now agree.
+
+### The counts
+
+`coverage.json` gives `status` 8, 48, 154; `loose_status` 41, 15, 154; `auditor_loose_status` 34, 22, 154. The 7 rules that the two looser readings differ on are `ARCH-06`, `ERR-03`, `HTTP-01`, `HTTP-02`, `CONC-03`, `CODE-02`, and `CODE-04`, as in the second rerun. The 39 give 4, 34, 1 by the strict test. The 8 stated rules are `ARCH-01`, `ARCH-02`, `ARCH-07`, `ARCH-21`, `ERR-09`, `DATA-15`, `CODE-03`, and `CODE-06`. I found no break by a named limit for these. N13 is closed. The second rerun's lean of the looser test stays, and it is now printed.
+
+### The upgrade
+
+- **Source:** only the `go` line changed, in `poc/app/go/go.mod`, `poc/app/golint/go.mod`, and `poc/app/vulcan/go.mod`. `git diff 1f8a7fe HEAD -- poc/app` holds these three lines and nothing else.
+- **The arms agree:** each base passes its check with no rules file. With `defaults v1`, the hash is `sha256:14c3ca9a...`, V gives 284 and L gives 285, with the same counts by rule, and the one difference by text is the row of `lib/shop`.
+- **Behavior:** `go test ./poc/acceptance/...` passes against the binary of each of the three arms.
+- **Not checked:** the sealed seeded cases. `QN-base-apps.md` says that T2 must confirm them, and that is right.
+
+### Linux
+
+With the host available, these hold there: `bt*` and `g6`, `g7` give K0901 and VL0901 for a tag of another system, and a rule's finding for a tag of this one, in both arms. So the same program can pass one host's read and fail another's, the same in both arms. `lc2`, `re1`, `dp4`, `m3e5`, `m3d10`, `fx1`, `fx3`, `fx5`, `ne*`, `t9`, `t10`, and `t14` give the results above. `t12` holds a Windows path, so that run says nothing. `as4`, `import "C"` with a C compiler, gives V K0804, and L VL0804 and VL0122. Both reject, and L also reads a directive that cgo generates.
+
+### What I could not check
+
+- The sealed seeded cases, as before.
+- A real `https` source, as before.
+- What the builder's note says of its own order of work.
