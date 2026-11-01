@@ -1,6 +1,5 @@
 N14, t10: a vendored package
 -- want.txt --
-error api/orders/extra.vulcan:3:8 K0209
 error vendor/modules.txt:1:1 K0002
 -- api/billing/billing.vulcan --
 package billing

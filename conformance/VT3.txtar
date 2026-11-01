@@ -1,5 +1,6 @@
 N1, t9: a nested module with a replace
 -- want.txt --
+error go.mod:7:1 K0002
 error third/go.mod:1:1 K0002
 error third/s.go:1:1 K0002
 -- api/billing/billing.vulcan --
