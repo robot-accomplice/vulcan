@@ -66,3 +66,11 @@ The tuning does not reach the blind tests: no text or result of T1 or T2 went in
 **How the limit 60 and the similarity 90 were first chosen.** The builder wrote them at the first build of the kind, before any run of this rule on an application, and after reading the code of these applications. No record gives a reason for them. The similarity 90 is the default of `duplicate_similarity` in the spec (section 9). The spec's `duplicate_min_tokens` is 50 tokens. The 60 is not that value and counts other units, the nodes of the syntax tree. Neither number was changed after a run. The builder cannot say more than this.
 
 `CTX-08` reports at the wires: `system.vulcan` in V, and the main package in L. No rule at level `warn` fires. No other rule of the draft fires on these applications. A rule that a model check already enforces could not fire here, because both applications pass their model checks. The rules that read test files, such as `TEST-04`, have nothing to read, because `poc/app` holds no test files of its own.
+
+## The Go version of the base applications
+
+The owner named an exception to "no change to base applications", for the toolchain rule. `poc/app/go`, `poc/app/golint`, and `poc/app/vulcan` moved from `go 1.26.0` to `go 1.27.3`. Only that line changed: `go mod tidy` and `vulcan mod tidy` changed nothing else, and no source or other dependency changed.
+
+After it, `go test ./...` passes, `poc/harness` included. `poc/acceptance` passes. `go build`, `go vet`, and `go test` pass in `poc/app/go` and `poc/app/golint`. Each arm's check passes with no rules file. With `defaults v1`, the findings do not change: the same rules, parts, and counts, as the tables above give, and the same hash.
+
+**T2 must confirm that round 2's sealed seeded cases still apply.** They are built on these applications, and this work may not read them, so this is not checked. A failure can show in these ways: a case that patches `go.mod` no longer applies; a workspace of a case fails to build or check before any rule reads it; or a case gives other diagnostics than its record, because a program now has the meaning of Go 1.27 where it had that of Go 1.26. Any of these must be reported by T2 as a result of this upgrade, and not as a result of a rule.
