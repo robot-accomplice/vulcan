@@ -950,3 +950,189 @@ With the host available, these hold there: `bt*` and `g6`, `g7` give K0901 and V
 - The sealed seeded cases, as before.
 - A real `https` source, as before.
 - What the builder's note says of its own order of work.
+
+## Fourth rerun
+
+Reviewed at commit db10d23 (branch main), with e2b9441, d641fbd, db10d23, and plan-r3, amendment 10. The same reviewer ran this. The sections above stay as they were at 1e1df8a. This rerun is narrow, as the owner asked: the three decisions, plus each existing case script for a regression, on Windows and in WSL.
+
+### Result
+
+**Step 3's gate (no open High finding) does not pass.** N16, N17, N18, N20, and N22 are fixed as reported. Two High findings are open, and both are new here. N23 is a fifth form of the module escape, in L alone. N28 is a difference in how a run is graded: with a new finding, V does not build and L does, so `TaskSuccess` differs by arm. N28 reaches step 8, not T1.
+
+| Severity | Open now | Which |
+|---|---:|---|
+| High | 2 | N23, N28 |
+| Medium | 4 | N24, N25, N26, N27 |
+| Low | 2 | N29, N30 |
+
+### How I ran it
+
+- A fresh build of db10d23, for Windows and for Linux. I reran `b1` to `b5`, `b7`, `c1`, `c2`, `a1` to `a3`, and `a5` to `a10`, with no change to their text, and compared them with the saved output of the third rerun. Of 658 rows, 24 changed. Each is a fix below, and none is a regression.
+- I wrote about 80 new cases: `a12` and `a15` on the `replace` check on Windows, `lx3.sh` on Linux, `a13` on the baseline. I reran 36 cases in WSL.
+- `harness validate` ran on the demo material of the repository, and on a copy with a third rule `RB` and my own shapes, in scratch copies of the repository: no rules file; `defaults v1`; `defaults v1` with a baseline.
+- `go test ./internal/rules ./poc/harness/... ./poc/golint/... ./conformance` passes, with `-parallel 2` for `conformance`.
+
+### Results for each finding
+
+| Finding | Result | Run |
+|---|---|---|
+| N16 | Fixed for its forms | `d2`, `u1`, `u4`, `u5`: K0002, VL0002, on Windows and Linux. The check now holds a fifth form: N23 |
+| N17 | Fixed on the demo | With a baseline: base and reference pass in both, V builds and runs its holdout. Harmless shapes are not rejected. `RT` stays in N. See "`harness validate`". The rest is N25 |
+| N18 | Fixed for its forms | `d1`, `d4`, `gi`-style targets by a plain path: K0002, VL0002. The rest is N24 |
+| N19 | Listed, acceptable | `rp26`, junction runs: as the Limits row now says |
+| N20 | Fixed | `r1`, `r2` fire in L only, and `rules-file.md` now names `at field` and `at param` |
+| N21 | Listed, acceptable | `m3q10` to `m3q14`: L fires at 10, V at 16. A Limits row states it |
+| N22 | Fixed | `p5`: a part `lib/vendor` is read in both |
+| Counts | Hold | `status` 8, 48, 154. `loose_status` 41, 15, 154. `auditor_loose_status` 34, 22, 154 |
+| Base findings | Hold | V 284, L 285, hash `sha256:14c3ca9a...`. By key, only `startup` against `Serve`, and `lib/shop`. With a baseline, each exits 0, with 284 and 285 old, none stale |
+
+### The `replace` check, attacked
+
+The check compares paths by text, with `filepath.Rel`. It does not ask the file system. The walk still skips `.git`, `.vulcan/build`, and `.vulcan/bin` at the root.
+
+| Target | V | L |
+|---|---|---|
+| A version on the left, a block form, quoted, `.\third`, `./a/../third`, `../<dir>/third`, an absolute path with either slash, another case of the drive or of a directory, a junction in the project (`rp1` to `rp10`, `rp16`) | K0002 | VL0002 |
+| A non-canonical version, an unknown directive, a bad `go` line, also with `GOFLAGS=-mod=mod` (`rp17` to `rp20`, `rp22`) | K0002 | VL0002 |
+| `\\?\` path, 8.3 path, or a junction outside the project, to a plain directory (`es_third_*`) | K0002 by the walk | VL0002 by the walk |
+| **The same three, to `.vulcan/build/evil`** (`es_build_*`) | K0008 | **Exit 0, and `go build` passes** |
+| **The same three, to `.git/evil` or `.vulcan/bin/evil`** (`es_git_*`, `es_bin_*`), in a real repository | **Exit 0, and it builds** | **Exit 0, and it builds** |
+| **Linux: `/proc/self/cwd/.git/evil`, `/proc/self/cwd/.vulcan/bin/evil`** (`li_*_proc`) | K0008 | **Exit 0, and `go build` passes** |
+| **Linux: a symlink outside the project, back into `.git` or `.vulcan/bin`** (`li_*_link`) | **Exit 0, and it builds** | **Exit 0, and it builds** |
+| Linux: a plain absolute path, `//` in it (`li_abs`, `li_dbl`) | K0002 | VL0002 |
+| `-modfile` in `GOFLAGS`, also by a `go env` file (`rp23`, `rp24`) | K0209 | The go command refuses |
+| `-overlay` in `GOFLAGS` (`rp25`) | K0002, K0209 | VL0002 |
+| A `go.work` above the root, `GOWORK` not set (`rp26`) | K0209 | **Exit 0**. Listed. With `GOWORK=off`, as `harness` sets it, L fails too |
+| `Main("lib/evil")`, a plain package that a leaf imports (`e1`) | K0008 | VL0003, VL0004 |
+
+#### N23. High. In L alone, a path that does not read as inside the project reaches `.vulcan/build`, or on Linux `.git` and `.vulcan/bin`
+
+- **Where:** `internal/rules/check.go`, `ForeignRoots`, the function `inside`, compares text. The walk skips those directories, and `poc/golint/cmd/vulcan-lint/main.go` calls it.
+- **Case `es_build_unc`, on Windows, rules `ERR-08` and `ARCH-10`:** `go.mod` holds `replace example.com/evil => \\?\C:\...\project\.vulcan\build\evil`. That directory holds `go.mod` and a `.go` file that calls `os.Exit(1)` and `net.Dial`. A leaf calls `evil.X()`. **L exit 0, and `go build ./cmd/shop` passes. V exit 1, K0008.** `es_build_short` (an 8.3 path) and `es_build_junction` (`../o/.vulcan/build/evil`, with `o` a junction to the project) give the same.
+- **Case `li_git_proc`, on Linux:** `replace example.com/evil => /proc/self/cwd/.git/evil`. **L exit 0, and `go build` passes. V exit 1, K0008.**
+- **Why High:** it is the escape of H3, N1, N10, and N16: code inside the project that leaves the model and each rule, with exit 0, in one arm. I gave those High, so I give this High. These paths are unusual. So were the others.
+- **Favors:** L passes more. A rule can land in U because of it.
+- **Smallest fix:** ask the file system. Walk up from the target, and compare each directory with the root by `os.SameFile`. Stop skipping directories in the walk, or keep only `.git/objects`. This covers text forms, links, and `/proc`.
+
+#### N24. Medium. In both arms, the same paths reach `.git` and `.vulcan/bin`
+
+`es_git_unc`, `es_git_short`, `es_git_junction`, `es_bin_unc`, `es_bin_short`, `es_bin_junction`, `li_git_link`, `li_bin_link`: exit 0 in both, and each builds. It is a hole in both, so Medium, as N18 was. A link outside the project is close to the listed limit of a module outside the project. A `\\?\` or 8.3 path is not: nothing outside the project exists. The fix of N23 closes it.
+
+### The baseline, attacked
+
+Each row is one project: `rules baseline`, then a change, then the check. Both arms gave the same result, the same counts of new, old, and stale, and equal keys, on each row. The one exception is the last row, where my case had a fault.
+
+| Change | Result | Case | Note |
+|---|---|---|---|
+| An edit above; to another file; into a closure; a generic function | Old | `k1`, `k2`, `k8`, `k11` | As listed |
+| One more in the function | New, the other old | `k3` | As listed |
+| A rename; between parts; another call of the rule; from package level into a function | New, and stale | `k9`, `k13`, `k14`, `k16` | As listed |
+| A swap in one function: another `os.Exit` | **Old** | `k4` | Listed: "Old, Loose" |
+| ERR-03: `_ = h()` in place of `_ = g()` | **Old** | `k17` | The text does not name the call |
+| SEC-07: `d.Query("select " + u + q)` in place of `d.Exec(q)` | **Old** | `k18` | The same. A worse statement passes |
+| To a method of another type, of one name | **Old** | `k5` | Not listed as such. See N29 |
+| A method to a plain function; a generic method to a plain function | Old | `k10`, `k12` | As listed |
+| Package level: `var B = os.Exit` for `var A = os.Exit` | **Old** | `k15` | The key has no symbol there |
+| A function `init` | No case | `k6`, `k7` | K0117 rejects `init` in a part, so the baseline refuses, in both |
+| A test file, then code, of one function name | Old | `k19` | |
+| A test and code of one name, one held; two files, one held | New is the later in order: `a_test`, `b` | `k20`, `k21` | The same in both arms. I expected this |
+| A function with `ensures`, with `old`; a method of a type with an invariant | Old, equal keys | `k30`, `k31`, `k32` | V's lowering does not change a key |
+| A status table with several states before | Old, 8 of 8 runs | `k34` | The text has one fixed order |
+| A count of 98 added by hand | **Old, and stale** | `k23` | Each new finding of the key passes. The check prints K0811. This is the harm that `rules-file.md` names, for `PROTECTED` at a later step |
+| A model check by hand: `K0205`, `VL0205`, `model-0205` | Rejected, and stale | `k24` | **A model check cannot get in.** No path in `Classify` reads one |
+| ARCH-10 by hand, with its model check | K0205 stays | `k25` | The rule's finding is old, and the model rejects |
+| An unknown rule, a bad line | K0801 in both for a bad line | `k26`, `k27` | My case also had an unused import, so its K0008 and build error say nothing |
+
+**Equal keys.** Each row above writes the same file in both arms. On the base applications, 257 and 258 keys differ only by `startup` and `Serve`, and `lib/shop`. Where a fixture differs (`k33`, a port comment in `R01` that only L's form has), the keys differ with it.
+
+**`-json`.** `vulcan-lint -json` puts a new finding on standard output, and old findings and stale entries on standard error, and it exits 0 with a new finding. `vulcan check --json` has them all, and exits 1. `harness` reads text and exit codes, so a run does not reach this. It matters only to a tool that reads the JSON of L. N30 records the exit code, which the Limits row does not.
+
+#### N28. High. With a new finding, V does not build and L does, so `TaskSuccess` differs by arm
+
+- **Where:** `poc/harness/record/record.go:155`, `TaskSuccess` is `r.Builds && r.Acceptance.OK()`. `poc/harness/grade/grade.go:164` builds V with `vulcan build`, which refuses a new finding, and `:166` builds L with `go build`, which reads no rule. Neither `TaskSuccess` nor `CleanSuccess` reads the final check.
+- **Run `k35`, one new finding of `ERR-08`:**
+
+  | | Check | Build | Test |
+  |---|---|---|---|
+  | V | `vulcan check` 1 | `vulcan build` **1** | `vulcan test` **1** |
+  | L | `vulcan-lint` 3 | `go build` **0** | `go test` **0** |
+
+- **Effect:** an agent that leaves one new finding of any default, such as an exported name with no comment (CODE-08), has a failed task in V. In L the same run can be a clean success. This form existed for a model error in round 2. `defaults v1` widens it to each of its 61 rules at `error`. `N17-demo.md` notes the build, and it does not name M1 or M3.
+- **Why High:** a run's success differs by arm on an ordinary form of code. That is the scale of the first High of `parity-r2.md`. It does not reach T1, which has no agent run. It reaches step 8.
+- **Favors:** L on M1 and M3. An agent in L also has less to fix before it can run a test.
+- **Smallest fix, one of these. The choice is the owner's:**
+  - Grade with the final check in both arms: a run with a new finding is no task success, in L too.
+  - Give the grader a V build that does not refuse a rule's finding, and record the check apart, in both arms.
+
+  Each gives one meaning of `Builds`.
+
+### `harness validate`
+
+**No rules file:** on the repository's demo material, the output is the same, byte for byte, as my run at 02f2464. `TestValidateNoRulesFile` passes.
+
+**`defaults v1` and a baseline, with my shapes of a rule `RB`, "Code logs through log/slog, not through log", and a match file that says only `OBS-01` matches:**
+
+| Shape | Fired, L and V | Item, and label |
+|---|---|---|
+| `count`: one more `log.Printf` beside an old one | `OBS-01` | Rejected, and matched |
+| `both`: that, and an exported name with no comment | `CODE-08`, `OBS-01` | Rejected, and matched |
+| `unrelated`: only an exported name with no comment | `CODE-08` | "rejected only by an unrelated rule, so it does not count" |
+| `harmless` | None | Not rejected |
+| `swap`: the old `log.Printf` with another text | None | Not rejected. The key holds the count |
+
+- `count` with `both`: `RB` in S, in both arms. `count` with `unrelated`: `RB` in N. `count` with `swap`: `RB` in N. All read correctly, with the same caveat: a seeded case that only changes an old finding cannot be caught. A labeler must seed a new one.
+- A `count` case is rejected by a rule that already fires there, so an old finding's rule still labels correctly.
+
+#### N25. Medium. With no baseline and a match file, the base fails and the labels are still written
+
+- **Where:** `poc/harness/grade/validate.go`, `noLabels` looks at a missing match. It does not look at a failed base. `cmdValidate` writes labels with `-write-labels`, and then returns its error.
+- **Run:** defaults on, no baseline, a match file with `RB` and `OBS-01` true, `-only seeded/RB/harmless,base,reference -write-labels`. Base and reference fail in both. `RB/harmless` fired `OBS-01` from an old finding, so it matched. **`set S: 1 (RB)`, and `meta.json` holds `enforced_by_v: true`, `enforced_by_l: true`.** The exit is 1, and the problems print.
+- **Severity:** it is N17 again, in a smaller form, and only if the template lacks a baseline. So Medium. The plan needs the baseline at step 4.
+- **Smallest fix:** write no label when a base item is rejected.
+
+#### N26. Medium. `-export-judge` shows the arm through the words of a model check
+
+- **Where:** `poc/harness/grade/fired.go`, `armWords` and `neutral`. The builder calls it a best effort.
+- **File names, paths, and code prefixes:** clean, on my run. No path, no `K` or `VL`, no arm name, no part. `validation.json` holds the arm, and the judge does not read it.
+- **Wording is not clean.** On the demo, `RD` and `model-0205` read: "uses the network function database/sql.Open, but leaf Inventory is not a gateway or an entry leaf; move the call to a gateway leaf (gateway for <External>) and reach it through a port (§5.4c rule 1)". `gateway for <External>` and `§5.4c` are V's. L's text for the same code is another sentence. By a scan of the format strings after `neutral`, V's messages hold `§` (9), `container` (6), `component` (3); L's hold `contract.` (8), `checked` (3), `wrapper` (2), `main` (17 against 4).
+- **A code can name the arm by itself.** 11 digits exist in L only, such as `model-0909`, `model-0907`, `model-0908`. 14 exist in V only, such as `model-0105`, `model-0111`. A pair with one of these says which arm fired.
+- **The text that a pair shows is the least of the two by sort order**, so a judge of a shared code reads one arm's sentence and decides for both.
+- **Severity:** plan-r3, section 5 says that the judge does not see the arm. A decision on a shared code applies to both arms, so the leak can bias little there. On a code of one arm it can bias a label. So Medium.
+- **Smallest fix:** one neutral sentence for each digit, in a table, used in the export. Export a one-arm code with the same sentence form and no digit, or list those pairs apart.
+
+#### N27. Medium. In both arms no rule reads `lib/contract`, and V has no reason for that
+
+- **Where:** `internal/rules/check.go`, `CheckUnit`, returns nothing for `IsRuntimeLib(u.Part.Dir)`, in each arm. That is right for L, whose contract package is that directory (call 17). In V a library with that name is an ordinary library.
+- **Case `e4`, rule `ERR-08`:** `lib/contract/evil` calls `os.Exit(1)`, and a leaf calls it. **V exit 0, L exit 0.** The model still reads it (`e3`: K0205, VL0205).
+- **Under the harness:** L's `PROTECTED` lists `lib/contract/*.go`, so a new file there is a configuration change. V has no such list, and a new library is allowed. So an agent in V can use it, and one in L cannot.
+- **Severity:** rules only, and the model stays. So Medium.
+- **Favors:** V passes more. **Smallest fix:** give `Unit` a field, as `Generates`, so that only L skips it.
+
+#### Low
+
+| # | Finding | Case | Where | Favors | Smallest fix |
+|---|---|---|---|---|---|
+| N29 | The key is looser than the table of `rules-file.md` says: a finding moves between types of one method name (`k5`), and at package level between variables (`k15`), and stays old. The table lists a swap in one function and a method to a plain function. A text with no detail of the call makes a swap harder to see (`k17`, `k18`) | `k5`, `k15`, `k17`, `k18` | `internal/rules/baseline.go`, `shape.go` texts | Neither | Two rows in the table. A call's name in the text of `discard-error` and `call-form` |
+| N30 | `vulcan-lint -json` exits 0 with a new finding, and `vulcan check --json` exits 1. The Limits row lists what is left out of the JSON, and not the exit | `k35` | `docs/poc/rules-file.md`, the Limits table | L, outside the harness | One sentence |
+
+### A choice for the owner: a model check as a rule that fired
+
+On the demo, `RD`, "Only store opens a database", has seeded cases that fire `ARCH-01`, `ARCH-10`, `ARCH-11`, and `model-0205`, in both arms.
+
+| Reading | Judge's decisions | `RD` | S | N |
+|---|---|---|---:|---:|
+| A model check counts | `model-0205` yes, the rest no | Enforced | `RD` | `RB`, `RT` |
+| It does not count | The rest no | **Not enforced** | none | `RB`, `RD`, `RT` |
+| It does not count, and a default says the same | `ARCH-10` yes | Enforced | `RD` | `RB`, `RT` |
+| No rules file (round 2's form) | None | Enforced by any rejection | `RD` | `RT` |
+
+**If it counts:** the count is closer to round 2's, which read any rejection. A team rule that only the model states can be enforced. It leans toward more enforced rules, and so toward the gate. Each code of one arm can put a rule in G or U, by a form that only that arm has: the 11 and 14 of N26. So it leans away from an empty U and G.
+
+**If it does not count:** the count reads only what the defaults add, which is what QD asks of the defaults. It leans toward fewer enforced rules, and away from the gate. A rule that the model rejects in both arms reads as not enforced, though both arms reject each case. That understates what each arm does. It leans toward an empty U and G. Six default rules restate a model check, so a judge's yes on those can give the same label as the third row.
+
+### What I could not check
+
+- The sealed seeded cases, as before.
+- A real `https` source, as before.
+- A fresh judge's decisions. Mine are for the mechanism.
+- An agent's run. N28 is from `k35` and the code of `grade.go` and `record.go`.
