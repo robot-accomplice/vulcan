@@ -74,3 +74,7 @@ The owner named an exception to "no change to base applications", for the toolch
 After it, `go test ./...` passes, `poc/harness` included. `poc/acceptance` passes. `go build`, `go vet`, and `go test` pass in `poc/app/go` and `poc/app/golint`. Each arm's check passes with no rules file. With `defaults v1`, the findings do not change: the same rules, parts, and counts, as the tables above give, and the same hash.
 
 **T2 must confirm that round 2's sealed seeded cases still apply.** They are built on these applications, and this work may not read them, so this is not checked. A failure can show in these ways: a case that patches `go.mod` no longer applies; a workspace of a case fails to build or check before any rule reads it; or a case gives other diagnostics than its record, because a program now has the meaning of Go 1.27 where it had that of Go 1.26. Any of these must be reported by T2 as a result of this upgrade, and not as a result of a rule.
+
+## The baseline
+
+Plan-r3, amendment 10 adds `rules.baseline`, so that a default that fires on a base application fails no check. This record is measured with no baseline, so it does not hide a finding: a baseline changes what a check fails on, and not what the rules find.
