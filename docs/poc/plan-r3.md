@@ -45,6 +45,11 @@ section 4.
   or result of a blind test, and they apply the same in L and V.
 - L rejects a wire that it cannot read (section 9, amendment 7). This leans toward an empty U. The
   difference of the two designs does not disappear: it becomes a limit on the form of L's `main`.
+- The baseline and the rule-match judgment (section 9, amendment 10) were added after the audit showed
+  that defaults on the base applications break T1's labels. The baseline hides each finding that
+  exists before a task, so a default cannot fail on old code. This can lower what QN shows an agent.
+  The judgment can lower the count of enforced rules, because a case rejected by an unrelated rule no
+  longer counts. Neither was chosen with any blind rule set or T1 result in view.
 
 ## 1. Questions
 
@@ -154,6 +159,12 @@ in S only because of a default that the team would have turned off, so QN is rea
 A rule at `warn` does not count as enforced, because the check does not reject its seeded cases. The
 report lists separately each rule that a `warn` default matches.
 
+**What counts as enforced, with a rules file.** A workspace is rejected only by a finding that its
+baseline does not hold. A team rule counts as enforced by an arm only if each seeded case is rejected
+by a rule that matches it. A fresh session decides each match from the team rule's text and the text
+of the rule that fired. It does not see the arm, the other rules' results, or the set sizes. A case
+that only an unrelated rule rejects does not count, and the report lists it.
+
 **What T1 cannot say.** Most rule kinds live in one shared package (`internal/rules`). On those kinds,
 a member of G or U comes from what an arm gives that package, or from a form that only one arm has.
 So T1 does not show that a second builder of the linter would reach the same result.
@@ -209,3 +220,4 @@ says yes, QN reads this repository's applications only.
 | 7 | Audit finding H2: L reads a wire only in plain form, and rejects a wire that `main` makes through a helper, closure, field, slice, map, or similar. V declares its wires, so it has no such limit. The owner chose this over naming the difference as a candidate for U (2026-10-31). The limit is a cost of L's form, and the T21 and form measures count it | [parity-r3.md](../../experiments/poc/parity-r3.md); section 0 |
 | 8 | Audit findings M8 and M10: section 2's claim on hidden layers is narrowed, the level `warn` is named, and a `warn` rule does not count as enforced | Sections 2 and 5 |
 | 9 | Audit section 2: `CTX-08`, `CODE-09`, and `CODE-11` stay in part at one package, in both arms. The limit is the design of the shared package, not of L. The wider forms are not built | [parity-r3.md](../../experiments/poc/parity-r3.md), section 2 |
+| 10 | Audit finding N17 (2026-11-01): all defaults stay on, and the base applications do not change for them. A baseline in both tools records existing findings, so only a new finding fails a check or a build. `harness validate` records the rules that fired, and a label needs a match by a fresh session (section 5). Audit finding N16: the check reads each `replace` in `go.mod` and `go.work` for a target inside the project | Sections 2 and 5; [parity-r3.md](../../experiments/poc/parity-r3.md), third rerun |
