@@ -161,10 +161,13 @@ type Unit struct {
 	PortFiles []*ast.File
 	// Pkg is the package. Generates says that this arm's lowering adds names with the prefix
 	// vulcan_, which no rule reads. SourceFile maps a file of a position to one that Go can parse.
-	Pkg        *types.Package
-	Generates  bool
-	SourceFile func(string) string
-	Info       *types.Info
+	Pkg       *types.Package
+	Generates bool
+	// ContractLib says that lib/contract is this arm's contract package, which no rule reads: L's. In
+	// V, a library of that name is an ordinary library.
+	ContractLib bool
+	SourceFile  func(string) string
+	Info        *types.Info
 	// Ports are the ports of the leaf. HasEnsures says whether a function has an ensures clause.
 	// TestsAbsent says that the package has tests, and this load left them out.
 	Ports       []Port
@@ -188,7 +191,7 @@ func (r *Rule) tail() string {
 // CheckUnit applies the rules that read the code of one package. A rule does not read a main
 // package: in V, main is generated, so a rule that fired on L's main would have no equal in V.
 func (s *Set) CheckUnit(u *Unit) []Finding {
-	if s == nil || u.Part.Kind == "main" || IsRuntimeLib(u.Part.Dir) {
+	if s == nil || u.Part.Kind == "main" || u.isRuntimeLib(u.Part.Dir) {
 		return nil
 	}
 	var out []Finding
@@ -338,7 +341,7 @@ func (u *Unit) imports(r *Rule, lock map[string]bool, add addFunc) {
 			}
 			for _, imp := range f.Imports {
 				path, _ := strconv.Unquote(imp.Path.Value)
-				if t, ok := u.partOfImport(path); ok && t.Dir != u.Part.Dir && t.Kind == "library" && !IsRuntimeLib(t.Dir) && lock != nil {
+				if t, ok := u.partOfImport(path); ok && t.Dir != u.Part.Dir && t.Kind == "library" && !u.isRuntimeLib(t.Dir) && lock != nil {
 					e := Edge{From: u.Part.Dir, To: t.Dir, Via: "import"}
 					if !lock[e.key()] {
 						add("0806", imp.Path.Pos(), "%s: %s", newDep(e), r.tail())
@@ -365,7 +368,7 @@ func (u *Unit) imports(r *Rule, lock map[string]bool, add addFunc) {
 			if wire {
 				continue
 			}
-			if t, ok := u.partOfImport(path); ok && t.Dir != u.Part.Dir && !IsRuntimeLib(t.Dir) && edgeDenied(r, t) {
+			if t, ok := u.partOfImport(path); ok && t.Dir != u.Part.Dir && !u.isRuntimeLib(t.Dir) && edgeDenied(r, t) {
 				add("0804", imp.Path.Pos(), "%s imports %s (%s), which a rule forbids here: %s", u.Part.Dir, t.Dir, t.Kind, r.tail())
 			}
 		}
@@ -378,6 +381,8 @@ func edgeDenied(r *Rule, to Part) bool {
 	}
 	return selected(r.Params["deny"], to)
 }
+
+func (u *Unit) isRuntimeLib(dir string) bool { return u.ContractLib && IsRuntimeLib(dir) }
 
 // symbolAt names the function that holds a place, with no receiver. A place outside a function has no
 // symbol: its text names it.
@@ -440,6 +445,38 @@ type Foreign struct {
 	Msg  string
 }
 
+// insideRoot asks the file system whether a path is inside the root: it walks up from the path, and
+// compares each directory with the root by os.SameFile. So no form of the text can hide a target: a
+// \\?\ or an 8.3 path, a junction, a symlink, /proc/self/cwd, or another case. A link outside the
+// project that leads back in is inside. It reads the path as written, and the path with its links
+// resolved. A part of the path that does not exist is passed over: a target that does not exist is
+// inside if a directory above it is, and otherwise the go command refuses it.
+func insideRoot(root, path string) bool {
+	rootInfo, err := os.Stat(root)
+	if err != nil {
+		return false
+	}
+	walk := func(p string) bool {
+		for {
+			if info, err := os.Stat(p); err == nil && os.SameFile(info, rootInfo) {
+				return true
+			}
+			parent := filepath.Dir(p)
+			if parent == p {
+				return false
+			}
+			p = parent
+		}
+	}
+	if walk(path) {
+		return true
+	}
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return walk(resolved)
+	}
+	return false
+}
+
 // ForeignRoots reads what brings code in: each replace of the root go.mod and of a root go.work with
 // a target inside the project, whatever its directory or the case of its file names, and a root
 // go.work itself, which changes what the go command builds. This needs no list of directories.
@@ -447,8 +484,9 @@ type Foreign struct {
 // The walk stays for a go.mod that nothing replaces, in any directory, and for a root
 // vendor/modules.txt. A go.mod that nothing replaces brings in nothing. It stays a fault because V's
 // K0002 rejects a Go file in a plain directory, and go ./... does not list a nested module, so
-// without the walk L would pass that file. The walk leaves out .git and what vulcan writes at the root,
-// the same in both arms. A replace into one of those is still read above.
+// without the walk L would pass that file. It leaves out two places at the root, the same in both arms,
+// and a replace into either is still read above: .vulcan/build, which holds V's own go.mod, and
+// .git/objects, which git alone writes and which can be large.
 func ForeignRoots(root string) []Foreign {
 	var out []Foreign
 	inside := func(target string) bool {
@@ -456,8 +494,7 @@ func ForeignRoots(root string) []Foreign {
 		if !filepath.IsAbs(abs) {
 			abs = filepath.Join(root, filepath.FromSlash(target))
 		}
-		rel, err := filepath.Rel(root, abs)
-		return err == nil && rel != ".." && !strings.HasPrefix(filepath.ToSlash(rel), "../")
+		return insideRoot(root, abs)
 	}
 	replaces := func(name string, reps []*modfile.Replace) {
 		for _, rep := range reps {
@@ -487,7 +524,7 @@ func ForeignRoots(root string) []Foreign {
 		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel == ".git" || rel == ".vulcan/build" || rel == ".vulcan/bin" {
+			if rel == ".git/objects" || rel == ".vulcan/build" {
 				return filepath.SkipDir
 			}
 			return nil

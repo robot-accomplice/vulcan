@@ -179,16 +179,12 @@ func TestValidateWithRules(t *testing.T) {
 	}
 	j := v.ExportJudge(mustMeta(t, material))
 	text, _ := json.Marshal(j)
-	for _, word := range []string{`"arm"`, "enforced", "set S", "vulcan-lint", "VL0", "K02", "K01"} {
-		if strings.Contains(string(text), word) {
-			t.Errorf("the judge's file holds %q: %s", word, text)
-		}
-	}
+	scanJudge(t, j, string(text))
 
 	// The judge's decisions: the model check that rejects RD matches it. CODE-08 does not match RT.
 	yes, no := true, false
 	for i := range j.Pairs {
-		if j.Pairs[i].TeamRule == "RD" && strings.HasPrefix(j.Pairs[i].FiredRule, "model-") {
+		if j.Pairs[i].TeamRule == "RD" && strings.HasPrefix(j.Pairs[i].FiredRule, "check-") {
 			j.Pairs[i].Match = &yes
 		} else {
 			j.Pairs[i].Match = &no
@@ -210,6 +206,12 @@ func TestValidateWithRules(t *testing.T) {
 		}
 		if !m["RD"] {
 			t.Errorf("RD is not enforced: %v", m)
+		}
+	}
+	// As each arm ships, the model check puts RD in S. For the rules file alone, no rule matches it.
+	for _, want := range []string{"the gate reads these", "set S: 1 (RD)", "rules file alone: set S: 0 ()", "rules file alone: set N: 2 (RD, RT)"} {
+		if !strings.Contains(v.Summary(), want) {
+			t.Errorf("the summary does not say %q:\n%s", want, v.Summary())
 		}
 	}
 	found := false
@@ -239,4 +241,167 @@ func mustMeta(t *testing.T, material string) *record.Meta {
 		t.Fatal(err)
 	}
 	return m
+}
+
+// scanJudge reads the judge's file for each word that names an arm or shows a code of one.
+func scanJudge(t *testing.T, j *JudgeFile, text string) {
+	t.Helper()
+	for _, word := range []string{`"arm"`, "enforced", "set S", "vulcan-lint", "VL0", "model-"} {
+		if strings.Contains(text, word) {
+			t.Errorf("the judge's file holds %q: %s", word, text)
+		}
+	}
+	if m := regexp.MustCompile(`\bK\d{4}\b|\b0\d{3}\b`).FindString(text); m != "" {
+		t.Errorf("the judge's file holds the code %q: %s", m, text)
+	}
+	checkWords := regexp.MustCompile(`(?i)vulcan|§|component|container|contract\.|checked|wrapper|gateway for|\bmain\b|manifest|\.go\b|arch\b`)
+	for _, p := range j.Pairs {
+		if strings.HasPrefix(p.FiredRule, "check-") {
+			if m := checkWords.FindString(p.FiredText); m != "" {
+				t.Errorf("the text of a model check holds %q: %s", m, p.FiredText)
+			}
+		}
+	}
+	for digits, c := range modelChecks {
+		if m := checkWords.FindString(c.text); m != "" {
+			t.Errorf("the sentence of %s holds %q: %s", digits, m, c.text)
+		}
+	}
+}
+
+// TestModelChecksTable holds the table to the code: each code of each arm has a sentence, and the
+// table knows which arm has it alone.
+func TestModelChecksTable(t *testing.T) {
+	root := repoRoot()
+	codes := func(re string, dirs ...string) map[string]bool {
+		out := map[string]bool{}
+		for _, dir := range dirs {
+			err := filepath.WalkDir(filepath.Join(root, dir), func(p string, d os.DirEntry, err error) error {
+				if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+					return err
+				}
+				b, err := os.ReadFile(p)
+				if err != nil {
+					return err
+				}
+				for _, m := range regexp.MustCompile(re).FindAllStringSubmatch(string(b), -1) {
+					out[m[1]] = true
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		return out
+	}
+	v := codes(`"K(\d{4})"`, "internal", "cmd")
+	l := codes(`\bVL(\d{4})\b`, filepath.Join("poc", "golint"))
+	for digits := range v {
+		c, ok := modelChecks[digits]
+		if !ok {
+			t.Errorf("K%s has no sentence", digits)
+		} else if want := map[bool]string{true: "", false: "V"}[l[digits]]; c.arm != want {
+			t.Errorf("K%s: the table says arm %q, and the code says %q", digits, c.arm, want)
+		}
+	}
+	for digits := range l {
+		if digits >= "0802" && digits <= "0810" {
+			continue // the rule kinds: a finding of these carries its rule's id
+		}
+		c, ok := modelChecks[digits]
+		if !ok {
+			t.Errorf("VL%s has no sentence", digits)
+		} else if want := map[bool]string{true: "", false: "L"}[v[digits]]; c.arm != want {
+			t.Errorf("VL%s: the table says arm %q, and the code says %q", digits, c.arm, want)
+		}
+	}
+	for digits := range modelChecks {
+		if id := judgeID("model-" + digits); fromJudgeID(id) != "model-"+digits {
+			t.Errorf("the id of %s does not come back", digits)
+		}
+	}
+}
+
+// TestNoLabelsWhenBaseRejected: defaults with no baseline reject the base, so no label is written, even
+// with a match file (audit N25).
+func TestNoLabelsWhenBaseRejected(t *testing.T) {
+	app := baseTemplates()
+	tmpl := Templates{record.ArmL: withRules(t, app[record.ArmL], record.ArmL, false), record.ArmV: withRules(t, app[record.ArmV], record.ArmV, false)}
+	material := demoWithShapes(t)
+	meta := mustMeta(t, material)
+	g := &Grader{Repo: repoRoot(), Material: material, ToolDir: tools(t), Meta: meta, Match: Matches{"RT": {"OBS-01": true, "CTX-06": true}}, Only: []string{"base", "seeded/RT/one"}}
+	v, err := g.Validate(tmpl, t.TempDir(), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(v.NoLabels, "rejects the base") || len(v.EnforcedByV) > 0 || len(v.EnforcedByL) > 0 {
+		t.Errorf("labels with a rejected base: %q %v %v\n%s", v.NoLabels, v.EnforcedByV, v.EnforcedByL, v.Summary())
+	}
+}
+
+// TestBuildsMeansCompiles is audit N28: with a rules file, Builds means the same in each arm, and the
+// check is recorded apart. With no rules file, a record has no final check.
+func TestBuildsMeansCompiles(t *testing.T) {
+	app := baseTemplates()
+	material := demoMaterial()
+	meta := mustMeta(t, material)
+	g := &Grader{Repo: repoRoot(), Material: material, ToolDir: tools(t), Meta: meta}
+	if err := g.Prepare(filepath.Join(t.TempDir(), "prepared")); err != nil {
+		t.Fatal(err)
+	}
+	ext := map[string]string{record.ArmL: ".go", record.ArmV: ".vulcan"}
+	grade := func(t *testing.T, arm, from, extra string) *record.Run {
+		t.Helper()
+		out := t.TempDir()
+		ws := filepath.Join(out, "workspace")
+		if err := copyTemplate(from, ws); err != nil {
+			t.Fatal(err)
+		}
+		if extra != "" {
+			if err := writeFile(filepath.Join(ws, "api", "orders", "extra"+ext[arm]), []byte(extra)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		r := &record.Run{Task: "DEMO", Arm: arm}
+		if err := g.Grade(out, r); err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	const newFinding = "package orders\n\nfunc NoComment() {}\n"
+	const modelError = "package orders\n\nimport \"stockroom/api/billing\"\n\nvar _ = billing.Ledger{}\n"
+	for _, arm := range []string{record.ArmL, record.ArmV} {
+		t.Run(arm, func(t *testing.T) {
+			if r := grade(t, arm, app[arm], ""); r.FinalCheck != nil {
+				t.Errorf("no rules file: a final check %+v", r.FinalCheck)
+			}
+			rules := withRules(t, app[arm], arm, true)
+			clean := grade(t, arm, rules, "")
+			if !clean.Builds || clean.FinalCheck == nil || !clean.FinalCheck.Passed {
+				t.Errorf("only old findings: builds %v, check %+v", clean.Builds, clean.FinalCheck)
+			}
+			r := grade(t, arm, rules, newFinding)
+			if !r.Builds || !r.Holdout.OK() {
+				t.Errorf("a new finding: builds %v, holdout %+v", r.Builds, r.Holdout)
+			}
+			if r.FinalCheck == nil || r.FinalCheck.Passed || !slicesContains(r.FinalCheck.Fired, "CODE-08") {
+				t.Errorf("a new finding: check %+v", r.FinalCheck)
+			}
+			m := grade(t, arm, rules, modelError)
+			t.Logf("%s, a model error: builds %v, check %+v", arm, m.Builds, m.FinalCheck)
+			if want := arm == record.ArmL; m.Builds != want {
+				t.Errorf("a model error: builds %v, and as today it builds only in L", m.Builds)
+			}
+		})
+	}
+}
+
+func slicesContains(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
 }

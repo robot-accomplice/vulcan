@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -604,6 +605,175 @@ func TestBaselineRefusesModelError(t *testing.T) {
 			}
 			if _, err := os.Stat(filepath.Join(arm.dir, "rules.baseline")); err == nil {
 				t.Errorf("rules baseline wrote a file with a model error")
+			}
+		})
+	}
+}
+
+// fixture writes the small project of case R05 in an arm, with no rules file.
+func fixture(t *testing.T, arm, dir string) {
+	t.Helper()
+	write := func(name string, data []byte) {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if arm == "L" {
+		src := lintest.Write(t, lintest.Read(t, filepath.Join("testdata", "base.txtar")), lintest.Read(t, filepath.Join("testdata", "R05.txtar")))
+		_ = filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				rel, _ := filepath.Rel(src, p)
+				b, _ := os.ReadFile(p)
+				write(filepath.ToSlash(rel), b)
+			}
+			return nil
+		})
+		return
+	}
+	for _, f := range lintest.Read(t, filepath.Join("..", "..", "..", "conformance", "R05.txtar")).Files {
+		write(f.Name, f.Data)
+	}
+}
+
+// TestReplaceByFileSystem is audit N23 and N24: each form of a replace target inside the project is
+// rejected, in both arms, because the check asks the file system. It holds es_build, es_git, es_bin,
+// and li_ of the audit.
+func TestReplaceByFileSystem(t *testing.T) {
+	type form struct {
+		name   string
+		target func(root, dir string) string
+	}
+	forms := []form{
+		{"relative", func(_, dir string) string { return "./" + dir }},
+	}
+	if runtime.GOOS == "windows" {
+		forms = append(forms,
+			form{"unc", func(root, dir string) string { return `\\?\` + filepath.Join(root, filepath.FromSlash(dir)) }},
+			form{"short", func(root, dir string) string { return shortPath(filepath.Join(root, filepath.FromSlash(dir))) }},
+			form{"junction", func(root, dir string) string {
+				link := filepath.Join(filepath.Dir(root), "o")
+				if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, root).CombinedOutput(); err != nil {
+					t.Fatalf("mklink: %v\n%s", err, out)
+				}
+				return "../o/" + dir
+			}},
+		)
+	} else {
+		forms = append(forms,
+			form{"proc", func(_, dir string) string { return "/proc/self/cwd/" + dir }},
+			form{"link", func(root, dir string) string {
+				link := filepath.Join(filepath.Dir(root), "o")
+				if err := os.Symlink(root, link); err != nil {
+					t.Fatal(err)
+				}
+				return "../o/" + dir
+			}},
+			form{"direct-link", func(root, dir string) string {
+				link := filepath.Join(filepath.Dir(root), "o")
+				if err := os.Symlink(filepath.Join(root, filepath.FromSlash(dir)), link); err != nil {
+					t.Fatal(err)
+				}
+				return "../o"
+			}},
+		)
+	}
+	vulcan := buildVulcan(t)
+	for _, arm := range []struct {
+		name, bin string
+		check     []string
+	}{{"V", vulcan, []string{"check"}}, {"L", lintBin, []string{"./..."}}} {
+		for _, f := range forms {
+			for _, dir := range []string{".vulcan/build/evil", ".vulcan/bin/evil", ".git/evil", "third"} {
+				t.Run(arm.name+"/"+f.name+"/"+dir, func(t *testing.T) {
+					base, err := filepath.EvalSymlinks(t.TempDir())
+					if err != nil {
+						t.Fatal(err)
+					}
+					root := filepath.Join(base, "project")
+					fixture(t, arm.name, root)
+					evil := filepath.Join(root, filepath.FromSlash(dir))
+					if err := os.MkdirAll(evil, 0o755); err != nil {
+						t.Fatal(err)
+					}
+					put := func(p, text string) {
+						if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
+							t.Fatal(err)
+						}
+					}
+					put(filepath.Join(evil, "go.mod"), "module example.com/evil\n\ngo 1.26.0\n")
+					put(filepath.Join(evil, "s.go"), "package evil\n\nimport \"os\"\n\n// X stops.\nfunc X() { os.Exit(1) }\n")
+					use := filepath.Join(root, "api", "orders", "extra.go")
+					if arm.name == "V" {
+						use = filepath.Join(root, "api", "orders", "extra.vulcan")
+					}
+					put(use, "package orders\n\nimport \"example.com/evil\"\n\nfunc stopIt() { evil.X() }\n")
+					put(filepath.Join(root, "go.mod"), "module shop\n\ngo 1.26.0\n\nrequire example.com/evil v0.0.0\n\nreplace example.com/evil => "+strconv.Quote(f.target(root, dir))+"\n")
+					code, out := run(t, root, arm.bin, arm.check...)
+					if code == 0 || !regexp.MustCompile(`go\.mod:7:1: (error K0002|VL0002)`).MatchString(out) {
+						t.Errorf("a target inside the project passes: exit %d\n%s", code, out)
+					}
+				})
+			}
+		}
+		t.Run(arm.name+"/missing", func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "project")
+			fixture(t, arm.name, root)
+			for target, inside := range map[string]bool{"./missing/evil": true, "../missing/evil": false} {
+				if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module shop\n\ngo 1.26.0\n\nrequire example.com/evil v0.0.0\n\nreplace example.com/evil => "+target+"\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				code, out := run(t, root, arm.bin, arm.check...)
+				if strings.Contains(out, "panic") {
+					t.Errorf("%s: %s", target, out)
+				}
+				if inside && (code == 0 || !strings.Contains(out, "0002")) {
+					t.Errorf("%s: exit %d\n%s", target, code, out)
+				}
+				if !inside && strings.Contains(out, "0002") {
+					t.Errorf("%s is outside the project, and it is read as inside:\n%s", target, out)
+				}
+			}
+		})
+	}
+}
+
+// TestAgentK35 is what an agent sees during a run, with one new finding (audit k35, amendment 11).
+// V's build and test refuse it, and L's go command does not read rules. That stays, as a measured cost.
+func TestAgentK35(t *testing.T) {
+	for _, arm := range arms(t) {
+		t.Run(arm.name, func(t *testing.T) {
+			if c, out := run(t, arm.dir, arm.bin, "init"); c != 0 {
+				t.Fatal(out)
+			}
+			if c, out := run(t, arm.dir, arm.bin, "rules", "baseline"); c != 0 {
+				t.Fatal(out)
+			}
+			name := "api/orders/stopit.vulcan"
+			if arm.name == "L" {
+				name = "api/orders/stopit.go"
+			}
+			text := "package orders\n\nimport \"os\"\n\nfunc stopIt() { os.Exit(1) }\n\nvar _ = stopIt\n"
+			if err := os.WriteFile(filepath.Join(arm.dir, filepath.FromSlash(name)), []byte(text), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			type step struct {
+				bin  string
+				args []string
+				want int
+			}
+			steps := []step{{arm.bin, arm.check, 3}, {"go", []string{"build", "./cmd/stockroom"}, 0}, {"go", []string{"test", "./..."}, 0}}
+			if arm.name == "V" {
+				steps = []step{{arm.bin, []string{"check"}, 1}, {arm.bin, []string{"build"}, 1}, {arm.bin, []string{"test"}, 1}}
+			}
+			for _, s := range steps {
+				code, out := run(t, arm.dir, s.bin, s.args...)
+				if code != s.want {
+					t.Errorf("%v: exit %d, want %d\n%s", s.args, code, s.want, out)
+				}
 			}
 		})
 	}

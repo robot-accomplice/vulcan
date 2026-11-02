@@ -972,9 +972,9 @@ BADBASE = rawfiles({"rules.baseline": "this is not a line of the file\n"})
 CASES += [
     # N16, N18: a replace inside the project, whatever its directory
     ("R260", "N16, d2: a replace into .vulcan/build", NE_RULES, replaced(".vulcan/build/evil"), foreign()),
-    ("R261", "N18, d1: a replace into .vulcan/bin", NE_RULES, replaced(".vulcan/bin/evil"), foreign()),
+    ("R261", "N18, d1: a replace into .vulcan/bin", NE_RULES, replaced(".vulcan/bin/evil"), foreign(v_more=[MOD_AT(".vulcan/bin/evil/go.mod")], l_more=[MOD_AT(".vulcan/bin/evil/go.mod")])),
     ("R262", "N18, d4: a replace into x/.git", NE_RULES, replaced("x/.git/evil"), foreign(v_more=[MOD_AT("x/.git/evil/go.mod")], l_more=[MOD_AT("x/.git/evil/go.mod")])),
-    ("R263", "N18, gi: a replace into .git", NE_RULES, replaced(".git/evil"), foreign()),
+    ("R263", "N18, gi: a replace into .git", NE_RULES, replaced(".git/evil"), foreign(v_more=[MOD_AT(".git/evil/go.mod")], l_more=[MOD_AT(".git/evil/go.mod")])),
     ("R264", "N16, d5: a replace into .vulcan", NE_RULES, replaced(".vulcan/evil"), foreign(v_more=[MOD_AT(".vulcan/evil/go.mod")], l_more=[MOD_AT(".vulcan/evil/go.mod")])),
     ("R265", "N16, u2: GO.MOD under testdata", NE_RULES, replaced("testdata/evil", "GO.MOD"), foreign(v_more=[MOD_AT("testdata/evil/GO.MOD")], l_more=[MOD_AT("testdata/evil/GO.MOD")])),
     ("R266", "N16, u3: Go.Mod under _x", NE_RULES, replaced("_x/evil", "Go.Mod"), foreign(v_more=[MOD_AT("_x/evil/Go.Mod")], l_more=[MOD_AT("_x/evil/Go.Mod")])),
@@ -999,13 +999,25 @@ CASES += [
     ("R290", "Baseline: a wire's finding, which each arm makes in its own form", rules(WIRED), with_baseline(NO, (1, "X", "wires", "api/billing", "", WIRED_T)), {"v": [("system.vulcan", "Billing.Ledger:", "w0807", 0)], "l": [("cmd/shop/main.go", "(keeper)", "w0807", 1)]}),
     ("R291", "Baseline: a port's finding, which each arm declares in its own form", rules(PORTM), with_baseline(NO, (1, "X", "code", "api/billing", "", PORTM_T)), {"v": [("api/billing/component.vulcan", "Save(id", "w0807", 0)], "l": [("api/billing/ports.go", "Save(id", "w0807", 0)]}),
     ("R292", "Baseline: a return in a function with ensures, which V lowers", rules(RET), with_baseline(RETF, (1, "X", "code", "api/orders", "commitIt", RET_T)), ef("orders", "t.Commit()", "w0810")),
+    # N29: a call's name in the text, so that a swap of the call is new
+    ("R294", "N29: another call in a discard is new, and the old entry is stale", rules(rule("X", "code-form", form="discard-error", unless_comment="yes")), with_baseline(extra("store", "func g() error { return nil }\n\nfunc h() error { return nil }\n\nfunc aIt() {\n\t_ = h()\n}\n\nvar _ = g\n"), (1, "X", "code", "api/store", "aIt", "this assignment discards the error of shop/api/store.g, with no comment that gives the reason")), both(e("api/store/extra", "_ = h()", "0810"), both_at("rules.baseline", "rules.baseline", "1\tX", "w0811"))),
+    ("R295", "N29: another call with a built text is new, and the old entry is stale", rules(rule("X", "call-form", funcs="(*database/sql.DB).Exec (*database/sql.DB).Query", require="constant")), with_baseline(extra("store", "func runIt(d *sql.DB, q string) {\n\t_, _ = d.Query(q)\n}\n", "database/sql"), (1, "X", "code", "api/store", "runIt", "this argument of (*database/sql.DB).Exec is not a constant")), both(e("api/store/extra", "q)", "0808"), both_at("rules.baseline", "rules.baseline", "1\tX", "w0811"))),
+    ("R297", "N29: the same call in a discard stays old, with its name in the key", rules(rule("X", "code-form", form="discard-error", unless_comment="yes")), with_baseline(extra("store", "func g() error { return nil }\n\nfunc aIt() {\n\t_ = g()\n}\n"), (1, "X", "code", "api/store", "aIt", "this assignment discards the error of shop/api/store.g, with no comment that gives the reason")), e("api/store/extra", "_ = g()", "w0810")),
+    ("R298", "N29: the same call with a built text stays old, with its name in the key", rules(rule("X", "call-form", funcs="(*database/sql.DB).Exec", require="constant")), with_baseline(extra("store", "func runIt(d *sql.DB, q string) {\n\t_, _ = d.Exec(q)\n}\n", "database/sql"), (1, "X", "code", "api/store", "runIt", "this argument of (*database/sql.DB).Exec is not a constant")), e("api/store/extra", "q)", "w0808")),
+    ("R296", "N29, as listed: a finding that moves to a method of another type of one name stays old", rules(FB), with_baseline(extra("orders", 'type a struct{}\n\ntype b struct{}\n\nfunc (b) readIt() string { return os.Getenv("X") }\n\nvar _ = a{}\n\nvar _ = b{}.readIt\n', "os"), ENTRY1), e("api/orders/extra", "Getenv", "w0802")),
     ("R293", "Baseline: a library's finding, which each arm declares in its own form", rules(LIBNAME), with_baseline(NO, (1, "X", "decls", "lib/money", "", LIBNAME_T)), {"v": [("lib/money/library.vulcan", "money {", "w0807", 0)], "l": [("lib/money/money.go", "package money", "w0807", 0)]}),
 ]
+
+
+CONTRACT_EVIL = 'package contract\n\nimport "os"\n\n// Stop stops.\nfunc Stop() { os.Exit(1) }\n'
 
 
 def third_arm_cases():
     out = []
     L, V = "l", "v"
+    stop = rule("X", "forbid-call", funcs="os.Exit", **{"in": "leaf gateway entry library"})
+    out.append((V, "VC1", "N27: in V, a library named lib/contract is an ordinary library", {"lib/contract/library.vulcan": "// contract holds things.\nlibrary contract {\n}\n", "lib/contract/evil.vulcan": CONTRACT_EVIL, "rules.vulcan": rules(stop)}, [("lib/contract/evil.vulcan", "Exit", "0802", 0)]))
+    out.append((L, "LC1", "N27: in L, lib/contract is the contract package, which no rule reads", {"lib/contract/evil.go": CONTRACT_EVIL, "rules.vulcan": rules(stop)}, []))
     cases = [
         ("U1", "N16, u1: third/GO.MOD", {"go.mod": NESTED_GOMOD, "third/GO.MOD": EVIL_MOD, "third/s.go": EVIL_S}, [("go.mod", "replace", "0002", 0), ("third/GO.MOD", "module", "0002", 0)], [("third/s.go", "package", "0002", 0)]),
     ]

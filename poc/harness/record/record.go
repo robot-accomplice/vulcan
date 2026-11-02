@@ -23,10 +23,13 @@ func IsGo(arm string) bool { return arm != ArmV }
 
 // Run is one run: one agent, one task, one arm.
 type Run struct {
-	Task  string `json:"task"`
-	Arm   string `json:"arm"`
-	Index int    `json:"index"` // 1, 2, 3 for the runs of one task and arm
-	Order int    `json:"order"` // the place in the schedule
+	// FinalCheck is set only with a rules file (plan-r3, amendment 11). No record of round 1 or round 2
+	// has it.
+	FinalCheck *FinalCheck `json:"final_check,omitempty"`
+	Task       string      `json:"task"`
+	Arm        string      `json:"arm"`
+	Index      int         `json:"index"` // 1, 2, 3 for the runs of one task and arm
+	Order      int         `json:"order"` // the place in the schedule
 
 	Start       time.Time `json:"start"`
 	WallSeconds float64   `json:"wall_seconds"`
@@ -150,6 +153,13 @@ type Tests struct {
 
 // OK reports whether every test passed, and at least one ran.
 func (t Tests) OK() bool { return t.Failed == 0 && t.Passed > 0 }
+
+// FinalCheck is the result of the arm's check on the final workspace, with a rules file. It stays apart
+// from Builds, which means the same in each arm: the code compiles.
+type FinalCheck struct {
+	Passed bool     `json:"passed"`
+	Fired  []string `json:"fired,omitempty"` // the rules and the model checks that the check reports as new
+}
 
 // TaskSuccess is M3: the acceptance tests pass.
 func (r *Run) TaskSuccess() bool { return r.Builds && r.Acceptance.OK() }

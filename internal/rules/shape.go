@@ -230,7 +230,7 @@ func (s *Set) resolveNames(r *Rule, u *Unit) []Problem {
 		for _, word := range r.Params[key] {
 			for _, name := range projectNames(word, u.Module) {
 				dir, base, member, ok := projectName(name, u.Module)
-				if !ok || dir != u.Part.Dir || IsRuntimeLib(dir) {
+				if !ok || dir != u.Part.Dir || u.isRuntimeLib(dir) {
 					continue
 				}
 				if strings.HasSuffix(name, "*") && member == "" && !strings.HasPrefix(name, "(") {
@@ -1009,7 +1009,7 @@ func (u *Unit) callForm(r *Rule, add addFunc) {
 			if paramType != "" {
 				for i, a := range c.Args {
 					if i < sig.Params().Len() && types.TypeString(sig.Params().At(i).Type(), nil) == paramType {
-						u.argument(r, a, f, comment, add)
+						u.argument(r, a, f, u.callName(c), comment, add)
 					}
 				}
 				return true
@@ -1020,7 +1020,7 @@ func (u *Unit) callForm(r *Rule, add addFunc) {
 			}
 			i := argIndex(r, sig)
 			if i >= 0 && i < len(c.Args) {
-				u.argument(r, c.Args[i], f, comment, add)
+				u.argument(r, c.Args[i], f, u.callName(c), comment, add)
 			}
 			return true
 		})
@@ -1092,7 +1092,7 @@ func argIndex(r *Rule, sig *types.Signature) int {
 	return -1
 }
 
-func (u *Unit) argument(r *Rule, a ast.Expr, f *ast.File, comment bool, add addFunc) {
+func (u *Unit) argument(r *Rule, a ast.Expr, f *ast.File, call string, comment bool, add addFunc) {
 	if comment && u.commentNear(a.Pos()) {
 		return
 	}
@@ -1102,20 +1102,20 @@ func (u *Unit) argument(r *Rule, a ast.Expr, f *ast.File, comment bool, add addF
 		switch k {
 		case "constant":
 			if tv.Value == nil {
-				add("0808", a.Pos(), "this argument is not a constant: %s", r.tail())
+				add("0808", a.Pos(), "this argument of %s is not a constant: %s", call, r.tail())
 			}
 		case "not-nil":
 			if tv.IsNil() {
-				add("0808", a.Pos(), "this argument is nil: %s", r.tail())
+				add("0808", a.Pos(), "this argument of %s is nil: %s", call, r.tail())
 			}
 		case "unexported-type":
 			n := namedOf(tv.Type)
 			if n == nil || n.Obj().Exported() || n.Obj().Pkg() == nil {
-				add("0808", a.Pos(), "this argument is not of an unexported named type: %s", r.tail())
+				add("0808", a.Pos(), "this argument of %s is not of an unexported named type: %s", call, r.tail())
 			}
 		case "tagged":
 			if bad := untagged(tv.Type, v, map[types.Type]bool{}); bad != "" {
-				add("0808", a.Pos(), "the field %s has no %s tag: %s", bad, v, r.tail())
+				add("0808", a.Pos(), "the field %s, in an argument of %s, has no %s tag: %s", bad, call, v, r.tail())
 			}
 		}
 	}
@@ -1123,12 +1123,12 @@ func (u *Unit) argument(r *Rule, a ast.Expr, f *ast.File, comment bool, add addF
 		text := constant.StringVal(tv.Value)
 		for _, re := range r.Params["deny-text"] {
 			if m, _ := regexp.MatchString(re, text); m {
-				add("0808", a.Pos(), "the text %q matches %s: %s", text, re, r.tail())
+				add("0808", a.Pos(), "the text %q, in a call of %s, matches %s: %s", text, call, re, r.tail())
 			}
 		}
 		for _, re := range r.Params["require-text"] {
 			if m, _ := regexp.MatchString(re, text); !m {
-				add("0808", a.Pos(), "the text %q does not match %s: %s", text, re, r.tail())
+				add("0808", a.Pos(), "the text %q, in a call of %s, does not match %s: %s", text, call, re, r.tail())
 			}
 		}
 	}
@@ -1449,11 +1449,29 @@ func (u *Unit) droppedErrors(r *Rule, f *ast.File, report reportFunc) {
 	})
 }
 
+// callName names the function of a call, the same in both arms, for the text of a finding.
+func (u *Unit) callName(e ast.Expr) string {
+	c, ok := ast.Unparen(e).(*ast.CallExpr)
+	if !ok {
+		return "a value"
+	}
+	if fn := calledFunc(u.Info, c); fn != nil {
+		return portName(fn.FullName())
+	}
+	return types.ExprString(c.Fun)
+}
+
 func (u *Unit) discards(f *ast.File, report reportFunc) {
 	ast.Inspect(f, func(n ast.Node) bool {
 		x, ok := n.(*ast.AssignStmt)
 		if !ok {
 			return true
+		}
+		rhs := func(i int) ast.Expr {
+			if len(x.Rhs) == len(x.Lhs) {
+				return x.Rhs[i]
+			}
+			return x.Rhs[0]
 		}
 		tuple := func(i int) types.Type {
 			if len(x.Rhs) == len(x.Lhs) {
@@ -1469,7 +1487,7 @@ func (u *Unit) discards(f *ast.File, report reportFunc) {
 		for i, l := range x.Lhs {
 			if id, ok := l.(*ast.Ident); ok && id.Name == "_" {
 				if t := tuple(i); t != nil && types.TypeString(t, nil) == "error" {
-					report(x.Pos(), "this assignment discards an error, with no comment that gives the reason")
+					report(x.Pos(), "this assignment discards the error of %s, with no comment that gives the reason", u.callName(rhs(i)))
 				}
 			}
 		}

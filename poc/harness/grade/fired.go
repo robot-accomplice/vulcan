@@ -36,8 +36,8 @@ var (
 	ruleTag = regexp.MustCompile(`\(rule ([\w.-]+) in rules\.vulcan`)
 )
 
-// parseFired reads the new findings from the output of a check. A model check's text loses each word
-// that names an arm, because the judge of a match must not see the arm.
+// parseFired reads the new findings from the output of a check. A model check's text is one sentence
+// for its digit (neutral.go), because the judge of a match must not see the arm.
 func parseFired(out []byte, ws string) []Fired {
 	file, _ := rules.ParseProject(mustRead(filepath.Join(ws, rules.FileName)))
 	seen := map[Fired]bool{}
@@ -63,7 +63,7 @@ func parseFired(out []byte, ws string) []Fired {
 			}
 		} else {
 			f.Rule = "model-" + m[4]
-			f.Text = neutral(m[5])
+			f.Text = modelText(m[4])
 		}
 		if !seen[f] {
 			seen[f] = true
@@ -88,13 +88,6 @@ func partOfFile(name string) string {
 		return d
 	}
 	return name
-}
-
-var armWords = regexp.MustCompile(`(?i)[\w./-]*vulcan[\w./-]*|\b(K|VL)\d{4}\b|\bports\.go\b|\bthe manifest\b|\barch\b|\b[\w/-]+\.go\b`)
-
-// neutral removes each word of a message that names an arm.
-func neutral(msg string) string {
-	return strings.TrimSpace(armWords.ReplaceAllString(msg, "[...]"))
 }
 
 // JudgePair is one thing to decide: does the rule that fired state the team rule?
@@ -135,7 +128,7 @@ func (v *Validation) ExportJudge(meta *record.Meta) *JudgeFile {
 	}
 	out := &JudgeFile{Instructions: judgeInstructions}
 	for k, t := range best {
-		out.Pairs = append(out.Pairs, JudgePair{TeamRule: k[0], TeamText: text[k[0]], FiredRule: k[1], FiredText: t})
+		out.Pairs = append(out.Pairs, JudgePair{TeamRule: k[0], TeamText: text[k[0]], FiredRule: judgeID(k[1]), FiredText: t})
 	}
 	slices.SortFunc(out.Pairs, func(a, b JudgePair) int {
 		return strings.Compare(a.TeamRule+"\x00"+a.FiredRule, b.TeamRule+"\x00"+b.FiredRule)
@@ -170,7 +163,7 @@ func ReadMatches(p string) (Matches, error) {
 		if out[pair.TeamRule] == nil {
 			out[pair.TeamRule] = map[string]bool{}
 		}
-		out[pair.TeamRule][pair.FiredRule] = *pair.Match
+		out[pair.TeamRule][fromJudgeID(pair.FiredRule)] = *pair.Match
 	}
 	return out, nil
 }

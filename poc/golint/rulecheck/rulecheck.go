@@ -81,7 +81,7 @@ func run(pass *analysis.Pass) (any, error) {
 	unit := &rules.Unit{
 		Part: parts[u.Part.Dir], Module: u.M.Module, Parts: parts, Fset: pass.Fset, Files: pass.Files, Info: pass.TypesInfo,
 		IsTest: func(f *ast.File) bool { return model.IsTest(pass, f) },
-		Pkg:    pass.Pkg, Ports: portsOf(pass, u), TestsAbsent: testsAbsent(pass, u),
+		Pkg:    pass.Pkg, Ports: portsOf(pass, u), TestsAbsent: testsAbsent(pass, u), ContractLib: true,
 		HasEnsures: func(fd *ast.FuncDecl) bool {
 			return len(model.PrologueOf(pass.TypesInfo, fd.Body, u.M.ContractPath()).Ensures) > 0
 		},

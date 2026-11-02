@@ -1,5 +1,6 @@
 N18, d1: a replace into .vulcan/bin
 -- want.txt --
+error .vulcan/bin/evil/go.mod:1:1 K0002
 error go.mod:7:1 K0002
 -- .vulcan/bin/evil/go.mod --
 module example.com/evil

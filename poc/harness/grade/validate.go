@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -46,8 +45,14 @@ type Validation struct {
 	ShapeCounts map[string]int  `json:"shape_counts"` // "<rule>/<arm>" -> shapes
 	Problems    int             `json:"problems"`
 	// NoLabels says why this run writes no enforced label: a workspace has a rules file, and a
-	// session has not decided which rule that fired matches which team rule.
+	// session has not decided which rule that fired matches which team rule, or a base is rejected.
 	NoLabels string `json:"no_labels,omitempty"`
+	// With a rules file: EnforcedByV and EnforcedByL are as each arm ships, with a model check as a
+	// rule that fired, and the gate of plan-r3, section 5 reads them. These read the rules file alone.
+	WithRules       bool                `json:"with_rules,omitempty"`
+	RulesOnlyByV    map[string]bool     `json:"rules_only_by_v,omitempty"`
+	RulesOnlyByL    map[string]bool     `json:"rules_only_by_l,omitempty"`
+	DecidedByOneArm map[string][]string `json:"decided_by_one_arm,omitempty"` // team rule -> codes that only one arm has
 }
 
 // Item is one validated workspace.
@@ -63,6 +68,8 @@ type Item struct {
 	HasRules bool    `json:"has_rules,omitempty"`
 	Fired    []Fired `json:"fired,omitempty"`
 	Matched  bool    `json:"matched,omitempty"`
+	// MatchedFile says that a rule of the rules file matched, and not only a model check.
+	MatchedFile bool `json:"matched_file,omitempty"`
 }
 
 // Templates names the workspace of each arm.
@@ -149,12 +156,15 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 	}
 	wg.Wait()
 	v.Items = results
+	byFile := false
 	enforcedBy := func(arm, rule string) bool {
 		enforced, cases := true, 0
 		for _, it := range results {
 			if it.Kind == "seeded" && it.Arm == arm && strings.HasPrefix(it.ID, rule+"/") {
 				cases++
-				if it.HasRules {
+				if byFile {
+					enforced = enforced && it.Rejected && it.MatchedFile
+				} else if it.HasRules {
 					enforced = enforced && it.Rejected && it.Matched
 				} else {
 					enforced = enforced && it.Rejected
@@ -164,11 +174,26 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 		return enforced && cases > 0
 	}
 	v.NoLabels = g.noLabels(results)
+	for _, it := range results {
+		v.WithRules = v.WithRules || it.HasRules
+	}
+	if v.WithRules {
+		v.RulesOnlyByV, v.RulesOnlyByL = map[string]bool{}, map[string]bool{}
+		v.DecidedByOneArm = g.decidedByOneArm(results)
+	}
 	for _, r := range g.Meta.Rules {
 		if v.NoLabels == "" {
 			v.EnforcedByV[r.ID] = enforcedBy(record.ArmV, r.ID)
 			if v.EnforcedByL != nil {
 				v.EnforcedByL[r.ID] = enforcedBy(record.ArmL, r.ID)
+			}
+			if v.WithRules {
+				byFile = true
+				v.RulesOnlyByV[r.ID] = enforcedBy(record.ArmV, r.ID)
+				if v.EnforcedByL != nil {
+					v.RulesOnlyByL[r.ID] = enforcedBy(record.ArmL, r.ID)
+				}
+				byFile = false
 			}
 		}
 		for _, arm := range arms {
@@ -188,9 +213,12 @@ func (g *Grader) Validate(tmpl Templates, dir string, jobs int) (*Validation, er
 // noLabels says why a run with a rules file cannot write an enforced label, or "".
 func (g *Grader) noLabels(items []Item) string {
 	withRules := false
-	var missing []string
+	var missing, rejected []string
 	for _, it := range items {
 		withRules = withRules || it.HasRules
+		if it.Kind == "base" && it.HasRules && it.Rejected {
+			rejected = append(rejected, it.Arm)
+		}
 		if it.Kind != "seeded" {
 			continue
 		}
@@ -204,6 +232,8 @@ func (g *Grader) noLabels(items []Item) string {
 	switch {
 	case !withRules:
 		return ""
+	case len(rejected) > 0:
+		return "the check rejects the base of arm " + strings.Join(rejected, ", ") + ", so a rejection says nothing about a seeded case; write a baseline first"
 	case g.Match == nil:
 		return "a workspace has a rules file, and no match file was given: a label needs a session's decision on each rule that fired (plan-r3, section 5). Export the pairs with -export-judge, and give the decisions with -match"
 	case len(missing) > 0:
@@ -211,6 +241,24 @@ func (g *Grader) noLabels(items []Item) string {
 		return "the match file has no decision on: " + strings.Join(missing, "; ")
 	}
 	return ""
+}
+
+// decidedByOneArm lists, for each team rule, each code that one arm alone has and that matches it. Such
+// a code can put a rule in G or U by a form that only that arm has.
+func (g *Grader) decidedByOneArm(items []Item) map[string][]string {
+	out := map[string][]string{}
+	for _, it := range items {
+		if it.Kind != "seeded" {
+			continue
+		}
+		team, _, _ := strings.Cut(it.ID, "/")
+		for _, f := range it.Fired {
+			if c, ok := modelChecks[f.Code]; ok && c.arm != "" && f.Rule == "model-"+f.Code && g.Match[team][f.Rule] && !slices.Contains(out[team], f.Rule) {
+				out[team] = append(out[team], f.Rule)
+			}
+		}
+	}
+	return out
 }
 
 func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task, rule string) Item {
@@ -234,14 +282,7 @@ func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task,
 		_ = writeFile(filepath.Join(ws, "RULES.md"), b)
 	}
 	if checked(it.Arm) {
-		// exec looks a bare name up in this process's PATH, not in cmd.Env: name the tool.
-		cmd := exec.Command(filepath.Join(g.ToolDir, "vulcan"+exe()), "check")
-		if it.Arm == record.ArmL {
-			cmd = exec.Command(filepath.Join(g.ToolDir, "vulcan-lint"+exe()), "./...")
-		}
-		cmd.Dir = ws
-		cmd.Env = append(g.env(), "GOPROXY=off")
-		out, err := cmd.CombinedOutput()
+		out, err := g.checkCommand(it.Arm, ws).CombinedOutput()
 		it.Rejected = err != nil
 		_ = os.WriteFile(filepath.Join(dir, "check.log"), out, 0o644)
 		if fileExists(filepath.Join(ws, rules.FileName)) {
@@ -252,6 +293,7 @@ func (g *Grader) validateOne(tmpl Templates, dir string, it Item, overlay, task,
 			if rule != "" {
 				for _, f := range it.Fired {
 					it.Matched = it.Matched || g.Match[rule][f.Rule]
+					it.MatchedFile = it.MatchedFile || (g.Match[rule][f.Rule] && !strings.HasPrefix(f.Rule, "model-"))
 				}
 			}
 		}
@@ -414,15 +456,33 @@ func (v *Validation) Summary() string {
 	if v.NoLabels == "" {
 		label(record.ArmV, v.EnforcedByV)
 	}
-	if v.EnforcedByL != nil && v.NoLabels == "" {
+	printSets := func(prefix string, l, vm map[string]bool) {
 		sets := map[string][]string{}
-		for id := range v.EnforcedByV {
-			s := record.Rule{EnforcedByL: v.EnforcedByL[id], EnforcedByV: v.EnforcedByV[id]}.Set()
+		for id := range vm {
+			s := record.Rule{EnforcedByL: l[id], EnforcedByV: vm[id]}.Set()
 			sets[s] = append(sets[s], id)
 		}
 		for _, s := range []string{record.SetS, record.SetG, record.SetU, record.SetN} {
 			sort.Strings(sets[s])
-			fmt.Fprintf(&b, "set %s: %d (%s)\n", s, len(sets[s]), strings.Join(sets[s], ", "))
+			fmt.Fprintf(&b, "%sset %s: %d (%s)\n", prefix, s, len(sets[s]), strings.Join(sets[s], ", "))
+		}
+	}
+	if v.EnforcedByL != nil && v.NoLabels == "" {
+		if v.WithRules {
+			b.WriteString("the sets as each arm ships, with a model check as a rule that fired; the gate reads these:\n")
+		}
+		printSets("", v.EnforcedByL, v.EnforcedByV)
+		if v.WithRules {
+			b.WriteString("the sets for the rules file alone:\n")
+			printSets("rules file alone: ", v.RulesOnlyByL, v.RulesOnlyByV)
+			var teams []string
+			for team := range v.DecidedByOneArm {
+				teams = append(teams, team)
+			}
+			sort.Strings(teams)
+			for _, team := range teams {
+				fmt.Fprintf(&b, "decided by a code of one arm: %s (%s)\n", team, strings.Join(v.DecidedByOneArm[team], ", "))
+			}
 		}
 	}
 	for _, it := range v.Items {

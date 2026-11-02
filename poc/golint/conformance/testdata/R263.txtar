@@ -1,5 +1,6 @@
 N18, gi: a replace into .git
 -- want.txt --
+error .git/evil/go.mod:1:1 VL0002
 error go.mod:7:1 VL0002
 -- .git/evil/go.mod --
 module example.com/evil

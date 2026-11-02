@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/robot-accomplice/vulcan/internal/rules"
 	"github.com/robot-accomplice/vulcan/poc/harness/detect"
 	"github.com/robot-accomplice/vulcan/poc/harness/measure"
 	"github.com/robot-accomplice/vulcan/poc/harness/record"
@@ -67,6 +68,7 @@ func (g *Grader) Grade(outDir string, r *record.Run) error {
 		return err
 	}
 	r.Builds = g.build(r.Arm, ws, bin, logf)
+	g.finalCheck(ws, r, logf)
 	if g.prepared == "" {
 		if err := g.Prepare(filepath.Join(outDir, "grade")); err != nil {
 			return err
@@ -162,6 +164,25 @@ func (g *Grader) build(arm, ws, bin string, logf *os.File) bool {
 			vulcan = "vulcan"
 		}
 		cmd = exec.Command(vulcan, "build", "-o", bin)
+		// With a rules file, Builds means that the code compiles, as it does in L, and the check is
+		// recorded apart: the grader builds a copy with no rules. A model error still refuses, as it
+		// did in round 2. vulcan build itself does not change for an agent or a user.
+		if fileExists(filepath.Join(ws, rules.FileName)) {
+			plain := ws + "-no-rules"
+			defer os.RemoveAll(plain)
+			if err := os.RemoveAll(plain); err != nil {
+				fmt.Fprintf(logf, "== build (%s): %v\n", arm, err)
+				return false
+			}
+			if err := copyTemplate(ws, plain); err != nil {
+				fmt.Fprintf(logf, "== build (%s): %v\n", arm, err)
+				return false
+			}
+			for _, name := range []string{rules.FileName, rules.OriginName, rules.LockName, rules.BaselineName} {
+				_ = os.Remove(filepath.Join(plain, name))
+			}
+			ws = plain
+		}
 	} else {
 		cmd = exec.Command("go", "build", "-o", bin, "./cmd/stockroom")
 	}
@@ -171,6 +192,34 @@ func (g *Grader) build(arm, ws, bin string, logf *os.File) bool {
 	out, err := cmd.CombinedOutput()
 	fmt.Fprintf(logf, "== build (%s): %v\n%s\n", arm, err, out)
 	return err == nil
+}
+
+// checkCommand is the arm's check.
+func (g *Grader) checkCommand(arm, ws string) *exec.Cmd {
+	// exec looks a bare name up in this process's PATH, not in cmd.Env: name the tool.
+	cmd := exec.Command(filepath.Join(g.ToolDir, "vulcan"+exe()), "check")
+	if arm == record.ArmL {
+		cmd = exec.Command(filepath.Join(g.ToolDir, "vulcan-lint"+exe()), "./...")
+	}
+	cmd.Dir = ws
+	cmd.Env = append(g.env(), "GOPROXY=off")
+	return cmd
+}
+
+// finalCheck records the arm's check on the final workspace, apart from the build. It does this only
+// with a rules file, so a record of round 1 or round 2 stays as it was.
+func (g *Grader) finalCheck(ws string, r *record.Run, logf *os.File) {
+	if !checked(r.Arm) || !fileExists(filepath.Join(ws, rules.FileName)) {
+		return
+	}
+	out, err := g.checkCommand(r.Arm, ws).CombinedOutput()
+	fmt.Fprintf(logf, "== final check (%s): %v\n%s\n", r.Arm, err, out)
+	r.FinalCheck = &record.FinalCheck{Passed: err == nil}
+	if err != nil {
+		for _, f := range parseFired(out, ws) {
+			r.FinalCheck.Fired = append(r.FinalCheck.Fired, f.Rule)
+		}
+	}
 }
 
 // detector runs a rule's compiled detector: exit 1 is a violation, 0 none, anything else an

@@ -196,7 +196,7 @@ func (c *Checker) ApplyRules(plan *Plan) []rules.Edge {
 			continue
 		}
 		for path := range gp.Imports {
-			if t := c.P.ByPath[path]; t != nil && t != pkg && !t.IsLeaf && !rules.IsRuntimeLib(t.Dir) {
+			if t := c.P.ByPath[path]; t != nil && t != pkg && !t.IsLeaf {
 				edges = append(edges, rules.Edge{From: pkg.Dir, To: t.Dir, Via: "import"})
 			}
 		}
