@@ -13,8 +13,19 @@ The demo material is `poc/harness/testdata/material`, with the audit's two harml
 | `enforced by L`, `enforced by V` | `RD` | **`RD`, `RT`** | No label, and the command says why | `RD` |
 | `set S`, `set N` | `RD`; `RT` | **`RD`, `RT`; none** | None printed | `RD`; `RT` |
 
-The test adds a third shape, `RT/unrelated`, an exported function with no comment. It fires `CODE-08` in both arms. With the match file, the report says "rejected only by an unrelated rule, so it does not count", and `RT` stays in N. In V that shape does not build, and in L it builds, as with each new finding: `vulcan build` refuses a new finding, and `go build` does not read rules.
+The test adds a third shape, `RT/unrelated`, an exported function with no comment. It fires `CODE-08` in both arms. With the match file, the report says "rejected only by an unrelated rule, so it does not count", and `RT` stays in N. An agent in V still sees `vulcan build` refuse it, and one in L does not.
 
 With no rules file, the items, the labels, and the summary are the same as at commit 73ad2eb: `TestValidateNoRulesFile` compares them with a file written at that commit, before the code that reads a rules file.
+
+**The two sets, with the test's match file** (`model-0205` matches `RD`, and nothing else matches):
+
+| | S | G | U | N |
+|---|---|---|---|---|
+| As each arm ships, with a model check as a rule that fired; the gate reads this | `RD` | none | none | `RT` |
+| For the rules file alone | none | none | none | `RD`, `RT` |
+
+No rule on this demo is decided by a code of one arm: `model-0205` is in both.
+
+**A run's grade (plan-r3, amendment 11).** With the fix of N28, `RT/unrelated` in V also builds, and its check is recorded apart: `Builds` is true in both arms, and `final_check` has `passed: false` with `CODE-08`.
 
 The decisions in the test's match file are the test's own, for a check of the mechanism. A fresh session makes them for T1.
