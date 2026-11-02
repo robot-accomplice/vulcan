@@ -165,6 +165,11 @@ by a rule that matches it. A fresh session decides each match from the team rule
 of the rule that fired. It does not see the arm, the other rules' results, or the set sizes. A case
 that only an unrelated rule rejects does not count, and the report lists it.
 
+A model check counts as a rule that fired, for the gate, because the gate runs the checks as each arm
+ships. This leans toward the gate, and away from an empty G and U. So the report also gives a row for
+what the rules file alone enforces, which is what QD asks, and it lists apart each rule that a code
+of one arm decides.
+
 **What T1 cannot say.** Most rule kinds live in one shared package (`internal/rules`). On those kinds,
 a member of G or U comes from what an arm gives that package, or from a form that only one arm has.
 So T1 does not show that a second builder of the linter would reach the same result.
@@ -221,3 +226,4 @@ says yes, QN reads this repository's applications only.
 | 8 | Audit findings M8 and M10: section 2's claim on hidden layers is narrowed, the level `warn` is named, and a `warn` rule does not count as enforced | Sections 2 and 5 |
 | 9 | Audit section 2: `CTX-08`, `CODE-09`, and `CODE-11` stay in part at one package, in both arms. The limit is the design of the shared package, not of L. The wider forms are not built | [parity-r3.md](../../experiments/poc/parity-r3.md), section 2 |
 | 10 | Audit finding N17 (2026-11-01): all defaults stay on, and the base applications do not change for them. A baseline in both tools records existing findings, so only a new finding fails a check or a build. `harness validate` records the rules that fired, and a label needs a match by a fresh session (section 5). Audit finding N16: the check reads each `replace` in `go.mod` and `go.work` for a target inside the project | Sections 2 and 5; [parity-r3.md](../../experiments/poc/parity-r3.md), third rerun |
+| 11 | Audit findings N23 and N28 (2026-11-02). The check compares a `replace` target with the root by the file system. For step 8, task success means behavior, the same in each arm: the grader builds with no refusal for a rule's finding, and it records the check apart, in L and V. An agent in V still cannot run `vulcan test` with a new finding, and one in L can run `go test`. That stays a cost of V's form, and the runs measure it. A model check counts for the gate (section 5) | Section 5; [parity-r3.md](../../experiments/poc/parity-r3.md), fourth rerun |
