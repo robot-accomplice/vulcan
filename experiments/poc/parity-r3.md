@@ -1136,3 +1136,197 @@ On the demo, `RD`, "Only store opens a database", has seeded cases that fire `AR
 - A real `https` source, as before.
 - A fresh judge's decisions. Mine are for the mechanism.
 - An agent's run. N28 is from `k35` and the code of `grade.go` and `record.go`.
+
+## Fifth rerun
+
+Reviewed at commit a4056dc (branch main), with 02cedb5, a4056dc, and plan-r3, amendment 11 (d94a9af). The same reviewer ran this. The sections above stay as they were at b4ace44. This rerun is narrow, as the owner asked: the fixes of the fourth rerun, the sets, and each existing case script for a regression, on Windows and in WSL where a host can change a result.
+
+### Result
+
+**Step 3's gate (no open High finding) does not pass.** One High finding is open, and it is new here. N31 is a sixth form of the module escape, in L alone, on Windows. It needs a directory outside the project. Section "Why N31 is High" gives what speaks for and against that rating, because the gate turns on it.
+
+N23, N25, N26, N27, N29, and N30 are fixed or listed as reported. N24 is fixed except for one form (N32). The part of N28 for a rule's finding is fixed. The part for a model error stays, and I rate it Medium (N33). The fix of N28 adds a new difference (N34).
+
+| Severity | Open now | Which |
+|---|---:|---|
+| High | 1 | N31 |
+| Medium | 3 | N32, N33, N34 |
+| Low | 4 | N35, N36, N37, N38 |
+
+Listed, and not counted as open, as before: M8, M11, M12, M13, L6, L8, L9, L10, N6, N8, N19, N21, and now N30.
+
+### How I ran it
+
+- A fresh build of a4056dc, for Windows and for Linux. I reran `b1` to `b5`, `b7`, `c1`, `c2`, `a1` to `a3`, `a5` to `a10`, `a12`, and `a13`. `cmp.py` compares each case with the fourth rerun's output.
+- New scripts in my scratch directory: `a17`, `a18`, `a23` (the escape on Windows), `lx4.sh` (the escape on Linux), `a20`, `a22` (the sets and the export), `a21` (the binary, an old baseline, the exits of `-json`), `a24`, `a25` (the names of calls), `audit5_test.go` (the real `Grader.Grade`, in exports of a4056dc and of b4ace44), and `lxc/main.go` (the text of `copyTemplate`, on Linux).
+- I read nothing under `C:\Users\jonat\vulcan-poc`. I changed no file but this report, and I did not freeze `defaults v1`.
+
+### Results for each finding
+
+| Finding | Result | Run |
+|---|---|---|
+| N23 | Fixed for its forms. `es_build_unc`, `es_build_short`, `es_build_junction`, and each `li_*_proc`: K0002, VL0002. A sixth form: N31 | `a17`, `lx4.sh` |
+| N24 | Fixed for its forms. `es_git_*`, `es_bin_*`, `li_*_link`: K0002, VL0002. One form is left: N32 | `a17`, `lx4.sh` |
+| N25 | Fixed. With no baseline and a match file, the report says "no enforced label: the check rejects the base of arm L, V", and no labels file is written | `a20`, repo `c` |
+| N26 | Fixed for its words. See the export scan. A smaller point: N35 | `a20`, `a22` |
+| N27 | Fixed. `e4`: V exit 1, K0802, on a library named `contract`. L exit 0 on its `lib/contract`, which `poc/app/golint/PROTECTED` lists, and call 17 of `rules-file.md` states this | `a12` |
+| N28 | Fixed for a rule's finding. Before (b4ace44): V `builds=false`, success false. After (a4056dc): V `builds=true`, success true, with `final_check` recorded. A model error stays: N33 | `audit5_test.go` |
+| N29 | Fixed. `k17`, `k18`: new in both arms, with the old entry stale. `k5`, `k15` stay old, and the table of `rules-file.md` now states both moves. A port call has one text and one key in both arms (`a25`). An old baseline: N36 | `a13`, `a24`, `a25` |
+| N30 | Listed. V exit 1, L exit 0. `rules-file.md` line 169 states it | `a21` |
+
+**Regression.** 658 cases compared, and 2 changed: `a10 d1` and `a10 d3` each now report the nested `go.mod` as well as the `replace`, in both arms. Both stay K0002, VL0002, with the same exits. No verdict changed.
+
+**Counts.** Unchanged: strict 8, 48, 154. Looser 41, 15, 154. Auditor's looser 34, 22, 154. Base findings: V 284, L 285. Keys: V 257, L 258. Hash of `defaults v1`: `sha256:14c3ca9a9ac1603d5227ff4275375f2fd38bded91be26887b921929972a6f427`, in both arms.
+
+**Tests.** `go test ./conformance -parallel 2`, `./poc/harness/...`, and `./poc/golint/...` pass, on an export of a4056dc. `./internal/rules` passes in the repository. On that export its `TestCoverage` fails, and the repository has `core.autocrlf` true, so I read that as the line ends of my export (`git archive`), and not as a fault of the code.
+
+### The `os.SameFile` walk, attacked
+
+A leaf calls `evil.X()`, and `evil` calls `os.Exit` and `net.Dial`, with rules `ERR-08` and `ARCH-10`.
+
+| Attack | V | L | Note |
+|---|---|---|---|
+| A target that does not exist, inside (`./later/evil`) | K0002 | VL0002 | A directory above it is the root |
+| A target that does not exist, outside (`../later/evil`) | K0008 | exit 1 | The go command refuses it. So a directory made after the check needs a failing check first |
+| A broken junction in the project | K0002 | VL0002 | |
+| A broken junction outside | K0008 | exit 1 | |
+| A cycle of junctions outside | K0008 | exit 1 | |
+| A case-only difference (`./.GIT/OBJECTS/EVIL`) | K0002 | VL0002 | |
+| `\\?\`, 8.3, a junction to the root, an admin share, `::$INDEX_ALLOCATION`, to each of `.git/evil`, `.vulcan/bin/evil`, `third`, `.vulcan/build/evil`, `.git/objects/evil` | K0002 | VL0002 | 15 forms, plus 3 |
+| A volume path (`\\?\Volume{...}\`) | exit 1 | exit 1 | `go.mod` does not parse |
+| A junction inside the project, to anything | K0002 | VL0002 | Stricter than `rules-file.md` line 164: N37 |
+| A junction outside, directly to `.git/evil`, `.vulcan/bin/evil`, or `third` | K0002 | VL0002 | The walk finds the `go.mod`, not the `replace` check |
+| **A junction outside, directly to `.vulcan/build/evil`** (`es_build_direct`, `ct_bld`). Also a junction to `.vulcan`, then `build/evil` (`es_up2`) | K0008 | **exit 0**, builds | **N31** |
+| **A junction outside, directly to `.git/objects/evil`** (`es_obj_direct`, `ct_obj`). Also two junctions (`es_chain`), and a junction to `.git`, then `objects/evil` (`es_up`) | **exit 0**, builds | **exit 0**, builds | **N32** |
+| A `go.mod` in `.git/objects/evil` or `.vulcan/build/evil`, with nothing that replaces it | exit 0 | exit 0 | It brings in nothing, as the code comment says |
+| `import "shop/.vulcan/build/evil"`, with no replace | K0008 | exit 3 | |
+| Linux: `/proc/self/cwd/`, a symlink to the root, a symlink directly to the target, an absolute path, for each of the five directories | K0002 | VL0002 | 15 forms, plus 1. `filepath.EvalSymlinks` follows a symlink, so N31 and N32 do not occur here |
+
+Controls: a plain `../out` module outside the project exits 0 and builds in both (the listed limit). A plain `./third` inside gives K0002, VL0002.
+
+### N28: the model error and the copy
+
+**How often.** The repository holds one set of agent runs, `experiments/poc/data/p5-deepseek/runs.jsonl`: V and G, with no L. In it, 4 of 36 V runs did not build, and 0 of 36 G runs. All 4 are stopped runs. Their last recorded check: ok in 2, K0002 in 1, none in 1. So an upper bound is 4 in 36 (11 points), and the only one with a known model error is 1 in 36 (3 points). Each of the 4 would still need to pass acceptance in L's form to change a result, and I cannot say how many would. I have no round-2 data to count: it is not in this repository.
+
+**The effect, by the real grader on the demo.** One run, one difference:
+
+| Final code | V builds | V acceptance | V success | L builds | L acceptance | L success |
+|---|---|---|---|---|---|---|
+| Clean | true | 2 of 2 | true | true | 2 of 2 | true |
+| One new rule finding, before (b4ace44) | **false** | failed | **false** | true | 2 of 2 | true |
+| One new rule finding, after (a4056dc) | true | 2 of 2 | true | true | 2 of 2 | true |
+| One model error, before and after | **false** | failed | **false** | true | 2 of 2 | **true** |
+
+In V the holdout and each rule test also do not run (`grade.go:89`).
+
+**Did plan-r2's parity accept it?** Not by name. The code was the same in round 2 (`git show e26680c:poc/harness/grade/grade.go`, lines 154 to 170). `parity-r2.md` records the two build commands and does not discuss the difference. `plan.md` defines M3 as "The acceptance tests pass, whatever the rules", and no text of `plan.md` or `plan-r2.md` says that a model error fails a task in one arm only. Amendment 11 names "a rule's finding", and it does not name a model error. The sentence "A model error stays as in round 2" is in the commit message of 02cedb5 and in a comment in `grade.go`.
+
+**Does the copy give the same binary?**
+
+| Comparison | Result |
+|---|---|
+| `vulcan build`, with the rules files and with none, from one path | Byte for byte equal: `73f14ed09172` both. The rules files do not change the code |
+| Two real builds in one directory, at b4ace44 | Equal: `ffc9caecf579` |
+| The graded binary (from `workspace-no-rules`) and a real build (from `workspace`), at a4056dc | Differ: 17804800 and 17803776 bytes. The graded one holds the text `-no-rules` 21 times. `go version -m` differs only in the first line, the file path |
+
+So the copy changes the source paths in the binary, and nothing else that I found. A difference in behavior needs a program that prints its own source path, such as a stack trace. The copy also drops `.git`, so V's binary has no VCS stamp where L's can have one. That reads only through `debug.ReadBuildInfo`. I did not run a project with `.git` through this comparison.
+
+**What the copy cannot do:** N34.
+
+**The fail-first gaps.** I ran the "before" myself. For N28, the same test on an export of b4ace44 shows V `builds=false` on a new finding, so the test would have failed first. For N26, the export of the fourth rerun's tool gives `model-0205` with the text "api/inventory uses the network function database/sql.Open, but leaf Inventory is not a gateway or an entry leaf; ...". The new export gives `check-8f638d44` and one sentence. So each fix does what it says. The gap hides N34: `TestBuildsMeansCompiles` grades only files that the copy keeps.
+
+### The sets
+
+| Check | Result |
+|---|---|
+| The demo, with `model-0205` matching `RD`, as each arm ships | S `RD`, N `RT`. As `N17-demo.md` says |
+| The demo, for the rules file alone | N `RD`, `RT`. As `N17-demo.md` says |
+| The demo: decided by a code of one arm | None. As it says |
+| My shape: `RL`, L's `main` calls a function of a leaf, `model-0907`, in L only | L enforces, V does not: G `RL`. Rules file alone: N. Listed: "decided by a code of one arm: RL (model-0907)" |
+| My shape: `RV`, a wire names a missing constructor, `model-0107`, in V only | V enforces, L does not: U `RV`. Rules file alone: N. Listed: "RV (model-0107)" |
+| My shape: `RC`, a type error, with the match false | V fires `model-0008`, L fires nothing. Each is "not enforced", N |
+| The table of 69 codes in `neutral.go`, each `arm` mark, against the codes in each arm's source | No code is missing. Each one-arm mark holds: 19 V, 8 L |
+
+These are correct on my shapes. One limit: `decidedByOneArm` reads model codes only. A rule kind that fires in one arm by form (`at field`, `at param`) shows in G or U, and it is not on this list. `rules-file.md` states that form. On the demo, my scratch repository also reports problems for `detector RD`, and those do not touch the sets. `TestValidateWithRules` in the repository runs this demo with its detector.
+
+### The export, scanned
+
+Run on the demo and on my shapes, with pairs from each arm.
+
+| Scan | Result |
+|---|---|
+| A field or a value that names an arm | None |
+| A path, a file extension (`.go`, `.vulcan`), a K or VL code, `model-` with digits | None. The only hit of my list is the text `ARCH-` in a rule's id, in both arms |
+| Hashes that differ by arm | None. The id comes from the digits alone, so `model-0205` is `check-8f638d44` for each arm |
+| The order of pairs | Sorted by team rule, then by id. Nothing from an arm |
+| A pair from one arm | It has the same form as any other. `RL` and `RV` show this |
+| What is left | N35 |
+
+### New findings
+
+#### N31. High. In L alone, on Windows, a junction outside the project reaches `.vulcan/build`
+
+- **Where:** `internal/rules/check.go:454`, `insideRoot`. It walks up the path as written, and then the path from `filepath.EvalSymlinks`. By this result, neither reaches the root for a junction outside the project that leads to a directory inside it. The later walk for a `go.mod` skips `.vulcan/build`.
+- **Case `ct_bld`:** `replace example.com/evil => ../pL`, with `pL` a junction to `<project>/.vulcan/build/evil`. That directory holds `go.mod` and a `.go` file that calls `os.Exit(1)` and `net.Dial`. A leaf calls `evil.X()`. **L exit 0, and `go build ./cmd/shop` passes. V exit 1, K0008**, as `vulcan check` clears that directory. `es_up2`, a junction to `.vulcan`, then `build/evil`, gives the same.
+- **The text:** `rules-file.md` line 90 says "a link outside the project that leads back in is inside". This case does not hold to that.
+- **Why High:** it is the escape of H3, N1, N10, N16, and N23: code inside the project that leaves the model and each rule, with exit 0, in one arm. `es_build_junction` needed a junction outside the project too, and it was part of N23's High.
+- **Favors:** L passes more. A rule can land in U because of it.
+- **Smallest fix:** in the walk, at each step that is a reparse point, follow it with `os.Readlink`, which reads a junction, and walk again. Or walk the two skipped directories for a directory that `os.SameFile` matches with a target.
+
+##### Why N31 is High
+
+The gate turns on this rating, so here is each side. I did not change the bar, so it stays High.
+
+- **For High:** the wording of N23 fits it, word for word. The form is L only, with exit 0, and the bytes are inside the project.
+- **Against, as context:** it needs a directory entry outside the project, and it occurs on Windows only. With that same power, a plain `../out` module already exits 0 in both arms (`ct_out`, the listed limit), so an agent in V can take code out of the rules too. So N31 gives L no power that V lacks. It differs only in where the bytes lie.
+
+If the owner lists this form with the module outside the project, the High count is 0. That choice is the owner's, and this report does not make it.
+
+#### N32. Medium. In both arms, on Windows, a junction outside the project reaches `.git/objects`
+
+`es_obj_direct`, `ct_obj`, `es_chain`, `es_up`: exit 0 in both, and each builds. It is a hole in both, so Medium, as N18 and N24 were. The same fix as N31 closes it.
+
+#### N33. Medium. With a model error in the final code, V does not build and L does, so `TaskSuccess` differs by arm
+
+- **Where:** `poc/harness/grade/grade.go:166` to `:187`, `poc/harness/record/record.go:165`. `TaskSuccess` does not read `final_check`.
+- **Case:** the table above. One model error, with behavior that passes: V success false, L success true.
+- **Why Medium:** this is N28's form on a smaller set. N28 was High because it hit "an ordinary form of code": one new finding of any of 61 rules, which an agent can leave and still test in L. A model error stops `vulcan check`, `vulcan build`, and `vulcan test` in V at once, and it prints exit 3 in L, so a final state with one comes from a run that stopped or gave up. In the only data here, that is at most 4 of 36 runs, and 1 of 36 with a known model error. It rises to the level of N28 only if such ends are common in step 8. That is not measured.
+- **Against this rating:** read as "a run's success differs by arm", it is High. The upper bound of 11 points is above the 10 points of `plan.md`'s "Promising" limit on ordinary tasks, though not all 4 would pass in L. I rate by the frequency that I can show, and I state this so that the owner can read it the other way.
+- **Favors:** L on M3 and M1.
+- **Smallest fix, one of these. The choice is the owner's:**
+  - In `TaskSuccess` for a run with a rules file, count a model code in `final_check` as no success, in both arms.
+  - State in plan-r3 that M3 keeps this difference, as a cost of V's form, and report in step 8 how many runs it decided. `final_check.fired` gives the count.
+
+#### N34. Medium. The grader's copy can fail or hang in V, on a workspace that L builds
+
+- **Where:** `poc/harness/grade/grade.go:177`, `copyTemplate` at `poc/harness/grade/validate.go:361`. It was written for templates, and it now reads an agent's final workspace. It is new in 02cedb5, and only with a rules file.
+- **Cases, by the real grader on Windows, before and after:**
+
+  | Final workspace | V before | V after | L |
+  |---|---|---|---|
+  | `//go:embed seed.db` in a leaf (the copy drops `*.db`) | builds, success | **no build, no success** | builds, success |
+  | A junction to a directory, anywhere in the workspace, used by nothing | builds, success | **no build, no success** | builds, success |
+
+- **Cases on Linux, by the same function's text alone:** a symlink to a directory, a broken symlink, and a socket each give an error, so V would not build. A FIFO blocks: **after 6 seconds the copy had not returned**, and the build step has no time limit that I found around it. I did not run these through the grader. Symlinks could not be created in my Windows test, so that row has no Windows result.
+- **Why Medium:** a run's success differs by arm, in V's disfavor, with code that passes. The forms are not common, so it is a smaller version of N28.
+- **Favors:** L on M3 and M1. The FIFO costs a grader's run, in V only.
+- **Smallest fix:** copy each regular file except the four rules files, including `*.db`, and pass over what is not a regular file. Better for the embed case: a grader-only way to run the real build in the workspace with no rule's refusal. A test with an embedded file and a link.
+
+#### Low
+
+| # | Finding | Case | Where | Favors | Smallest fix |
+|---|---|---|---|---|---|
+| N35 | The sentences of one-arm codes describe a form that one arm has: "The start of the program..." (L), "A wiring...", "A startup function..." (V). The id is a plain SHA-256 of `model-NNNN`, so 10,000 tries reverse it, and `neutral.go` holds the arm. A judge sees only the pair, and plan-r3 says that a judge does not read this repository. A judge who knows both forms could guess an arm on 27 codes | `a22`, `RL`, `RV` | `poc/harness/grade/neutral.go` | Neither | Accept and list it, or add a per-export salt to the id |
+| N36 | N29 changes the text in 6 keys and the hash of `defaults v1` stays. A baseline from the prior tool then fails: V exit 1, L exit 3, 6 new findings and 6 stale. `rules baseline` clears it. No baseline exists outside this repository, and `defaults v1` is not frozen, so nothing is broken today. After the freeze, a change of a message would do this with no change of the hash | `a21` | `internal/rules/baseline.go`, `shape.go` | Neither | One line in `rules-file.md`: the tool's version is part of what a baseline holds, or a version in the file |
+| N37 | `rules-file.md` line 164 says that a link or a junction in the project to a module outside passes. It gives K0002, VL0002 in both (`ct_in_out`, `ct_nest`). The check is stricter than the text. Line 90 is N31 | `ct_in_out`, `ct_nest` | `docs/poc/rules-file.md:164` | Neither | Change the row |
+| N38 | `unless-comment` takes the doc comment above a one-line function as the reason. `// Drop is.` over `func Drop() { _ = g() }` passes `ERR-03` in both, and the same code on separate lines fails in both. Equal, and not listed | `a25`, first form | `internal/rules/shape.go` | Neither | One row in Limits, or read only a comment inside the body |
+
+### What I could not check
+
+- The sealed seeded cases, as before.
+- A real `https` source, as before.
+- A fresh judge's decisions. Mine are for the mechanism.
+- An agent's run. N33 and N34 are from the real grader on a seeded final state. How often a run ends in such a state in step 8 is not measured.
+- Round-2 run data, which is not in this repository. The frequency in N33 is from `p5-deepseek` alone, with arms V and G.
+- Windows symlinks, which my account could not create. Junctions stand in for them, and `EvalSymlinks` was tested on Linux.
+- N34's Linux rows through the whole grader.
