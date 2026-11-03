@@ -1330,3 +1330,143 @@ If the owner lists this form with the module outside the project, the High count
 - Round-2 run data, which is not in this repository. The frequency in N33 is from `p5-deepseek` alone, with arms V and G.
 - Windows symlinks, which my account could not create. Junctions stand in for them, and `EvalSymlinks` was tested on Linux.
 - N34's Linux rows through the whole grader.
+
+## Sixth rerun
+
+Reviewed at commit 4752184 (branch main), with 4f4eecc, 8bd9c25, and plan-r3, amendment 12. 4752184 adds only `docs/poc/hypotheses-views.md`. The same reviewer ran this. The sections above stay as they were at 6038e4a. This rerun is narrow, as the owner asked: the fixes of the fifth rerun, the forms that can bring code into a build, the grader's copy, and each existing case script for a regression.
+
+### Result
+
+**Step 3's gate (no open High finding) does not pass.** Two High findings are open. Both are new here, and both are older than the fixes: the fixes did not add them. Each is code that the build holds and that no rule and no model check reads, with exit 0, in L alone:
+
+- **N39.** An assembly file and a function with no body in L's `main`. H6 reads only leaves and libraries, and V has no `main` that a person writes.
+- **N40.** A leaf's directory that is a junction. `go ./...` does not follow it, so L's check never loads the leaf, and `go build` does. V gives K0003.
+
+Amendment 12 closes N31, N32, and N8 for each form of `replace` that I tried, in both arms. N33's fix holds as stated, with one Low point about a count (N42). N34's fix holds on the grading path that the harness uses. On a Linux host, two forms are left (N43). A form that both arms share is new: the `ignore` directive of `go.mod` (N41).
+
+N35, N36, and N38 are now stated in `rules-file.md`, in judgment calls 35 and 36 and in the paragraph on baselines. I count them as listed, not open. N37's row is changed, and its new reason is wrong (a new form, Low).
+
+| Severity | Open now | Which |
+|---|---:|---|
+| High | 2 | N39, N40 |
+| Medium | 1 | N41 |
+| Low | 3 | N37, N42, N43 |
+
+Listed, and not counted as open, as before: M8, M11, M12, M13, L6, L8, L9, L10, N6, N19, N21, N30, and now N35, N36, N38. N8 is closed by amendment 12.
+
+### How I ran it
+
+- A fresh build of 4752184, for Windows and for Linux, and an export of it (`git archive`) for tests that call the grader's own functions.
+- I reran 21 case scripts: those of the fifth rerun's regression, and `a4` and `c3`. `cmp6.py` compares each case with the fifth rerun's output.
+- New scripts in my scratch directory: `a26`, `a27` (assembly and the reads of L's `main`), `a28` (a parent `go.work`, `-modfile`, the `ignore` directive, a module from a file proxy), `a29` (the `ignore` directive), `a30`, `lx6.sh`, and `audit6_test.go` (the grader's `copyForBuild`, then each arm's build, on Windows and on Linux), and junction runs on Windows (`s5` to `s8`).
+- I read nothing under `C:\Users\jonat\vulcan-poc` and no sealed case. I changed no file but this report, and I did not freeze `defaults v1`.
+
+### 1. What brings code into a build
+
+| Form | V | L | Note |
+|---|---|---|---|
+| `replace` to a junction outside, to `.vulcan/build/evil` (N31: `ct_bld`) | K0002 | VL0002 | Closed |
+| The same to `.git/objects/evil` (N32: `ct_obj`) | K0002 | VL0002 | Closed |
+| `replace` to `../out` (N8: `ct_out`), `./third`, and each junction form inside (`ct_in*`, `ct_nest`) | K0002 | VL0002 | Closed, by the text alone |
+| A `go.work` in the parent directory with a `replace`, `GOWORK` not set (`pw`) | K0209, no build | **exit 0, builds** | The listed limit, as the row of Limits states it. With `GOWORK=off`, as the grader and the runner set it: both fail (`pw_off`) |
+| `GOFLAGS=-modfile=` a second file with a local `replace` (`modfile`) | K0209 | exit 1 | Both checks fail. The grader and the runner set `GOFLAGS` themselves, so a workspace cannot set it |
+| A module by its module path from a file proxy outside, by `require` or by a `replace` with a version (`proxy`, `proxyrep`) | K0209 | exit 0, builds | The listed limit. V fails here only for want of a `go.sum` line. The grader sets `GOPROXY=off`, and the sandbox has its own module cache, so an agent cannot add a module there |
+| An assembly file in L's `main` (`m_asm`) | No such place | **exit 0, builds, runs** | **N39** |
+| A leaf's directory that is a junction, to `_keep`, `testdata`, `.keep` inside, or to a place outside (`s7*`, `s6`) | K0003 | **exit 0, builds** | **N40** |
+| The `ignore` directive of `go.mod` on a part (`i1` to `i7`) | **exit 0, builds** | **exit 0, builds** | **N41** |
+| A junction in the project to a module outside, with nothing that replaces it (`s8`) | exit 0 | exit 0 | Harmless, because no `replace` can reach it. `rules-file.md` says it fails: N37 |
+
+**The backslash fallback (`refused`).** On Windows, R300 to R305 pass in both arms. The function reads a line only when the parser's error says "Windows path", and x/mod v0.42.0 gives that error only for a directory path with a backslash on a host that is not Windows. The go command uses the same parser, so it refuses the same file. I found no text that the go command accepts and the check reads otherwise. I did not run the Linux side myself. `TestReplaceByFileSystem` covers it in the repository.
+
+**The build `go.mod` (`internal/gen/leaves.go`).** With the rewrite removed, the project's `go.mod` is copied as it is, and the runtime's `require` and `replace` are added. Each V build in this rerun and in the conformance tests used it, and each one built. A project's `go.mod` can no longer hold a relative `replace`, so the rewrite has nothing left to change.
+
+### 2. N33
+
+- **A shared model code is no success in both arms.** `TaskSuccess` reads `final_check.model`. In V, such a code also stops the build, so V fails M3 in either case. In L the build passes, and the code now fails M3. `TestModelError` shows each case.
+- **One-arm codes are counted apart.** The table of `neutral.go` has 19 codes of V alone, 8 of L alone, and 42 shared, as `rules-file.md` says. A one-arm code goes to `one_arm` and does not fail M3. In V such a code still stops the build, so V fails M3 there, and `CountModel.OneArm` counts those runs. That is the difference as stated.
+- **"An unknown code counts as shared."** The rule is the same in both arms. Its effect falls on L alone, because in V each model code already stops the build. So it moves L toward V's result, never the other way. `TestModelChecksTable` holds the table to the code, so the guard does not act today.
+- **The count `Decided`:** N42.
+
+### 3. N34
+
+| Final workspace | Host | V: check, copy, build | L: check, build |
+|---|---|---|---|
+| Control | Windows, Linux | ok, ok, builds | ok, builds |
+| A source file that is a symlink | Linux | ok, ok, **no build** (`undefined: Z`) | ok, **builds** |
+| The same link, made in WSL on the Windows drive, as the sandbox would | Windows | **fail** (cannot open) | **fail**, no build |
+| A file with mode 000 | Linux | ok, **copy error** | ok, **builds** |
+| A directory with mode 000 | Linux | fail, copy error | fail, builds |
+| `chmod 000` made in WSL on the Windows drive | Windows | No effect: the drive has no metadata, and the file stays readable | |
+| A FIFO | Linux | ok, ok, builds | ok, builds |
+| A FIFO made in WSL on the Windows drive | Windows | `mkfifo` is not supported there | |
+| A leaf's directory that is a junction | Windows | K0003 | exit 0, builds (N40) |
+
+The harness runs an agent in WSL with the workspace on the Windows drive, and it grades on Windows. On that path, the link and the mode give the same result in both arms, and a FIFO cannot be made. So the copy gives no difference there. On a Linux host that grades, two forms give V no build where L builds: N43. The builder's named lean, code that reads a file through a link, is one case of it. A source file that is a link is another. I found no form that builds in V and not in L.
+
+### 4. N35 to N38
+
+| Finding | Result |
+|---|---|
+| N35 | Stated, in the judge's paragraph, and judgment call 36 |
+| N36 | Stated, in the paragraph "The tool's version" |
+| N37 | The row is changed. Its new reason, "because the walk finds its `go.mod`", does not hold: `filepath.WalkDir` does not follow a junction, and `s8` passes in both arms. That is harmless, since no `replace` can reach it, but the text is wrong. Low |
+| N38 | Stated, as the rule is, and judgment call 35 |
+
+### 5. Regressions
+
+**Regression.** 694 cases compared, in the fifth rerun's scripts and also `a4` and `c3`. One changed: `a3 t12`, "a module outside the project, with a replace", was exit 0 in both arms and is now K0002 and VL0002. That is amendment 12, the same in both arms. No other verdict or code changed.
+
+**Tests.** In the repository at 4752184, with `-timeout 30m`: `go test ./...` at the root, which holds `conformance`, `internal/rules`, and `poc/harness`, and `go test ./...` in `poc/golint`. Both pass.
+
+**Counts.** `internal/rules/defaults`, `experiments/poc/r3`, and `poc/app` have no change since 6038e4a. The base applications have no `replace`. So the counts of the fifth rerun stand, and so does the hash of `defaults v1`, `sha256:14c3ca9a9ac1603d5227ff4275375f2fd38bded91be26887b921929972a6f427`. `TestDefaultsOnBase` passes.
+
+### New findings
+
+#### N39. High. In L alone, assembly in `main` reaches the build, and no rule reads it
+
+- **Where:** `poc/golint/imports/imports.go:29` and `:33`. `foreignCode` and `Bodyless` skip a part of kind `Main`. So does the `//go:linkname` check, at `:65` to `:70`.
+- **Case `m_asm`:** in `cmd/shop/main.go`, `func evil() int`, with its body in `cmd/shop/evil_amd64.s`, and `main` ends the process when `evil()` returns 42. With `ERR-08` and `ARCH-10`: **L exit 0, `go build` passes, and the binary exits 7.** With no rules file, also exit 0. The same in a leaf gives VL0126 in L and K0126 in V (`m_leaf`). A bodyless function with `//go:linkname` in `main` also gives exit 0 (`m_link`).
+- **What `main` may not do in Go:** L reads `main`'s Go code. `net.Dial` and `exec.Command` there give VL0205 (`a27`). Assembly is not read, so it can do what the Go code may not.
+- **V:** V generates `main` from `system.vulcan`, and a person writes no Go code there. So V has no such place.
+- **Why High:** it is the escape of H3, N1, N10, N16, N23, and N31: code inside the project that leaves the model and each rule, with exit 0, in one arm. Unlike N31, it needs nothing outside the project.
+- **Favors:** L passes more.
+- **Smallest fix:** apply H6 and the `//go:linkname` check to `main` too, in L.
+
+#### N40. High. In L alone, a leaf's directory that is a junction leaves the check, and the build holds it
+
+- **Where:** L runs its check on `./...`. The go command does not follow a junction or a symlink to a directory when it expands `./...`, so the leaf is not a package that the check loads. `go build ./cmd/shop` imports it through the junction. The walk for a `go.mod` does not follow it either.
+- **Cases, on Windows:** `api/orders` is a junction to `_keep/orders`, `testdata/orders`, or `.keep/orders` inside the project (`s7*`), or to a directory outside it (`s6`). The leaf holds `os.Exit(2)`, which `ERR-08` forbids. **L exit 0, and `go build` passes.** `vulcan-lint ./api/orders` on the same leaf gives VL0802, so the code is there and the pattern is what leaves it out. V gives K0003, because it does not find the leaf's directory.
+- **Linux:** not run. The go command's documentation says that `./...` does not follow a symlink to a directory either, so I expect the same result there, but I did not show it. A link that WSL makes on the Windows drive cannot be opened on Windows, so on the harness's grading path L's build fails too.
+- **Why High:** the same wording as N39. The bytes are inside the project, in `_keep`, `testdata`, or `.keep`.
+- **Against, as context:** it needs a junction, which an agent in the sandbox cannot make on the Windows drive. A run on the host can make one.
+- **Favors:** L passes more.
+- **Smallest fix:** load each part of the manifest by its import path, not by `./...` alone, or reject a part's directory that is a link, in both arms.
+
+#### N41. Medium. In both arms, the `ignore` directive of `go.mod` takes a part out of each rule and the model
+
+- **Where:** `go.mod` can say `ignore ./api/orders` (Go 1.25). The go command then leaves that directory out of `./...` and still builds it when it is imported. Both checks load packages through the go command, and `ForeignRoots` reads the `replace` lines of `go.mod`, not `ignore`.
+- **Cases (`a29`):** a leaf with `func init() { os.Exit(2) }` gives K0117 and K0802 in V, and VL0117 and VL0802 in L, with no `ignore` (`i0`). With `ignore ./api/orders`, `ignore api/orders`, or `ignore ./lib` on a library: **exit 0 in both, each builds, and the binary exits 2 or 5**, also with no rules file (`i1`, `i3`, `i6`, `i7`). A leaf that imports a leaf passes in both (`i4`). An ignored plain directory that a leaf imports still fails in both (`i5`). With `ignore ./api`, V's binary exits 0 at once, and L's exits 2 (`i2`). I did not look further into that.
+- **Why Medium:** a hole in both arms, as N18 and N32 were. Its reach is wider than theirs: one line in a file that the agent can write, in each arm, with no link and nothing outside the project.
+- **Smallest fix:** reject an `ignore` directive in the root `go.mod`, in the shared function of amendment 12, as is done for a `replace` by a local path.
+
+#### N42. Low. `CountModel.Decided` is 0 in V by its definition
+
+`Decided` counts a run with a shared model code that builds and passes its acceptance tests. In V such a code stops the build, so V's count is always 0, and only L's count has meaning (`TestModelError` checks `Decided[V] == 0`). M3 is not affected. A report of step 8 that sets the two counts side by side would mislead. **Fix:** count, in each arm, the runs with a shared model code, or state that the count is L's alone.
+
+#### N43. Low. On a Linux host, the copy for V's build still loses some workspaces that L builds
+
+A source file that is a symlink, and a file with mode 000 anywhere, give V no build (`undefined: Z`, or a copy error) and L a build (`lx6.sh`). The harness grades on Windows, from a workspace on the Windows drive, and there neither form gives a difference. So this reaches only a grader on Linux. **Fix:** state it, or for a grader on Linux, copy the target of a link to a file.
+
+### Decisions for the owner
+
+- **N39 and N40 decide the gate.** Each is in L alone, and each has a small fix in L or in the shared loading. If the owner instead lists N40 as a limit of the host's links, the High count is 1, and N39 stays.
+- **N41.** Whether to reject `ignore` with the same rule as a local `replace`. It is a one-line form in both arms.
+- **N43.** Whether a grader on Linux is in scope. If not, it can be listed.
+
+### What I could not check
+
+- The sealed seeded cases, as before.
+- A fresh judge's decisions, an agent's real run, and round-2 run data, as before.
+- Windows symlinks, which my account could not create. Junctions stand in for them.
+- On Linux: N39, N40, and the backslash fallback, which I did not run myself.
+- The cause of `i2`.
