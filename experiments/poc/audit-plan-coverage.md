@@ -1225,3 +1225,313 @@ See S2.
 4. The four High findings of section 8.6 that are still open: R2, R3, R4. R1 is closed.
 
 A check of these six High fixes is enough before the owner decides D1a.
+
+## 10. Third rerun, on draft 3
+
+Object: draft 3 of `plan-coverage.md` (491 lines, working tree, not committed), and
+`experiments/poc/sim/cs-sim.py` with its two output files `r10a.txt` and `r10b.txt`. I ran the
+script, and I ran my own checks of the method (section 10.8). Not read: anything under
+`C:\Users\jonat\vulcan-poc`, and hidden harness material.
+
+### 10.1 Result
+
+- **Of the 26 open findings:** 21 are Closed, 5 are Partly closed (R5, R17, S1, S2, S7), and 0 are
+  Open.
+- **New findings:** High 1 (W1), Medium 6 (W2 to W7), Low 2 (W8, W9).
+- **Open after this rerun,** counting each partly closed finding once, by its residual: High 1 (W1,
+  the residual of S1 and R5), Medium 6 (W2 to W7; W7 is the residual of S2, W2 of S7), Low 3 (W8,
+  W9, R17).
+- **Verdict: not ready to accept as written.** One High remains. The method of rule 5 is sound for
+  one stream of units with a constant mean. Rule 7 feeds it a stream whose mean changes by batch,
+  and my simulation shows false verdicts at 17% to 31%, not at most 5%. The fix is small: change the
+  form of replication, define the estimand, and simulate again. After that fix, the plan is ready for
+  the owner to decide D1a, with W2 to W9 fixed or accepted as named limits.
+
+### 10.2 Status of each open finding
+
+| Finding | Status | Reason |
+|---|---|---|
+| R2 (High) | Closed | Every column has the same four outcomes with ±X. Accepted rules set X and are reported as the hr3 reading. Section 9 lists each change, T23 and T24 included |
+| R3 (High) | Closed | Option A: P's linter has a default configuration from published practice, frozen with `defaults v1` before any blind rule. Option B is secondary (D14) |
+| R4 (High) | Closed | The primer stays in every condition. The primary is V against V−hints |
+| R5 | Partly closed | The task is the unit, so runs of one task are inside the unit. But tasks, seeds and rules of one batch share one writer, and rule 7 changes the model or corpus by batch. The method assumes a constant mean across units. See W1 |
+| R6 | Closed | Batches of 36 workspaces, read by rule 5. The new netting of faults against false alarms is W5 |
+| R7 | Closed | Rows 11c, 16, 17 read an outcome that exists in every arm. Rows 5c and 18 against P go to the owner as D12, with a reason |
+| R8 | Closed | Section 5: C2 has warnings on and off |
+| R9 | Closed | Section 3 and C2's P−linter condition |
+| R10 | Closed | Rule 2 |
+| R11 | Closed | Phase A' |
+| R12 | Closed | T2 is history |
+| R14 | Closed | Build order and 65 to 115 sessions |
+| R15 | Closed | Section 4 and rule 11 |
+| R16 | Closed | Section 3 |
+| R17 | Partly closed | T29a still has no measure and no margin. The plan now gates C6 on them, which is a justified sequence. The finding closes when the views amendment states them |
+| R18 | Closed | A request path is the primary. Its sign is W3 |
+| R19 | Closed | The status paragraph names section 11 |
+| R20 | Closed | Rule 9 |
+| S1 (High) | Partly closed | One confidence sequence per column replaces the series of tests. It is valid for one stream with a constant mean. With the alternation of rule 7, it is not (W1) |
+| S2 (High) | Partly closed | The design is fixed, every batch pools, and funding is per campaign from a blind memo. Two paths remain for choices after data: D13 and the view of open intervals (W7) |
+| S3 | Closed | Rule 5 replaces the group sequential design. Count rules become interval readings |
+| S4 (High) | Closed | The union of enforced rules, P's linter included; per-rule results; the lean is named |
+| S5 | Closed | The second model is D5's, named before any pilot, in every arm |
+| S6 | Closed | Rule 14: calibration sets only the variance and the correlation, for cost |
+| S7 | Partly closed | Section 6 simulates task success at X = 12 points. The columns with small margins, which drive C1's cost, are not simulated (W2) |
+| S8 | Closed | Rule 7: no batch repeats after a result |
+
+### 10.3 Is the confidence sequence valid as used?
+
+I checked the code of `cs-sim.py` against Waudby-Smith and Ramdas (hedged capital, theorem 3).
+
+- **The method, for one stream.** Valid.
+  - λ at unit t uses the variance estimate from units 1 to t−1, so it is predictable.
+  - μ̂ and σ̂² follow the paper's plug-in rule.
+  - The truncations c/m and c/(1−m) with c = 1/2, and θ = 1/2, are as the paper states.
+  - The grid has 2,000 points, a step of 0.001 on the D scale. That is fine for margins of 0.05 and
+    more. For ln 1.05 on a range of ±ln 4, one grid step is about 3% of the margin. That is fine,
+    too.
+- **Batch-end reads.** Valid. The sequence holds at every time at once, so a read at a subset of
+  times (batch ends) keeps the bound. Reading at every unit would also be valid.
+- **The running intersection.** Valid, under the same assumption. The script keeps a point m alive
+  until its capital first crosses 1/α, which is the intersection over all past times. It reports the
+  hull of the live points, which is conservative.
+- **The four outcomes.** Valid. With one sequence that covers the mean at all times with
+  probability 0.95, the chance that any of the three verdicts is false is at most 5%. My check at a
+  true difference exactly at +X gave 1 false verdict in 200 (section 10.8, case 1).
+- **Clipping.** Valid for the mean of the clipped values. It changes the estimand, not the error
+  rate. The estimand is then not the mean of D. See W6.
+- **Pooled alternating replication.** Not valid. See W1.
+- **An empty intersection.** Not defined. See W9.
+
+**The assumption that rule 5 does not state.** Theorem 3 needs the conditional mean of each new
+unit, given all past units, to be the same value m. Rule 5 says "the true mean", but rule 7 makes
+the mean change with the batch: model A, then model B, then model A. Then the capital at the pooled
+mean rises in each batch whose mean lies on the other side of it. It is not a supermartingale, so
+Ville's inequality does not bound its running maximum.
+
+### 10.4 Is the simulation sound?
+
+- **The code matches the method.** See 10.3.
+- **The table reproduces in part.** I ran the two command lines that the script header names, with
+  5 runs a task. The rows at true differences 0, +4, +6, +7, +9 and −22 points (base 0.8) and at
+  +15, +18, +21 and −10 points (base 0.6) match the table exactly. Two rows, +10 and +13 points at
+  base 0.8, are not produced by those command lines. Their command is not recorded (W8).
+- **"No simulation gave a false verdict"** is true for the stated cases. But no stated case tests
+  where validity can fail: a true difference at ±X, or a mean that changes by batch. I ran both
+  (10.8).
+- **The data model is optimistic.** Each task has one success rate p, and the other condition has
+  p + δ. So the task effect cancels in D, and there is no task-by-arm interaction. With an
+  interaction of standard deviation 15 points, the batches at a true 0 rose from 4 (90th percentile
+  5) to 5 (7). The effect is modest for this margin.
+- **The batch medians are over the runs that reached a verdict.** For +13 points, "26 (27)" is the
+  median of 7 runs in 200. A reader can take it for a typical count (W8).
+- **"With 10 runs a task the median falls by only 0 to 2 batches."** On the medians, yes. But those
+  medians are over the runs that reached a verdict, and 10 runs a task raises that share a lot: at
+  +15 points (base 0.6), Gain rose from 82 to 155 of 200; at −10 points, No measured gain rose from
+  41 to 94. The 90th percentiles fell by up to 7 batches. The script also never compares designs of
+  equal cost (40 tasks × 5 runs against 20 × 10). So "more tasks, not more runs" may be right, but
+  the simulation does not show it (W8).
+
+### 10.5 New findings
+
+#### W1. High. Rule 7's alternation by batch breaks the method of rule 5, and the pooled verdict has no fixed estimand
+
+- **Location.** Rule 7 ("batches alternate between the main model and the second model ... in a
+  fixed order"; also corpora and machines); rule 5 ("covers the true mean at every time at once");
+  rule 6 (each batch from a fresh writer).
+- **Problem.**
+  1. Theorem 3 needs one conditional mean for every unit. Under rule 7, the mean of a model A batch
+     and of a model B batch differ when the models differ. That is the case that replication exists
+     to find.
+  2. The pooled mean then depends on where the series stops. After an odd number of batches, it
+     weights the first model more. So "the true mean" that the sequence covers is not defined.
+  3. My check (10.8, case 2): model A at +22 points and model B at +2 points, so the pooled mean is
+     +12 points, exactly at X. Every verdict is false. The sequence gave a false "No measured gain"
+     in 35 of 200 runs (17.5%) with A first, and in 61 of 200 (30.5%) with B first. The nominal
+     bound is 5%. The same stream with one constant mean gave 1 in 200.
+  4. The limit note "differs by model" needs secondary verdicts "of opposite sign". In case 2, model
+     A alone reads Gain and model B alone reads No measured gain. Those are not of opposite sign, so
+     no limit is noted, and the pooled verdict is the false one.
+  5. A random shift by writer is a weaker form of the same thing. With a shift of standard deviation
+     6 points per batch, the false-verdict rate at X was 5 of 200 (2.5%). That is inside 5%, but
+     above the 0.5% of a constant mean. This simulation does not show a failure from writers alone.
+- **Effect.** The main fix for S1, one alpha per column, does not hold when the replication model
+  or corpus changes the effect. The direction of the error follows the order of the batches, which
+  is fixed in advance, so it does not lean to one arm by design. But the verdict changes with an
+  arbitrary choice: which model goes first.
+- **Fix.**
+  1. Define the estimand in rule 5: the mean of D over tasks, with the two models (or corpora, or
+     machines) at equal weight.
+  2. Put both replication levels inside each unit, not in alternate batches. For models: run every
+     task in every condition under both models, and let the unit's D be the mean of its two model
+     differences. For corpora: each batch takes units from two writers, in a random order sealed
+     before the batch. For machines: run each change or request on both machines, and average.
+  3. Keep the sequence of each model, corpus or machine alone as secondary. Note "differs by model"
+     when the two secondary verdicts differ, not only when their signs differ.
+  4. State the assumption of theorem 3 in rule 5, and run the boundary and the alternation cases of
+     10.8 in `cs-sim.py`, with their results in section 6.
+
+#### W2. Medium. Section 6 understates C1's cost, because the small margins are not simulated
+
+- **Location.** Section 6 ("At 4 to 20 batches a campaign ... 16,000 to 78,000"); rows 1 against L
+  (X = 5 points), 8 against L (X = ln 1.05), N1.
+- **Problem.** The simulation uses X = 12 points only. C1 holds columns with much smaller margins.
+  My checks (10.8, cases 5 and 6), with the plan's batch and the same data model:
+  - X = 5 points, true 0: median 12 batches (90th percentile 18). True +2 points: 19 (43).
+  - X = ln 1.05 on log tokens clipped to ±ln 4, true 0, with a per-task standard deviation of D of
+    0.32 (my assumption): median 30 batches (90th percentile 42).
+  C1 runs all its conditions in every batch (rule 6), so it runs until its slowest column closes.
+  That is 30 to 40 or more batches, at 900 runs each: about 27,000 to 38,000 runs for C1 alone, at a
+  true difference of 0. A true difference near either margin makes it longer.
+- **Effect.** The owner decides D1a and D7 on a cost range that is low for the largest campaign.
+- **Fix.** Simulate each margin that the plan uses (5 points, ln 1.05, ln 1.1, ln 1.15, ln 1.2,
+  ln 1.25, 10 and 14 points) with a stated variance per measure. Give the cost per campaign as set
+  by its slowest column. Or let a closed column leave the campaign's conditions, if no other column
+  needs them, and say so in rule 6.
+
+#### W3. Medium. Rule 5 has no sign rule, and rows 18 and 19 read a loss for V as "Gain measured"
+
+- **Location.** Rule 5 (outcomes); row 18 ("V minus L ... Clipped to 0 to 5"); row 19 ("V minus P");
+  section 4.
+- **Problem.**
+  1. Rule 5 says "above +X" is a Gain, but not which sign of D is good for V. Most rows define D so
+     that a positive value favors V (rows 8, 13a, 15). Rows 18 and 19 do not: more bypasses in V, or
+     a slower V, gives a positive D. Read as written, that is "Gain measured".
+  2. Row 18 clips a difference to 0 to 5. A difference can be negative. Clipping at 0 sets every
+     session where V has fewer bypasses to 0. Then the mean leans toward more bypasses for V, and V
+     cannot show a gain.
+  3. Row 18's unit is "per attacker session", but each session attacks one arm. A difference per
+     unit needs a pairing rule, and the row gives none. Its replication, "Repeat", is not a method of
+     rule 7.
+- **Effect.** Two rows can report the opposite of the result. Row 18 leans against V.
+- **Fix.** Add to rule 5: "D is defined so that a positive value favors the first-named condition
+  (V, or the condition with the feature)". Restate rows 18 and 19 to fit. In row 18, clip each arm's
+  count to 0 to 5, then take the difference. Pair sessions by their order in a schedule fixed before
+  the batch. Name its replication method, or add "Repeat" to rule 7.
+
+#### W4. Medium. "No measured gain" also names a measured loss, and a measured harm, smaller than X
+
+- **Location.** Rule 5 (outcomes); section 4 ("Loss measured means the harm is measured"); section 6
+  (the row at −10 points reads "No measured gain").
+- **Problem.** The third outcome holds when the interval lies within ±X, whatever its sign. An
+  interval of −11 to −8 points is a loss that excludes 0, and it reads "No measured gain". For a
+  harm column, a harm of 3 to 4 points against X = 5 reads as no harm. The name says less than the
+  data, and it says it in one direction.
+- **Effect.** A reader of the table sees "no gain" where a loss smaller than X was measured. This
+  leans toward V on harms and on losses. On gains smaller than X, it leans against V, but the name
+  does not mislead there.
+- **Fix.** Rename the outcome "Within margin". Report its interval beside it, and add "(excludes 0)"
+  when it does. The verdict does not change.
+
+#### W5. Medium. Row 6 nets real faults against false alarms one for one, which hr3 rank 3 did not
+
+- **Location.** Row 6 ("+1 if the rewriter shows a real fault, −1 if it raises a false alarm ... X 5
+  points"); section 9 (hr3, rank 3).
+- **Problem.** Rank 3 asked for at least 10 faults in 108 and at most 1 false alarm in 108: a false
+  alarm cost about ten times a fault. The new unit weighs them the same. For example, 15 faults and
+  9 false alarms in 108 give +5.6 points, which can read Gain. Rank 3 refutes that. Rule 11 forbids
+  netting a harm against a gain, and this unit nets inside one measure.
+- **Effect.** It leans toward V (the rewriter), against an accepted rule. Section 9 lists the change
+  to rank 3, but not this change of weight, and section 8 does not name the lean.
+- **Fix.** Give row 6 two columns, each read by rule 5: the rate of real faults shown, and the rate
+  of false alarms (a harm). Or keep one unit with the weight of rank 3 written in it. Name the
+  choice in section 9.
+
+#### W6. Medium. The log measures have no value for a run that never reaches its end point
+
+- **Location.** Rows 8, 13a ("tokens to a correct program", "to the first passing check"), 11d
+  ("turns from a rejection to a pass"); N2; rule 5 (clipping).
+- **Problem.** A run that fails, or hits its budget, has no "tokens to a correct program". If such
+  runs are left out of the task's mean, the arm with more failures keeps only its easy runs. Then
+  its mean falls, and it looks cheaper. If a task has no successful run in one condition, its D does
+  not exist. Clipping at ±ln 4 then sets the tail of the runs that do not stop, which is N3's harm,
+  to a fixed cap.
+- **Effect.** The direction follows the arm with more failures. Round 1's failures were in V, so it
+  leans toward V on rows 8 and 13a.
+- **Fix.** State, for each such measure, the value of a run that does not reach the end point (for
+  example the run's total tokens, or the clip value ln 4), and of a task with no success in a
+  condition. Report the count of such runs per arm. Say that the estimand is the mean of the clipped
+  value.
+
+#### W7. Medium. Two paths remain for choices after the data (the residual of S2)
+
+- **Location.** D13 ("Decide with D7, after calibration gives the variance"); rule 6 (the memo);
+  rule 5.
+- **Problem.**
+  1. D13 cuts conditions, and D7 is per campaign batch. So a condition can be cut after some
+     batches, when its columns' intervals are known. A cut leaves those columns open. That is a
+     choice of which columns get a verdict, made after the data.
+  2. The memo session does not see directions. But no rule seals the running interval of an open
+     column from the owner or from the findings report. The owner decides on the next batch.
+- **Effect.** The error rate of reached verdicts stays valid, because the sequence allows any stop.
+  But the set of columns that reach a verdict can be chosen by direction, either way.
+- **Fix.** Decide D13 once per campaign, before its first batch, from calibration's pooled values
+  only. Seal the running interval of each open column until it closes or its campaign stops. Report
+  only "open" in the findings report until then.
+
+#### W8. Low. The simulation record cannot reproduce two rows, and its medians are conditional
+
+- **Location.** Section 6, the table and "What it shows"; `cs-sim.py`, header.
+- **Problem.**
+  1. The rows at +10 and +13 points (base 0.8) do not come from the command lines in the script
+     header. The output of the 5-run table is not saved, and only the 10-run outputs (`r10a.txt`,
+     `r10b.txt`) are.
+  2. "Batches to a verdict" is the median of the runs that reached a verdict within 30 batches. For
+     +13 points, that is 7 runs of 200.
+  3. The claim on 10 runs compares those conditional medians, and not designs of equal cost.
+- **Fix.** Record every command line and save every output beside the script. Report the median
+  over all runs, with "more than 30" as a value. Compare 40 × 5 with 20 × 10 at equal cost before
+  the claim on tasks against runs.
+
+#### W9. Low. An empty running intersection has no outcome
+
+- **Location.** Rule 5; `cs-sim.py` (`'err'`).
+- **Problem.** The running intersection can become empty when the assumption of a constant mean
+  fails. The script counts this as `err`. The plan does not say what it means.
+- **Fix.** Add to rule 5: an empty intersection is not a verdict. The column stays open, and the
+  record names it as a failure of the method's assumption.
+
+### 10.6 New leans
+
+| Lean | Direction | Finding |
+|---|---|---|
+| The pooled verdict follows the order of the replication batches | Toward whichever level runs first; not toward an arm by design | W1 |
+| Row 18 clips a difference at 0 | Against V | W3 |
+| "No measured gain" for a measured loss or harm smaller than X | Toward V on losses and harms | W4 |
+| Row 6 nets faults and false alarms one for one | Toward V | W5 |
+| Runs with no end point left out of log measures | Toward the arm with more failures; on round 1, toward V | W6 |
+| Conditions cut, and intervals seen, between batches | Either way, by the set of columns that reach a verdict | W7 |
+
+The leans of section 8 of the plan are named correctly. I found no lean in draft 3 that the plan
+states in a direction other than its true one.
+
+### 10.7 What acceptance needs
+
+1. W1: replication inside each unit, a defined estimand, and the assumption written in rule 5, with
+   the boundary and alternation cases simulated.
+2. The owner fixes W2 to W7, or accepts each as a named limit in section 8 or section 12.
+
+The W1 fix is a change to rules 5 and 7 and to the script. A short check of that change is enough
+before the owner decides D1a.
+
+### 10.8 The checks that I ran
+
+**Reproduction.** `python cs-sim.py 30 20 200 0.8 0,0.05,0.08,0.11,0.14,-0.22 5` and
+`python cs-sim.py 30 20 200 0.6 0,0.17,0.21,0.26,-0.10 5`. The results are in 10.4.
+
+**My checks.** A copy of the script's `verdict` function, unchanged except for a scale R (a unit's D
+in [−R, R] maps to (D + R) / (2R)). The same data model: a task's p from a beta with mean 0.8 and
+ICC 0.3, 5 runs a condition, 20 tasks a batch, at most 30 batches. Seed 20261104. For cases 1 to 3,
+δ is solved so that the mean clipped difference equals the stated value.
+
+| Case | Design | True value | Result in 200 runs (100 for case 5, 50 for case 6) |
+|---|---|---|---|
+| 1 | One constant mean | +12 points (= X) | 1 false verdict (0.5%); 199 open |
+| 2a | Batches alternate, model A first: +22, then +2 points | Pooled +12 (= X) | 35 false "No measured gain" (17.5%) |
+| 2b | Batches alternate, model B first: +2, then +22 points | Pooled +12 (= X) | 61 false "No measured gain" (30.5%) |
+| 3 | Each batch shifted by N(0, 6 points), a writer effect | +12 (= X) | 5 false (2.5%) |
+| 4 | Task-by-arm interaction, N(0, 15 points) | 0 | No measured gain, 200; median 5 batches (90th percentile 7) |
+| 5 | X = 5 points, at most 100 batches | 0; +2 points | 12 (18); 19 (43), 1 open |
+| 6 | Log tokens, D ~ N(0, 0.32) clipped to ±ln 4, X = ln 1.05, at most 300 batches | 0 | 30 (42) |
+
+Cases 2a and 2b are the evidence for W1. Case 3 does not show a failure. Case 6 rests on my assumed
+standard deviation, which calibration can replace.
