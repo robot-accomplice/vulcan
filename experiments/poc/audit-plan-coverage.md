@@ -1761,3 +1761,191 @@ A cap of 30 batches, except case D (60).
 
 Case C rests on an assumed writer spread. Its size in real tasks is not known. Calibration, or a
 small pilot with two writers on the same brief, can measure it.
+
+## 12. Fifth rerun, on draft 5
+
+Object: draft 5 of `plan-coverage.md` (656 lines, working tree, not committed), and
+`experiments/poc/sim/cs-sim.py` with its six outputs in `sim/out/`. I ran the script in a scratch
+copy, and ran one check of my own (section 12.7). Not read: anything under
+`C:\Users\jonat\vulcan-poc`, and hidden harness material.
+
+### 12.1 Result
+
+- **Of Y1 to Y5, W2, W9 and R17:** 6 are Closed (Y1, Y3, Y4, Y5, W9, and W2 with Y2 except one
+  gap). 2 are Partly closed: Y2 (row 18 is not costed, Z4) and R17 (unchanged).
+- **New findings:** High 0, Medium 2 (Z1, Z2), Low 2 (Z3, Z4).
+- **Open after this rerun,** with each partly closed finding counted once by its residual: High 0,
+  Medium 2 (Z1, Z2), Low 3 (Z3, Z4 with Y2's residual, R17).
+- **Verdict: no High finding remains. The plan is ready for the owner to decide D1a,** with Z1 and
+  Z2 either fixed or accepted as named limits. Z1 is the decision that matters. The 5% bound now
+  covers each column's pool, and not the writers in general. At the margin, a verdict can be wrong
+  for writers in general in 28% to 48% of cases, at a writer spread of 10 to 20 points. Section 12 of
+  the plan names this limit, and D15 puts it to the owner. The owner should decide D15 knowing
+  that number.
+
+### 12.2 Status
+
+| Finding | Status | Reason |
+|---|---|---|
+| Y1 (High) | Closed | Units are draws with replacement from a sealed pool, so theorem 3 holds for the pool's mean (12.3). The writers scenario tests it fairly (12.4). The step from the pool to all writers is now a named limit and D15. Its size is Z1 |
+| Y2 | Partly closed | The cost counts the conditions that an open column still reads, and row 6b and N6 are simulated. I checked the arithmetic (12.5). Row 18 is not simulated or costed (Z4) |
+| Y3 | Closed | Pool writing is in the cost: 7 task pools × 20, about 10 seed pools × 20, 9 rule writers, and the checks, about 370 sessions. With a pool, the tasks to write no longer grow with the batches |
+| Y4 | Closed | After an empty intersection, the campaign goes on unchanged. A change makes a new column by amendment before its data |
+| Y5 | Closed | Rule 6 seals the secondary sequences. Row 18's pair is four sessions. Rows 6a and 6b carry the one-sided note |
+| W2 | Closed | Through Y2. The remaining gap is Z4 |
+| W9 | Closed | Through Y4 |
+| R17 | Partly closed | Unchanged. C6 waits for T29a's measure and margin |
+
+### 12.3 Do draws with replacement from a sealed pool satisfy theorem 3 for the pool mean?
+
+Yes, under three conditions that the plan meets or that I add.
+
+1. **The draw does not depend on the data.** The draw seed is fixed before the first batch. So the
+   next unit is a uniform draw from the pool, independent of all past units. Its expected D is the
+   mean, over the pool, of each unit's expected D. That is the same value at every step, which is
+   the condition of theorem 3. Met.
+2. **A unit drawn again is a new independent run.** The plan says "run again with fresh runs". Then
+   two draws of one task are independent given the task, and the stream is i.i.d. from the pool's
+   mixture. Met for agent runs, if no state carries over between runs (no cache, no workspace kept,
+   no fixed sampling seed). The plan should say this in one line (Z2). For units with a fixed
+   outcome, see Z2.
+3. **The pool does not change after data.** The pool is sealed before the first batch, and "a fresh
+   session checks the pool against its brief". The check is valid if it reads only the brief, not a
+   run in any arm. The plan does not say that the check runs nothing. Section 3's pilot gate does
+   read runs (Z3).
+
+Two notes:
+- With replacement, the pool never runs out, and the sequence can go on without limit. This is the
+  right choice for the owner's rule. Draws without replacement would also be valid, but they end
+  when the pool is used up.
+- The estimand is a finite-pool mean. As the draws grow, the interval closes on that mean, whatever
+  the writers in general would give. So every column closes in the end, unless its pool mean lies
+  exactly at ±X. This is correct for the stated estimand, and it is why Z1 matters.
+
+### 12.4 Does the `writers` scenario test it fairly?
+
+Yes.
+- **Pool design.** Each simulation draws a pool of 20 writers × 20 tasks, with one writer shift per
+  writer. Units are drawn uniformly with replacement. Each draw has new binomial runs. The truth is
+  the pool's mean of the expected difference, after clipping. That is exactly the estimand of rule 5.
+- **One-writer design.** Each batch is one writer's tasks. The truth is the population difference,
+  set exactly at +X, so every verdict is false. That is the right target for draft 4's design.
+- **Results.** Against its own mean, the pool gives 0 to 2 false verdicts in 200 at every spread.
+  The one-writer design gives 2% to 84%. My section 11 check, at base 0.8, gave 18% to 51% for the
+  one-writer design. The plan's numbers at base 0.6 are higher, in the same direction.
+- **The spread of the pool's mean** (1.7, 2.4 and 3.5 points at a writer spread of 10, 15 and 20
+  points) is below spread / √20 (2.2, 3.4 and 4.5). Clipping at a base rate of 0.6 shrinks the
+  shifts. That is consistent.
+- **"28% to 48%"** is 57, 67 and 96 verdicts in 200. Each is right for its pool and wrong for a
+  population at exactly +X. This is the size of Z1.
+- **One limit.** The scenario has no task-by-arm interaction inside a writer. This does not change
+  validity for the pool, and the plan names the assumption.
+
+### 12.5 Is the recomputed cost right?
+
+The arithmetic is right: C1 is 10,800 + 7 to 24 × 800, so 16,400 to 30,000. C2 is 9,600 + 1 to 9 ×
+600, so 10,200 to 15,000. Calibration is 10 to 22 × 216, so 2,200 to 4,800. The sum of the rows is
+36,600 to 69,600, which the plan gives as about 37,000 to 70,000. The rate scenario reproduces my
+section 11 check of row 6b: 10, 13 (17), 22 (34) batches, and no close at 2%. Pool writing at about
+370 sessions matches its parts (140 + 200 + 9 + checks).
+
+Not counted: row 18's attacker sessions (Z4). Not simulated: C6, which the views draft owns.
+Phase A' tests without agents cost no runs, but see Z2.
+
+### 12.6 New findings
+
+#### Z1. Medium. The bound covers each pool, and the verdict does not say how far the pool is from writers in general
+
+- **Location.** Rule 5 (estimand); section 6 (`writers`, "28% to 48%"); section 12; D15.
+- **Problem.**
+  1. Rule 5's 5% is about the pool. A reader of the findings report will read "Gain measured" as a
+     claim about Vulcan, not about 20 writers' tasks.
+  2. At a writer spread of 10 to 20 points, a column at its margin reaches a verdict that is wrong
+     for writers in general in 28% to 48% of simulations. The interval does not show this, because
+     it narrows on the pool's mean without limit.
+  3. D15 picks the writer count "with calibration's measured spread reported". Calibration runs
+     all three arms, so if the count changes after calibration, it is a choice after data. That
+     choice does not select a direction, but it should be fixed now.
+- **Effect.** No lean to an arm. But the closed columns can claim more than the evidence holds, near
+  their margins.
+- **Fix.**
+  1. Write "for this pool" in each verdict, and give the pool's writer count.
+  2. Report beside each verdict a writer-level interval, with the writer as the unit: the mean of D
+     for each of the 20 writers over its drawn units, and a 95% interval over the 20 writer means.
+     It is secondary, and no verdict reads it. A reader then sees the step from the pool to writers
+     in general.
+  3. Fix D15's rule now: for example, "20 writers; if calibration's spread is above 10 points, 40
+     writers, written before the campaign's first batch".
+
+#### Z2. Medium. On columns with a fixed outcome per unit, repeated draws are copies, and the interval has no meaning
+
+- **Location.** Rule 6 ("A unit drawn twice is run again with fresh runs"); rows 2, 5a, 5b, 9, 10a,
+  10b, 11a, 11b, 11c (phase A', no agents); section 6, seeds and rules.
+- **Problem.**
+  1. On these columns, a unit's outcome is fixed. A check rejects a seeded case or does not. A rule
+     is enforced or not. A second draw of the same unit gives the same D, so it is a copy and not a
+     new independent run.
+  2. The pool mean is then a known count. Evaluate each of the 200 seeds or 280 rules once, and the
+     estimand is exact. A confidence sequence over draws with replacement adds sampling noise that
+     the analysis made itself, and then narrows it away. The "95%" describes that noise and nothing
+     else.
+  3. Section 6 gives these columns 3 to 21 batches (60 to 420 draws). That cost buys nothing: one
+     pass over the pool gives the answer.
+  4. The only real uncertainty on these columns is the step from the pool to writers in general
+     (Z1), and the plan does not bound it.
+- **Effect.** No lean. But eight to ten columns would close on an interval that means less than it
+  says, and they would spend batches on copies.
+- **Fix.**
+  1. For each column with a fixed outcome per unit, evaluate every pool unit once. Report the exact
+     pool mean.
+  2. Read the verdict on the writer-level interval of Z1 (2), here as the primary, because it is
+     the only uncertainty that exists. Say whether it is a fixed-sample interval or a confidence
+     sequence over pools.
+  3. Or keep rule 5 as written, and state in section 12 that these verdicts are exact statements
+     about the pool, with no sampling error.
+  4. Add to rule 6: a repeated draw of an agent task carries no state from an earlier run.
+
+#### Z3. Low. Section 3 still writes C2's tasks with one writer, and its pilot gate meets the pool undefined
+
+- **Location.** Section 3 ("A fresh session writes the tasks"; "a second fresh session rewrites the
+  tasks once. It sees only P's rate per task"); rule 6 (the pool); C2v.
+- **Problem.**
+  1. Section 3 has one task writer. Rule 6 has 20 writers for every task pool.
+  2. The pilot reads runs. If its tasks come from the pool, then a gate failure leads to a rewrite
+     after data, and the rewrite sees P's rate per task. Section 8 names this lean. But the plan does
+     not say whether the whole pool is rewritten, by 20 writers again, and sealed again.
+  3. C2v has the same gate.
+- **Fix.** Restate section 3 with the pool: 20 writers write C2's pool, the pilot draws 10 tasks
+  from it, and if the gate fails, 20 fresh writers write a new pool, which is a new estimand. Pilot
+  tasks leave the pool. State the same for C2v.
+
+#### Z4. Low. Row 18 is not simulated or costed, and one row of section 11 is out of date
+
+- **Location.** Section 6, cost; row 18 (X 1 bypass, a batch of 3 pairs of 4 sessions); section 11,
+  row W1.
+- **Problem.**
+  1. My check (12.7): with unnamed bypasses at a Poisson mean of 1 in both arms, row 18 closes in 13
+     batches (90th percentile 15). With L at 1 and V at 0.5, it closes in 22 (29). With L at 2 and V
+     at 1, a difference of exactly X, it does not close in 200. So row 18 needs about 160 to 350
+     attacker sessions, or more near its margin. These are long sessions, and the cost leaves them
+     out.
+  2. Section 11's W1 row still says "two writers inside each batch in a sealed random order". Draft
+     5 replaces that with the pool's fixed split of writers (rule 7).
+- **Fix.** Add row 18 to the `rates` scenario and to the cost. Update the W1 row of section 11.
+
+### 12.7 The checks that I ran
+
+**Reproduction.** I copied `cs-sim.py` to a scratch folder and ran `python cs-sim.py`. All six files in `out/` were byte-identical to `experiments/poc/sim/out/`.
+
+**My check (row 18).** It imports `run_sequences` and `summarize` from the plan's script, unchanged.
+Seed 20261108, 100 simulations a row, a cap of 200 batches. A unit is a pair under two models. For
+each arm and model, the count of unnamed bypasses is Poisson, clipped to 0 to 5. D is the mean over
+the two models of L's count minus V's. X = 1 bypass, R = 5, 3 units a batch.
+
+| L's mean | V's mean | Result |
+|---|---|---|
+| 1.0 | 1.0 | Within margin, 100; 13 (15) batches |
+| 1.0 | 0.5 | Within margin, 100; 22 (29) batches |
+| 2.0 | 1.0 (difference = X) | Within margin, 3; open, 97; more than 200 batches |
+
+The Poisson means are my assumption. The holes stage of hr3 section 5 can replace them.
