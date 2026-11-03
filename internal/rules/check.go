@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -445,73 +446,71 @@ type Foreign struct {
 	Msg  string
 }
 
-// insideRoot asks the file system whether a path is inside the root: it walks up from the path, and
-// compares each directory with the root by os.SameFile. So no form of the text can hide a target: a
-// \\?\ or an 8.3 path, a junction, a symlink, /proc/self/cwd, or another case. A link outside the
-// project that leads back in is inside. It reads the path as written, and the path with its links
-// resolved. A part of the path that does not exist is passed over: a target that does not exist is
-// inside if a directory above it is, and otherwise the go command refuses it.
-func insideRoot(root, path string) bool {
-	rootInfo, err := os.Stat(root)
-	if err != nil {
-		return false
-	}
-	walk := func(p string) bool {
-		for {
-			if info, err := os.Stat(p); err == nil && os.SameFile(info, rootInfo) {
-				return true
-			}
-			parent := filepath.Dir(p)
-			if parent == p {
-				return false
-			}
-			p = parent
-		}
-	}
-	if walk(path) {
-		return true
-	}
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		return walk(resolved)
-	}
-	return false
-}
-
-// ForeignRoots reads what brings code in: each replace of the root go.mod and of a root go.work with
-// a target inside the project, whatever its directory or the case of its file names, and a root
-// go.work itself, which changes what the go command builds. This needs no list of directories.
+// ForeignRoots reads what brings code in: each replace of the root go.mod and of a root go.work whose
+// target is a local path, and a root go.work itself, which changes what the go command builds
+// (plan-r3, amendment 12). A local path is one that modfile.IsDirectoryPath accepts: relative or
+// absolute, in the form of any host. The check reads the text alone, and asks the file system
+// nothing, so no link, junction, or other form of the path changes its result. A replace by a module
+// path and a version passes.
 //
-// The walk stays for a go.mod that nothing replaces, in any directory, and for a root
-// vendor/modules.txt. A go.mod that nothing replaces brings in nothing. It stays a fault because V's
-// K0002 rejects a Go file in a plain directory, and go ./... does not list a nested module, so
-// without the walk L would pass that file. It leaves out two places at the root, the same in both arms,
-// and a replace into either is still read above: .vulcan/build, which holds V's own go.mod, and
-// .git/objects, which git alone writes and which can be large.
+// The walk stays for a go.mod in any directory, and for a root vendor/modules.txt. A go.mod that
+// nothing replaces brings in nothing. It stays a fault because V's K0002 rejects a Go file in a plain
+// directory, and go ./... does not list a nested module, so without the walk L would pass that file.
+// It leaves out two places at the root, the same in both arms: .vulcan/build, which holds V's own
+// go.mod, and .git/objects, which git alone writes and which can be large.
 func ForeignRoots(root string) []Foreign {
 	var out []Foreign
-	inside := func(target string) bool {
-		abs := target
-		if !filepath.IsAbs(abs) {
-			abs = filepath.Join(root, filepath.FromSlash(target))
-		}
-		return insideRoot(root, abs)
+	local := func(name string, line int, old, target string) {
+		out = append(out, Foreign{name, line, fmt.Sprintf("%s replaces %s with the local path %s, so it can bring in code that the check does not read; a replace must name a module path and a version", name, old, target)})
 	}
 	replaces := func(name string, reps []*modfile.Replace) {
 		for _, rep := range reps {
-			if rep.New.Version == "" && inside(rep.New.Path) {
-				out = append(out, Foreign{name, rep.Syntax.Start.Line, fmt.Sprintf("%s replaces %s with %s, a directory inside the project, so it brings in code that no rule reads; move the code into a part, or use a module from outside", name, rep.Old.Path, rep.New.Path)})
+			if rep.New.Version == "" || modfile.IsDirectoryPath(rep.New.Path) {
+				local(name, rep.Syntax.Start.Line, rep.Old.Path, rep.New.Path)
 			}
+		}
+	}
+	// A host that is not Windows refuses a replace by a path with a backslash, so the file does not
+	// parse there. Each such replace is read from its line, so that it fails the same on each host.
+	refused := func(name string, b []byte, err error) {
+		var list modfile.ErrorList
+		if !errors.As(err, &list) {
+			return
+		}
+		lines := strings.Split(string(b), "\n")
+		for _, e := range list {
+			if e.Pos.Line < 1 || e.Pos.Line > len(lines) || !strings.Contains(e.Err.Error(), "Windows path") {
+				continue
+			}
+			before, after, ok := strings.Cut(lines[e.Pos.Line-1], "=>")
+			left, right := strings.Fields(before), strings.Fields(after)
+			if !ok || len(left) == 0 || len(right) == 0 {
+				continue
+			}
+			target := right[0]
+			if t, err := strconv.Unquote(target); err == nil {
+				target = t
+			}
+			old := left[0]
+			if old == "replace" && len(left) > 1 {
+				old = left[1]
+			}
+			local(name, e.Pos.Line, old, target)
 		}
 	}
 	if b, err := os.ReadFile(filepath.Join(root, "go.mod")); err == nil {
 		if f, err := modfile.Parse("go.mod", b, nil); err == nil {
 			replaces("go.mod", f.Replace)
+		} else {
+			refused("go.mod", b, err)
 		}
 	}
 	if b, err := os.ReadFile(filepath.Join(root, "go.work")); err == nil {
 		out = append(out, Foreign{"go.work", 1, "go.work changes what the go command builds, so the check may read other code than a build does; remove it from the project"})
 		if f, err := modfile.ParseWork("go.work", b, nil); err == nil {
 			replaces("go.work", f.Replace)
+		} else {
+			refused("go.work", b, err)
 		}
 	}
 	_ = filepath.WalkDir(root, func(full string, d os.DirEntry, err error) error {

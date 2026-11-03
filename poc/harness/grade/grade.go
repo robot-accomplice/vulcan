@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/robot-accomplice/vulcan/internal/rules"
 	"github.com/robot-accomplice/vulcan/poc/harness/detect"
@@ -174,12 +175,9 @@ func (g *Grader) build(arm, ws, bin string, logf *os.File) bool {
 				fmt.Fprintf(logf, "== build (%s): %v\n", arm, err)
 				return false
 			}
-			if err := copyTemplate(ws, plain); err != nil {
+			if err := copyForBuild(ws, plain, copyLimit); err != nil {
 				fmt.Fprintf(logf, "== build (%s): %v\n", arm, err)
 				return false
-			}
-			for _, name := range []string{rules.FileName, rules.OriginName, rules.LockName, rules.BaselineName} {
-				_ = os.Remove(filepath.Join(plain, name))
 			}
 			ws = plain
 		}
@@ -192,6 +190,41 @@ func (g *Grader) build(arm, ws, bin string, logf *os.File) bool {
 	out, err := cmd.CombinedOutput()
 	fmt.Fprintf(logf, "== build (%s): %v\n%s\n", arm, err, out)
 	return err == nil
+}
+
+// copyLimit is the time that the copy of a final workspace may take.
+const copyLimit = 2 * time.Minute
+
+// copyForBuild copies a final workspace for V's build with no rules (audit N34): each regular file but
+// the rules files, wherever it is, so an embedded *.db stays. It passes over each entry that is not a
+// regular file or a directory: a symlink, a junction, a socket, a FIFO. It opens none of them, so a
+// FIFO cannot block it, and it stops with an error after limit.
+func copyForBuild(src, dst string, limit time.Duration) error {
+	skip := map[string]bool{rules.FileName: true, rules.OriginName: true, rules.LockName: true, rules.BaselineName: true}
+	end := time.Now().Add(limit)
+	return filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if time.Now().After(end) {
+			return fmt.Errorf("the copy of %s took more than %v", src, limit)
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return os.MkdirAll(filepath.Join(dst, rel), 0o755)
+		}
+		if !d.Type().IsRegular() || skip[filepath.ToSlash(rel)] {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return writeFile(filepath.Join(dst, rel), b)
+	})
 }
 
 // checkCommand is the arm's check.
@@ -218,6 +251,16 @@ func (g *Grader) finalCheck(ws string, r *record.Run, logf *os.File) {
 	if err != nil {
 		for _, f := range parseFired(out, ws) {
 			r.FinalCheck.Fired = append(r.FinalCheck.Fired, f.Rule)
+			digits, ok := strings.CutPrefix(f.Rule, "model-")
+			if !ok {
+				continue
+			}
+			// A code that is not in the table counts as shared, so it fails in both arms.
+			if c, known := modelChecks[digits]; known && c.arm != "" {
+				r.FinalCheck.OneArm = append(r.FinalCheck.OneArm, f.Rule)
+			} else {
+				r.FinalCheck.Model = append(r.FinalCheck.Model, f.Rule)
+			}
 		}
 	}
 }

@@ -1,6 +1,6 @@
-A replace to a path outside the project stays a limit
+N31: a replace to a path outside the project fails (amendment 12)
 -- want.txt --
-accept
+error go.mod:7:1 K0002
 -- api/billing/billing.vulcan --
 package billing
 

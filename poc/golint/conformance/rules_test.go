@@ -639,9 +639,9 @@ func fixture(t *testing.T, arm, dir string) {
 	}
 }
 
-// TestReplaceByFileSystem is audit N23 and N24: each form of a replace target inside the project is
-// rejected, in both arms, because the check asks the file system. It holds es_build, es_git, es_bin,
-// and li_ of the audit.
+// TestReplaceByFileSystem is audit N23, N24, N31, and N32 (plan-r3, amendment 12): each replace by a
+// local path is rejected, in both arms, inside the project or outside, in each form of the path, and
+// whether it exists or not. It holds es_build, es_git, es_bin, li_, ct_bld, and ct_obj of the audit.
 func TestReplaceByFileSystem(t *testing.T) {
 	type form struct {
 		name   string
@@ -661,9 +661,18 @@ func TestReplaceByFileSystem(t *testing.T) {
 				}
 				return "../o/" + dir
 			}},
+			form{"direct-junction", func(root, dir string) string {
+				link := filepath.Join(filepath.Dir(root), "o")
+				if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, filepath.Join(root, filepath.FromSlash(dir))).CombinedOutput(); err != nil {
+					t.Fatalf("mklink: %v\n%s", err, out)
+				}
+				return "../o"
+			}},
+			form{"drive", func(root, dir string) string { return filepath.Join(root, filepath.FromSlash(dir)) }},
 		)
 	} else {
 		forms = append(forms,
+			form{"absolute", func(root, dir string) string { return filepath.Join(root, dir) }},
 			form{"proc", func(_, dir string) string { return "/proc/self/cwd/" + dir }},
 			form{"link", func(root, dir string) string {
 				link := filepath.Join(filepath.Dir(root), "o")
@@ -687,7 +696,7 @@ func TestReplaceByFileSystem(t *testing.T) {
 		check     []string
 	}{{"V", vulcan, []string{"check"}}, {"L", lintBin, []string{"./..."}}} {
 		for _, f := range forms {
-			for _, dir := range []string{".vulcan/build/evil", ".vulcan/bin/evil", ".git/evil", "third"} {
+			for _, dir := range []string{".vulcan/build/evil", ".vulcan/bin/evil", ".git/evil", ".git/objects/evil", "third", "../out/evil"} {
 				t.Run(arm.name+"/"+f.name+"/"+dir, func(t *testing.T) {
 					base, err := filepath.EvalSymlinks(t.TempDir())
 					if err != nil {
@@ -714,7 +723,7 @@ func TestReplaceByFileSystem(t *testing.T) {
 					put(filepath.Join(root, "go.mod"), "module shop\n\ngo 1.26.0\n\nrequire example.com/evil v0.0.0\n\nreplace example.com/evil => "+strconv.Quote(f.target(root, dir))+"\n")
 					code, out := run(t, root, arm.bin, arm.check...)
 					if code == 0 || !regexp.MustCompile(`go\.mod:7:1: (error K0002|VL0002)`).MatchString(out) {
-						t.Errorf("a target inside the project passes: exit %d\n%s", code, out)
+						t.Errorf("a replace by a local path passes: exit %d\n%s", code, out)
 					}
 				})
 			}
@@ -722,7 +731,7 @@ func TestReplaceByFileSystem(t *testing.T) {
 		t.Run(arm.name+"/missing", func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "project")
 			fixture(t, arm.name, root)
-			for target, inside := range map[string]bool{"./missing/evil": true, "../missing/evil": false} {
+			for _, target := range []string{"./missing/evil", "../missing/evil"} {
 				if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module shop\n\ngo 1.26.0\n\nrequire example.com/evil v0.0.0\n\nreplace example.com/evil => "+target+"\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
@@ -730,11 +739,8 @@ func TestReplaceByFileSystem(t *testing.T) {
 				if strings.Contains(out, "panic") {
 					t.Errorf("%s: %s", target, out)
 				}
-				if inside && (code == 0 || !strings.Contains(out, "0002")) {
+				if code == 0 || !strings.Contains(out, "0002") {
 					t.Errorf("%s: exit %d\n%s", target, code, out)
-				}
-				if !inside && strings.Contains(out, "0002") {
-					t.Errorf("%s is outside the project, and it is read as inside:\n%s", target, out)
 				}
 			}
 		})

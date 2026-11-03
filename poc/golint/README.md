@@ -64,7 +64,7 @@ Vulcan's syntax, or a hole that Go closes.
 
 | Analyzer | Code | K-code | What it rejects |
 |---|---|---|---|
-| Before the driver | VL0002 | K0002 | A `replace` in the root `go.mod` or `go.work` with a target inside the project, a root `go.work`, a `go.mod` below the root, or a root `vendor/modules.txt`. The command stops there |
+| Before the driver | VL0002 | K0002 | A `replace` by a local path in the root `go.mod` or `go.work`, inside the project or outside, a root `go.work`, a `go.mod` below the root, or a root `vendor/modules.txt`. The command stops there |
 | A1 `layout` | VL0002 | K0002 | A package that the manifest does not list, or a package (or part) inside a leaf |
 | | VL0003 | K0003 | A part with no package; a library outside `lib/`, or another kind in it; `Main` not `package main`, or `package main` not `Main`; the manifest as a part |
 | | VL0004 | K0004 | A package name that is not its directory; an external test package |

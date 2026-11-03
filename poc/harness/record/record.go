@@ -159,10 +159,49 @@ func (t Tests) OK() bool { return t.Failed == 0 && t.Passed > 0 }
 type FinalCheck struct {
 	Passed bool     `json:"passed"`
 	Fired  []string `json:"fired,omitempty"` // the rules and the model checks that the check reports as new
+	// Model is each code in Fired of the shared model check: a code that both arms emit (audit N33).
+	Model []string `json:"model,omitempty"`
+	// OneArm is each model code in Fired that one arm alone emits. It is a difference between the arms,
+	// and it does not fail M3.
+	OneArm []string `json:"one_arm,omitempty"`
 }
 
-// TaskSuccess is M3: the acceptance tests pass.
-func (r *Run) TaskSuccess() bool { return r.Builds && r.Acceptance.OK() }
+// TaskSuccess is M3: the acceptance tests pass. With a rules file, a code of the shared model check in
+// the final check is no success, in both arms (audit N33): V's build refuses it, and L's go build
+// does not read it.
+func (r *Run) TaskSuccess() bool {
+	return r.Builds && r.Acceptance.OK() && !r.ModelError()
+}
+
+// ModelError reports whether the final check holds a code of the shared model check.
+func (r *Run) ModelError() bool { return r.FinalCheck != nil && len(r.FinalCheck.Model) > 0 }
+
+// ModelCounts is how many runs a model code decides, for the report of step 8.
+type ModelCounts struct {
+	// Decided is the runs that pass M3 but for a code of the shared model check.
+	Decided map[string]int
+	// OneArm is the runs with a model code that one arm alone emits, by arm. These are a difference
+	// between the arms, not runs with no success.
+	OneArm map[string]int
+}
+
+// CountModel counts, by arm, the runs that a model code decides.
+func CountModel(runs []Run) ModelCounts {
+	c := ModelCounts{Decided: map[string]int{}, OneArm: map[string]int{}}
+	for i := range runs {
+		r := &runs[i]
+		if r.FinalCheck == nil {
+			continue
+		}
+		if r.ModelError() && r.Builds && r.Acceptance.OK() {
+			c.Decided[r.Arm]++
+		}
+		if len(r.FinalCheck.OneArm) > 0 {
+			c.OneArm[r.Arm]++
+		}
+	}
+	return c
+}
 
 // CleanSuccess is M1: the acceptance tests pass, and no targeted rule is broken. In round 2 a
 // run that changed its check configuration (F7) is not a clean success.

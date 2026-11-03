@@ -316,6 +316,15 @@ func TestModelChecksTable(t *testing.T) {
 			t.Errorf("VL%s: the table says arm %q, and the code says %q", digits, c.arm, want)
 		}
 	}
+	oneArm := map[string]int{}
+	for _, c := range modelChecks {
+		oneArm[c.arm]++
+	}
+	// Audit N33: these are a difference between the arms, and they do not fail M3.
+	t.Logf("codes that one arm alone emits: V %d, L %d", oneArm["V"], oneArm["L"])
+	if oneArm["V"] != 19 || oneArm["L"] != 8 {
+		t.Errorf("one-arm codes: V %d, L %d; the audit counts V 19, L 8", oneArm["V"], oneArm["L"])
+	}
 	for digits := range modelChecks {
 		if id := judgeID("model-" + digits); fromJudgeID(id) != "model-"+digits {
 			t.Errorf("the id of %s does not come back", digits)
@@ -351,7 +360,7 @@ func TestBuildsMeansCompiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	ext := map[string]string{record.ArmL: ".go", record.ArmV: ".vulcan"}
-	grade := func(t *testing.T, arm, from, extra string) *record.Run {
+	grade := func(t *testing.T, arm, from, extra string, more ...func(ws string)) *record.Run {
 		t.Helper()
 		out := t.TempDir()
 		ws := filepath.Join(out, "workspace")
@@ -362,6 +371,9 @@ func TestBuildsMeansCompiles(t *testing.T) {
 			if err := writeFile(filepath.Join(ws, "api", "orders", "extra"+ext[arm]), []byte(extra)); err != nil {
 				t.Fatal(err)
 			}
+		}
+		for _, f := range more {
+			f(ws)
 		}
 		r := &record.Run{Task: "DEMO", Arm: arm}
 		if err := g.Grade(out, r); err != nil {
@@ -392,6 +404,33 @@ func TestBuildsMeansCompiles(t *testing.T) {
 			t.Logf("%s, a model error: builds %v, check %+v", arm, m.Builds, m.FinalCheck)
 			if want := arm == record.ArmL; m.Builds != want {
 				t.Errorf("a model error: builds %v, and as today it builds only in L", m.Builds)
+			}
+			// Audit N33: a code of the shared model check is no success in either arm.
+			if m.TaskSuccess() || m.FinalCheck == nil || len(m.FinalCheck.Model) == 0 {
+				t.Errorf("a model error: success %v, check %+v", m.TaskSuccess(), m.FinalCheck)
+			}
+			// Audit N34: an embedded *.db and a link that nothing uses build in both arms.
+			embed := func(ws string) {
+				if err := writeFile(filepath.Join(ws, "api", "orders", "seed.db"), []byte("seed")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			e := grade(t, arm, rules, "package orders\n\nimport _ \"embed\"\n\n//go:embed seed.db\nvar seed []byte\n\nvar _ = seed\n", embed)
+			if !e.Builds || !e.TaskSuccess() {
+				t.Errorf("an embedded *.db: builds %v, success %v", e.Builds, e.TaskSuccess())
+			}
+			l := grade(t, arm, rules, "", func(ws string) {
+				if err := os.Symlink(filepath.Join(ws, "api"), filepath.Join(ws, "link")); err == nil {
+					return
+				}
+				if runtime.GOOS == "windows" {
+					if out, err := exec.Command("cmd", "/c", "mklink", "/J", filepath.Join(ws, "link"), filepath.Join(ws, "api")).CombinedOutput(); err != nil {
+						t.Fatalf("mklink: %v %s", err, out)
+					}
+				}
+			})
+			if !l.Builds || !l.TaskSuccess() {
+				t.Errorf("a link that nothing uses: builds %v, success %v", l.Builds, l.TaskSuccess())
 			}
 		})
 	}

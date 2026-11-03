@@ -982,7 +982,14 @@ CASES += [
     ("R268", "N18, go.work: a replace in it, into the project", None, rawfiles({"go.work": WORK_REPLACE, "third/go.mod": EVIL_MOD}), {"v": [("go.work", "go 1.27.3", "0002", 0), ("go.work", "replace", "0002", 0), MOD_AT("third/go.mod")], "l": [("go.work", "go 1.27.3", "0002", 0), ("go.work", "replace", "0002", 0), MOD_AT("third/go.mod")]}),
     ("R269", "N16, u4: vendor/MODULES.TXT", None, rawfiles({"vendor/MODULES.TXT": MODULES}), both_at("vendor/MODULES.TXT", "vendor/MODULES.TXT", "#", "0002")),
     ("R270", "N16, u5: VENDOR/modules.txt", None, rawfiles({"VENDOR/modules.txt": MODULES}), both_at("VENDOR/modules.txt", "VENDOR/modules.txt", "#", "0002")),
-    ("R271", "A replace to a path outside the project stays a limit", None, rawfiles({"go.mod": "module shop\n\ngo 1.26.0\n\nrequire example.com/nope v0.0.0\n\nreplace example.com/nope => ../nope\n"}), NO),
+    ("R271", "N31: a replace to a path outside the project fails (amendment 12)", None, rawfiles({"go.mod": "module shop\n\ngo 1.26.0\n\nrequire example.com/nope v0.0.0\n\nreplace example.com/nope => ../nope\n"}), foreign()),
+    # Amendment 12: each replace by a local path fails, in any form, and a module path passes
+    ("R300", "Amendment 12: a relative path outside, which a leaf uses", NE_RULES, join(rawfiles({"go.mod": NESTED_GOMOD.replace("./third", "../out/evil")}), code("api/orders/extra", EVIL_USE)), foreign()),
+    ("R301", "Amendment 12: an absolute path", None, rawfiles({"go.mod": NESTED_GOMOD.replace("./third", "/opt/evil")}), foreign()),
+    ("R302", "Amendment 12: a Windows drive path", None, rawfiles({"go.mod": NESTED_GOMOD.replace("./third", "C:/evil")}), foreign()),
+    ("R303", "Amendment 12: a Windows UNC path", None, rawfiles({"go.mod": NESTED_GOMOD.replace("./third", "\\\\server\\share\\evil")}), foreign()),
+    ("R304", "Amendment 12: a path with backslashes, relative", None, rawfiles({"go.mod": NESTED_GOMOD.replace("./third", "..\\out\\evil")}), foreign()),
+    ("R305", "Amendment 12: a replace by a module path and a version passes", None, rawfiles({"go.mod": "module shop\n\ngo 1.26.0\n\nrequire example.com/nope v0.0.0\n\nreplace example.com/nope => example.com/other v1.0.0\n"}), NO),
     # N22
     ("R272", "N22: a part can be named vendor", rules(rule("X", "declaration", at="library", deny_names="vendor")), LIB_VENDOR, {"v": [("lib/vendor/library.vulcan", "vendor {", "0807", 0)], "l": [("lib/vendor/v.go", "package vendor", "0807", 0)]}),
     # The baseline
