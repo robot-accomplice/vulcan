@@ -1535,3 +1535,229 @@ ICC 0.3, 5 runs a condition, 20 tasks a batch, at most 30 batches. Seed 20261104
 
 Cases 2a and 2b are the evidence for W1. Case 3 does not show a failure. Case 6 rests on my assumed
 standard deviation, which calibration can replace.
+
+## 11. Fourth rerun, on draft 4
+
+Object: draft 4 of `plan-coverage.md` (601 lines, working tree, not committed), and the rewritten
+`experiments/poc/sim/cs-sim.py` with its outputs in `sim/out/`. I ran the script in a scratch copy, so
+that the files in `sim/out/` did not change. I also ran my own checks, which call the script's
+functions (section 11.7). Not read: anything under `C:\Users\jonat\vulcan-poc`, and hidden harness
+material.
+
+### 11.1 Result
+
+- **Of W1 to W9 and R17:** 7 are Closed (W1, W3, W4, W5, W6, W7, W8). 3 are Partly closed (W2, W9,
+  R17). None is Open.
+- **The residuals of section 10:** S1 and S2 close with W1 and W7. R5's residual, the writer of a
+  batch, is now Y1. S7's residual is now Y2.
+- **New findings:** High 1 (Y1), Medium 1 (Y2), Low 3 (Y3 to Y5).
+- **Open after this rerun,** with each partly closed finding counted once by its residual: High 1
+  (Y1), Medium 1 (Y2, which holds W2's residual), Low 4 (Y3, Y4 with W9's residual, Y5, R17).
+- **Verdict: not ready to accept as written.** Draft 4's fix for models is valid, and my checks
+  confirm it. But the same flaw remains one level up. Each task batch comes from one fresh writer.
+  If writers differ in how much their tasks favor an arm, the units of one batch share that shift,
+  and the bound fails. At a writer spread of 10 points, the false-verdict rate at the margin was
+  18%. The fix is a change to how tasks are written and ordered (Y1). After that fix, and a short
+  check of it, the plan is ready for the owner to decide D1a.
+
+### 11.2 A correction to section 10.8, case 2
+
+The coordinator is right. My case 2 asked for +22 points at a base rate of 0.8. There, the largest
+reachable difference is the mean of 1 − p, about +20 points. My bisection stopped at its upper end, a
+δ of 0.5, which gives about +18 points. So the pooled mean in cases 2a and 2b was about +10 points,
+not +12. A pooled mean of +10 points lies within ±12. So the "No measured gain" verdicts in those
+cases were **correct**, not false. **The 17.5% and 30.5% of section 10.8 are not false-verdict
+rates, and I withdraw them.** Cases 1, 3, 4, 5 and 6 asked for reachable values, and they stand.
+
+**Does W1 still hold?** I checked again at reachable values, with my own runs (11.7, cases A and B):
+
+| Design | Models (base 0.6) | False verdicts in 200 |
+|---|---|---|
+| Alternating batches, 20 tasks × 5 runs (draft 3's batch) | +22 and +2 | A first 0; B first 4 (2%) |
+| The same | +32 and −8 | A first 2 (1%); B first 6 (3%) |
+| Alternating batches, 50 tasks × 2 runs (draft 4's batch) | +22 and +2 | A first 18 (9%); B first 30 (15%) |
+| The same | +20 and +4 | A first 14 (7%); B first 21 (10.5%) |
+| Both models inside each task, 50 × 2 | +22 and +2 | 5 (2.5%) |
+
+So:
+- At draft 3's own batch, I could not show a failure of alternation at reachable values. Section
+  10's evidence for W1 was wrong at that batch.
+- At draft 4's batch, alternation fails: my runs give 7% to 15%, and the plan's give 11% to 66%. The
+  bound fails when one batch is large enough to reach a verdict on one model alone.
+- W1's design point holds at any batch: under alternation, the pooled mean is not defined, and the
+  assumption of theorem 3 does not hold. Draft 4's in-unit design answers it.
+
+The plan's sentence in section 6, "The conclusion does not depend on that case", is true for the
+plan's own cases. It is not true that draft 3's alternation failed at draft 3's batch. I suggest that
+section 6 says so, so that the record does not claim more than the runs show.
+
+### 11.3 Status of W1 to W9 and R17
+
+| Finding | Status | Reason |
+|---|---|---|
+| W1 (High) | Closed | Rule 5 defines the estimand and states the assumption. Rule 7 puts both models inside each task. My check: 2.5% false at the margin with a 20-point gap between models. The same flaw by writer is Y1 |
+| W2 | Partly closed | Every margin is simulated, and the cost is set by the slowest column. But the cost after columns close leaves out the columns that keep conditions running, and two columns are not simulated (Y2) |
+| W3 | Closed | I checked the sign of every row and harm against rule 5. All are signed so that a positive value favors V or the feature. Rows 18 and 19 are correct now |
+| W4 | Closed | "Within margin", with the interval and "(excludes 0)" |
+| W5 | Closed | Rows 6a and 6b are separate, with no netting. The cost of 6b is in Y2 |
+| W6 | Closed | A run that does not reach its end point counts its total cost. The lean is named |
+| W7 | Closed | Conditions are fixed before a campaign's first batch, and open intervals are sealed. One gap is in Y5 |
+| W8 | Closed | One command runs every scenario. My scratch copy gave the same bytes in all four files of `sim/out/`. Medians are over all simulations. The equal-cost comparison exists, with one gap (Y3) |
+| W9 | Partly closed | An empty intersection is not a verdict. But "examined before any further batch" does not say what can follow (Y4) |
+| R17 | Partly closed | Unchanged. C6 waits for T29a's measure and margin |
+
+### 11.4 Is the new method text valid?
+
+- **Estimand, sign rule, outcomes, empty intersection:** valid, and stated before any data.
+- **The assumption:** stated correctly. But "The design keeps this" is true for models and machines,
+  and not for writers (Y1).
+- **Both models inside each task:** valid. The unit's D is the mean of the two model differences, so
+  every unit has the same mean, whatever the gap between models.
+- **Both machines inside each change:** valid, by the same argument.
+- **Two writers in each corpus batch, in a sealed random order:** better than one, but not enough. It
+  halves the writer share of each batch. The units of one batch still share two writer effects (Y1).
+- **Clipping, and the end-point values of W6:** valid for the stated estimand.
+- **Dropping a closed column's conditions (rule 6):** valid. The rule is fixed now, and the
+  remaining columns keep their design.
+- **The sealed interval:** valid as written. It does not change the bound. It removes the choice by
+  direction.
+
+### 11.5 Is the simulation sound?
+
+- **Code.** The CS code is the same as in draft 3, now vectorized over simulations. `solve_delta`
+  now refuses a target that it cannot reach within 0.002. That is the right guard, and it would have
+  caught my case 2.
+- **Reproduction.** All four output files reproduce byte for byte from `python cs-sim.py`.
+- **Boundary cases.** At +X, 2 of 200 false (1%). At −X, 6 of 200 (3%). Both are within 5%.
+- **Equal cost.** The three designs have equal runs a condition (200, 204 and 200). The result,
+  more tasks with fewer runs, is in the direction that a task-by-arm interaction would make stronger.
+  But the comparison counts runs only, not the tasks that must be written (Y3).
+- **The data model** still has no writer effect, and no task-by-arm interaction. Section 6 says the
+  second. It does not say the first, and the first is what breaks the bound (Y1).
+- **The alternation numbers** are false-verdict rates against the equal-weight estimand. Some of
+  them are verdicts at batch 1, where the data hold model A alone. The table is correct, because
+  draft 4's estimand is the equal-weight mean.
+
+### 11.6 New findings
+
+#### Y1. High. One fresh writer per task batch breaks the method's assumption, as alternation did
+
+- **Location.** Rule 6 ("New units come from a fresh writer who gets the same brief as the first");
+  rule 5 ("Its assumption ... The design keeps this"); rule 7 ("Corpus: each batch takes half its
+  units from each of two fresh writers"); section 6, batches.
+- **Problem.**
+  1. Every task batch, of every task column, comes from one fresh writer. Columns with Model
+     replication have no second writer in the batch.
+  2. Writers differ. One writer's tasks can favor an arm more than another's: for example, more
+     tasks that touch the architecture, or tasks that are easier in plain Go. That is a
+     writer-by-arm effect on D. All units of one batch share it.
+  3. Then the conditional mean of a unit, given the earlier units of its batch, is not the
+     estimand. The sequence counts 50 units a batch as 50 independent pieces of information, when
+     the information on the writer effect is one piece a batch.
+  4. My check (11.7, case C): one writer per batch of 50 tasks, both models inside each task, a
+     true population difference exactly at +X, so every verdict is false:
+
+     | Writer spread (standard deviation of the writer's shift of D) | False verdicts in 200 |
+     |---|---|
+     | 0 | 3 (1.5%) |
+     | 10 points | 36 (18%) |
+     | 15 points | 67 (33.5%) |
+     | 20 points | 102 (51%) |
+
+     Section 10.8, case 3, gave 2.5% at 6 points with batches of 20. The failure grows with the
+     spread and with the batch size.
+  5. Corpus columns (two writers a batch) have the same flaw, at about half the size. Seed and rule
+     columns are corpus columns.
+- **Effect.** The 5% bound of rule 5 does not hold for any task, seed or rule column when writers
+  differ. The false verdicts go both ways (Gain and Within margin, in case C), so they do not lean
+  to one arm by design. But each verdict rests on fewer writers than its interval says, and this is
+  the main fix of S1.
+- **Fix.** Choose one, and write it into rules 5 to 7 before any data:
+  1. **A sealed pool written first.** Before a campaign's first batch, many fresh writers (for
+     example 10 or more, each with at most 5% of the pool) write the whole pool of tasks for the
+     campaign's batch cap. The pool is put in an order drawn at random and sealed. Each batch takes
+     the next 50 tasks. Then the units are exchangeable draws from one fixed pool, and theorem 3
+     holds for the pool mean. If the pool runs out, a new pool is a new estimand, and the record
+     says so.
+  2. **The writer as the unit.** The unit is one writer's batch, and its D is the batch mean. This
+     is valid, but much slower: it gives one unit a batch.
+  3. **Many writers a batch.** Each batch has many fresh writers, with a few tasks each, in a sealed
+     random order. This reduces the flaw, but does not remove it. Size it by a simulation with a
+     stated writer spread.
+
+  In each case, state the estimand as the mean over the writer population (or the pool), and add a
+  writer effect to `cs-sim.py` with the result in section 6. Calibration can estimate the writer
+  spread if its tasks come from two or more writers.
+
+#### Y2. Medium. The cost after columns close leaves out columns that keep conditions, and two columns are not simulated
+
+- **Location.** Section 6, "Cost" ("row 8 against L reads only L+gen and V (400 runs a batch)"; C2's
+  "Slowest column"; "Row 6b, 2 points: not simulated"; C7).
+- **Problem.**
+  1. In C1, row 1 against L (and N1) has X = 5 points: 7 batches at a true 0 and 15 (90th
+     percentile 30) at half the margin. It keeps L and V. N3 and N4 read P against each checked arm,
+     and N4 has X = 5 points. So after batch 6, C1 runs P, L, L+gen and V: about 800 runs a batch,
+     not 400. That makes C1 about 16,400 to 30,000 runs, not 13,600 to 20,400.
+  2. In C2, the slowest column is not row 3 at 12 points. N4 (5 points) and N3 (10 points) read C2
+     too.
+  3. Row 6b is not simulated. My check (11.7, case D): 36 units a batch, both models in each unit,
+     X = 2 points. A true false-alarm rate of 0 closes in 10 batches; 0.5% in 14 (90th percentile
+     17); 1% in 20 (37); 2%, at the margin, does not close in 60. Rank 3's own limit, 1 in 108, is
+     about 0.9%. So calibration needs about 10 to 37 batches of 216 runs, which is about 2,200 to
+     8,000 runs, not 430 to 1,300.
+  4. C7 (N6, 5 points) is not simulated for chains. Its cost is borrowed from task success.
+- **Effect.** The total of 27,000 to 55,000 is low, by roughly 10,000 to 20,000 runs on these items
+  alone. The owner decides D1a and D7 on it.
+- **Fix.** Give each campaign's cost as a sum over batches of the conditions that some open column
+  still reads, by its slowest column of each condition. Simulate 6b with the rate model above, and
+  C7 with a stated chain model. Restate the total.
+
+#### Y3. Low. The equal-cost comparison counts runs, not the tasks that must be written
+
+- **Location.** Section 6, "Equal cost" and the task batch.
+- **Problem.** 50 new tasks a batch, over 13 to 30 batches in C1, is 650 to 1,500 tasks, each with a
+  brief, tests and a grading rule, and a share of a parity check. The comparison and the cost table
+  leave this out. With Y1, the writing plan also sets the validity.
+- **Fix.** Add task writing to the cost, in sessions per task, and say how many writers the pool
+  needs (Y1).
+
+#### Y4. Low. "Examined before any further batch" leaves an open choice after data
+
+- **Location.** Rule 5, "An empty intersection".
+- **Problem.** The rule does not say what the examination can change. If it can change the design,
+  it is a choice after data, against rule 6.
+- **Fix.** Say what follows: the column stays open, its campaign continues unchanged for the other
+  columns, and any change to this column is a new column with a new estimand, by an amendment.
+
+#### Y5. Low. Three gaps in the wording
+
+- **Location.** Rule 6 (sealing); rule 7 (secondary sequences); row 18; rule 5 ("the same burden
+  ... in each direction"); rows 6a and 6b.
+- **Problem.**
+  1. Rule 6 seals the running interval of an open column. It does not say that the secondary
+     sequences of each model, corpus or machine are sealed too. They show the direction.
+  2. Row 18: "both models inside the pair" does not say how many sessions a pair has (two or four).
+  3. Rows 6a and 6b are one-sided by nature: 6a cannot read a Loss, and 6b cannot read a Gain. Rule
+     5's sentence "the same burden ... in each direction" does not hold for them. That is correct for
+     these measures, but the plan should say so.
+- **Fix.** Seal the secondary sequences with the primary. State the sessions of a pair in row 18.
+  Add a note to rows 6a and 6b.
+
+### 11.7 The checks that I ran
+
+**Reproduction.** I copied `cs-sim.py` to a scratch folder and ran `python cs-sim.py`. All four
+files in `out/` were byte-identical to `experiments/poc/sim/out/`.
+
+**My checks.** They import `run_sequences`, `success_units`, `alternate_units` and `solve_delta` from
+the plan's script, unchanged. Seeds 20261106 and 20261107. 200 simulations a row, except case D (100).
+A cap of 30 batches, except case D (60).
+
+| Case | Design | Result |
+|---|---|---|
+| A | Alternation against in-unit, base 0.6, at 20 × 5 and 50 × 2, models +22/+2 and +20/+4 | Section 11.2 |
+| B | Alternation, 20 × 5, models +32/−8 | A first 2 false (1%); B first 6 (3%) |
+| C | One writer per batch of 50 tasks × 2 runs × 2 models, base 0.8; the writer shifts both models' δ by N(0, sd) for the whole batch; δ solved so that the population difference, over the writer spread, is exactly +12 points | sd 0: 3 false; 0.10: 36; 0.15: 67; 0.20: 102 (of 200) |
+| D | Row 6b: per unit, minus the mean of two Bernoulli false alarms (one a model), 36 units a batch, X = 2 points | Rate 0: 10 (10) batches; 0.005: 14 (17); 0.01: 20 (37); 0.02: more than 60 |
+
+Case C rests on an assumed writer spread. Its size in real tasks is not known. Calibration, or a
+small pilot with two writers on the same brief, can measure it.
