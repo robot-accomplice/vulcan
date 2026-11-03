@@ -1513,3 +1513,96 @@ No change: `sha256:14c3ca9a9ac1603d5227ff4275375f2fd38bded91be26887b921929972a6f
 - The reviewer has not checked these fixes.
 - T2's check of the sealed seeded cases for a local `replace`, a link, or an `ignore` is still the owner's. I read no sealed case and nothing under `C:\Users\jonat\vulcan-poc`.
 - `spec.md`'s K0002 row does not name the new forms.
+
+## Seventh rerun
+
+Reviewed at commit bd7fe7d (branch main), the fixes of the sixth rerun. The same reviewer ran this. The sections above stay as they were. This rerun is narrow, as the owner asked: each fix, the regression of the existing cases, and a search for new forms.
+
+### Result
+
+**Step 3's gate (no open High finding) passes.** No High and no Medium finding is open.
+
+- N39, N40, N41, N42, and N37 are closed, on Windows and on Linux, with the same result in both arms.
+- N43 is now a listed limit, in `rules-file.md`.
+- One new finding, Low: N44. The N40 fix added it. A symlink named `vendor/modules.txt` now passes the walk. It does not reach the grader's path, because the grader sets `-mod=mod`, and both arms then fail.
+
+| Severity | Open now | Which |
+|---|---:|---|
+| High | 0 | |
+| Medium | 0 | |
+| Low | 1 | N44 |
+
+Listed, and not counted as open, as before: M8, M11, M12, M13, L6, L8, L9, L10, N6, N19, N21, N30, N35, N36, N38, and now N43.
+
+### How I ran it
+
+- A fresh build of bd7fe7d, for Windows and for Linux (WSL, Go 1.27.3). For N44, a Linux build of 9a5c2d7, the commit before the fix, from an export (`git archive`).
+- I reran the same 21 case scripts as in the sixth rerun. `cmp7.py` compares each case with the sixth rerun's output.
+- New scripts in my scratch directory: `a32` (each fix on Windows, with junctions), `a33` and `lx7.sh` (the same on Linux, with symlinks), `a34` (a `go.mod` that the check's parser refuses), and `lx7b.sh` (`vendor/modules.txt` as a symlink).
+- I read nothing under `C:\Users\jonat\vulcan-poc` and no sealed case. I changed no file but this report, and I did not freeze `defaults v1`.
+
+### 1. The fixes
+
+Each case has `os.Exit` in the code behind the form, which `ERR-08` forbids, or assembly that a run would reach. "exit 0, builds" would be an escape. None is left.
+
+| Finding | Cases | V | L | Verdict |
+|---|---|---|---|---|
+| N39 | Assembly and a function with no body in L's `main` (`m_asm`), also with no rules file; a `.s` file for another architecture, a `.S`, a `.sx`, a `.syso` | No such place | VL0126 | Closed |
+| N39 | `//go:linkname` in L's `main`, the pull form and the push form | No such place | VL0122 | Closed |
+| N39 | Control: the same in a leaf | K0126 | VL0126 | As before |
+| N40 | A leaf's directory that is a junction (Windows) or a symlink (Linux) to `_keep/orders`, `testdata/orders`, `.keep/orders`, or a place outside | K0002, K0003 | VL0002 | Closed. Both arms fail at the link |
+| N40 | The directory `api` as a link; L's `cmd/shop` as a junction | K0002, K0003 | VL0002 | Closed |
+| N40 | A junction to a data directory that nothing uses | K0002 | VL0002 | Stricter in both arms, as judgment call 37 states |
+| N40 | A dangling junction | exit 0, builds | exit 0, builds | Harmless: it holds nothing |
+| N41 | `ignore` of `./api/orders`, `./api`, `api/orders`, `./lib`, a block, a quoted path, a path that does not exist; also with no rules file | K0002 | VL0002 | Closed. Also `ignore .\api\orders` on Linux |
+| N37 | A link in the project to a module outside, that nothing replaces (`j_s8`, `l_s8`) | K0002 | VL0002 | Closed. The row's reason now holds |
+| N42 | `TestModelError`: `Model` counts a shared model code in each arm, 1 and 1 | | | Closed. `Decided` is stated as L's count alone |
+
+On a linked part, V gives K0003 as well as K0002, and L gives VL0002 only. Both fail at the link, so the verdict is the same. This is a difference in codes, not in verdict.
+
+The backslash fallback holds on Linux: `replace example.com/evil => ..\evil` gives K0002 and VL0002.
+
+### 2. The regression
+
+694 cases compared, **0 changed**. The 123 rows tagged DIFF are the same as in the sixth rerun.
+
+This is the expected result. The fixes add three faults: assembly or a link in L's `main`, a link to a directory, and an `ignore` directive. No case of the 21 scripts has any of these. Each such case of the sixth rerun is in `a26` to `a30` or in my junction runs, and those are not among the 694. Section 1 reruns them, and each one now changes, as it should.
+
+The defaults hash is unchanged: `sha256:14c3ca9a9ac1603d5227ff4275375f2fd38bded91be26887b921929972a6f427`. bd7fe7d does not change `internal/rules/defaults` or the base applications.
+
+Both test suites pass on Windows: `go test -count=1 -timeout 30m ./...` at the root (exit 0, 26 packages ok) and in `poc/golint` (exit 0, 10 packages ok). The longest are `poc/harness/grade` at 643 s, `poc/golint/conformance` at 545 s, and `conformance` at 403 s.
+
+### 3. The search for new forms
+
+| Form | V | L | Note |
+|---|---|---|---|
+| A `go.mod` that the check's parser refuses and the go command fixes: `require example.com/evil latest`, with a local `replace` (`f_latest`) | exit 1 | exit 1 | `ForeignRoots` reads no `replace` of a file that does not parse. But the go command needs the network to fix the version, and `GOPROXY=off` stops it. No build in either arm |
+| The same with `v1.0`, an old version `v1.0`, or an `exclude` with `v1` (`f_short`, `f_old`, `f_excl`) | K0002 | VL0002 | The parser takes these, so the `replace` fails |
+| A directive that neither parser knows (`f_bad`) | exit 1 | exit 1 | Control |
+| A junction inside `.git/objects`, which the walk skips | exit 1 | exit 0, no build | Nothing can import a path with a dot element. My `.git` was not a real repository, so each build failed on its VCS stamp |
+| Code in L's `main` that a team rule would forbid | No such place | exit 0 | Judgment call 2, listed |
+| cgo in L's `main` | | | Not tried: this host has no C compiler, so `CGO_ENABLED` is 0 |
+| **`vendor/modules.txt` as a symlink to a file (Linux)** | K0209 | **exit 0**, and builds with `GOFLAGS` empty | **N44** |
+
+### New findings
+
+#### N44. Low. In L alone, a symlink named `vendor/modules.txt` passes the walk
+
+- **Where:** `ForeignRoots` in `internal/rules/check.go`. The N40 fix added a branch for each link. It returns `nil` for a link that does not lead to a directory, before the test of the name. So a symlink to a file named `vendor/modules.txt` (or a nested `go.mod`) is no longer read.
+- **Cases, on Linux:** `go.mod` requires `example.com/evil v1.0.0`. `vendor/example.com/evil` holds an `init` with `os.Exit(6)`. `vendor/modules.txt` is a symlink to a file outside the project.
+  - With `GOFLAGS` empty: **L exit 0, `go build` passes, and the binary exits 6.** V gives K0209, because it does not read `vendor`.
+  - With `GOFLAGS=-mod=mod`, as the grader sets it: L exit 1, and both builds fail.
+  - Control, a regular file: K0002 and VL0002, in each setting.
+- **Against the old code:** the Linux binaries of 9a5c2d7 give K0002 and VL0002 on the same symlink, in each setting. So the fix added this form.
+- **Why Low:** it does not reach the harness's path. The grader sets `-mod=mod`, so the go command does not use `vendor`. The harness grades on Windows. There, a symlink to a file needs a right that my account does not have, and a symlink that WSL makes on the Windows drive is one that Windows does not follow (as for N43). A nested `go.mod` as a symlink gives no build in either arm.
+- **Fix, if wanted:** test the name before the link branch returns, or return from that branch only for a link to a directory.
+
+### Decisions for the owner
+
+- **N44:** fix it, or list it with N43 as a limit of a Linux host. It does not change the gate.
+- **K0003 beside K0002** on a linked part, in V alone: accept it, or make V stop at K0002 as L stops at VL0002. The verdict is the same in each arm.
+
+### What I could not check
+
+- Windows symlinks, which my account cannot make. Junctions stand in for them. On Linux I ran symlinks.
+- The cause of `i2` in the sixth rerun. It is now K0002 and VL0002, so the question no longer affects a verdict.
