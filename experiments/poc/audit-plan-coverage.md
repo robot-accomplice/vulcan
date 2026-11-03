@@ -1012,3 +1012,216 @@ P. R2 and R4 lean toward V. R1 is a path to close a column with no information.
 
 The Medium findings can be fixed in the same draft. A check of the four High fixes alone is enough
 before the owner decides D1a.
+
+## 9. Second rerun on draft 2, after the owner's decision on D1b and D1c
+
+Date: 2026-11-03. Object: `docs/poc/plan-coverage.md` as it is now (363 lines, not committed). The
+coordinator changed section 0, rules 5 and 6, section 3, and sections 6, 8, 9 and 10, after the
+owner's decision: "rows do not close in any of these circumstances". I read those sections in full,
+and I checked by search that rows 2, 5b, 9, 12 and 17 and the calibration lines did not change. Same
+scale and constraints as above.
+
+### 9.1 Result
+
+| | Count |
+|---|---|
+| Section 8 findings now Closed | R1, R13 |
+| Section 8 findings still open (sections they are in did not change) | 18: R2 to R12, R14 to R20 |
+| New findings: High | 3 (S1, S2, S4) |
+| New findings: Medium | 4 (S3, S5, S6, S7) |
+| New findings: Low | 1 (S8) |
+| **All open findings** | **High 6, Medium 14, Low 6** |
+
+The open High findings are R2, R3, R4, S1, S2 and S4.
+
+**Verdict: the plan is not ready for the owner to accept.** The owner's decision removes the R1
+problem: a column can no longer close with an interval that says nothing. But "a new test after each
+Unclear final look, with no limit" brings a problem of its own. Repeated tests, chosen and designed
+after each result, are optional stopping at the level of tests. The planned looks inside one test do
+not protect against that (S1, S2). This is fixable inside the plan, by a method that is valid under
+unlimited extension (S1, fix).
+
+### 9.2 Status of the section 8 findings
+
+| Id | Status | Reason |
+|---|---|---|
+| R1 | Closed | By the owner's decision, an unresolved result does not close a column, at any size. One part, sizes set after calibration, remains as S6 |
+| R13 | Closed | D1c is decided: no closure. D1d no longer recommends closure on a label count. Its new form is S4 |
+| R2 to R12, R14 to R20 | Open | The sections that hold them did not change |
+
+### 9.3 Is the group sequential design valid?
+
+The idea is right for one test: planned looks with O'Brien-Fleming spending let a reader look at an
+interim result and go on, with the error rate held. As written, it is not yet enough:
+
+- The verdict rule has four outcomes, read from an interval against a margin. Alpha spending is
+  defined for a test of one hypothesis. Three outcomes are claims: "Gain measured" (above +X), "Loss
+  measured" (below −X), and "No measured gain" (inside ±X, an equivalence claim). Each needs its own
+  bound at each look. See S3.
+- It holds the error rate inside one test. It says nothing about a series of tests on one column.
+  See S1.
+- Several columns read accepted hr3 rules that are counts, not intervals (rank 3: 10 of 108; T16:
+  "more than 1 seed"). Alpha spending does not apply to them as written. See S3.
+
+### 9.4 Is "a new test after Unclear" free of leans?
+
+No, not as written. It allows three choices after the data, and each one can lean either way:
+
+1. **Whether** the column gets a new test. D7 sets spend per test, so funds can go to the columns
+   whose interval points in a preferred direction.
+2. **How** the new test differs: "a larger size, a more sensitive primary measure, or another
+   corpus".
+3. **Whether** the new test pools the old data: "unless the amendment says so before its data". The
+   amendment is written after the first test's data are known.
+
+See S2.
+
+### 9.5 New findings
+
+#### S1. High. Repeated new tests until a verdict are optional stopping, and the error across the series is not controlled
+
+- **Location.** Rule 5 ("Unclear at the final look ... A new test is designed"); rule 6 ("If the two
+  disagree ... rule 5's next step applies"); section 6 ("this total is not an upper bound").
+- **Problem.**
+  1. Each new test spends a fresh 5% on a false claim. A column that runs k tests until one gives a
+     verdict has an error rate near 1 − 0.95^k for a false Gain or Loss, not 5%.
+  2. Take a true difference near the margin X. Then each test is close to a coin toss between a
+     verdict and Unclear. Which verdict the column gets depends on when the series stops, not on the
+     data.
+  3. Replication repeats this. A disagreement keeps the column open, and a new test follows. The
+     first pair that agrees closes the column. Earlier pairs that disagreed are reported, but they do
+     not count. That is a selection of the agreeing pair.
+- **Effect.** The verdicts that close columns are not at the stated error rate. The direction of the
+  error is not fixed: it favors whichever outcome the data reach first. With S2, it can favor the
+  outcome that someone wants.
+- **Fix.** Control the error over the whole series of one column, not only inside one test:
+  1. Use an anytime-valid method for each column: a confidence sequence (for example a mixture
+     martingale or an e-value method). It stays valid when data are added without limit, and when a
+     reader looks at any time. This fits the owner's rule, which has no upper bound. Or:
+  2. Keep group sequential tests, but treat the series as one test: always pool every earlier
+     test's data by a fixed rule, and spend one total alpha across the series with a spending
+     function that has no end (for example a geometric spending of the remaining alpha).
+  3. For replication, read the verdict on all agreeing and disagreeing data together, by the same
+     rule. Do not keep only the pair that agrees.
+
+  Write the method into rule 5 now, before any data.
+
+#### S2. High. The next test of a column is chosen and designed after its data
+
+- **Location.** Rule 5 ("a larger size ..., a more sensitive primary measure, or another corpus";
+  "does not pool them unless the amendment says so before its data"); D7 ("spend per test").
+- **Problem.** Three choices are made after the interval of the first test is known: whether the
+  column gets a new test, which change the new test makes, and whether old data are pooled. "Before
+  its data" means before the new test's data, not before the old test's data. A change of the primary
+  measure after the data is also a change of what the column measures, and the new measure may stand
+  in for the claim.
+- **Effect.** Each choice can lean the final verdict in the direction that the person who makes it
+  prefers. This can be toward V or against V. The owner's rule on equal burden is not kept.
+- **Fix.**
+  1. Write the next-test rule now, the same for every column: the same primary measure, a size
+     computed from the pooled variance only, and pooling by the fixed rule of S1.
+  2. Name now, per column, the one more sensitive measure or the other corpus that a new test may
+     use, if any.
+  3. Fund new tests per campaign, for every Unclear column of that campaign together, in a fixed
+     order, without regard to the direction of each interval. Or let a session that does not see the
+     interval direction propose the spend.
+
+#### S3. Medium. The sequential design is not fitted to the four outcomes and to the count rules
+
+- **Location.** Rule 5 ("Sizes, by a group sequential design"); section 6.
+- **Problem.**
+  - The plan does not say that each look reads a repeated confidence interval at the adjusted level
+    (for two looks at half and full information, O'Brien-Fleming gives about z = 2.80 at the first
+    look and 1.98 at the final look).
+  - It does not say which outcomes may stop a test at the first look. Stopping early for "No
+    measured gain" needs an equivalence bound (two one-sided tests) with its own spending.
+  - It does not say how information is counted under the cluster bootstrap. The natural count is
+    tasks (20 of 40).
+  - The count rules of hr3 (rank 3, T16, T17, T20) are not interval rules, so alpha spending does
+    not apply to them.
+  - The stated half-widths in section 6 (11 and 8 points) are for unadjusted intervals. At the first
+    look, the adjusted interval is wider, about 16 points before the clustering of R5.
+- **Effect.** Two readers can apply the looks differently. The stated sizes give fewer verdicts than
+  the plan suggests.
+- **Fix.** State the boundaries, the interval method and the information count for each look. Say
+  which outcomes can stop early. For the count rules, either convert them to intervals by amendment,
+  or say that they have a single look. Restate the half-widths at the adjusted levels.
+
+#### S4. High. D1d selects C2's rules on being enforced by V and L, which leans against P
+
+- **Location.** Section 3 ("C2 then runs on the rules that the checks do enforce"); section 8 (the
+  lean named as "Toward a task test that plan-r3 found not worth its cost"); D1d.
+- **Problem.** If the plan-r3 gate fails, C2 uses only the rules that "the checks" enforce, which
+  are L's and V's. Tasks then tempt breaks of rules that V and L reject by construction. P's linter
+  may not cover those rules. The result says that V and L stop breaks of rules they stop. It does
+  not show how much of a team's architecture that covers. Section 8 names a lean on cost, but not
+  this lean on direction.
+- **Effect.** Rows 2 and 3 against P lean toward V and L. A reader can take the result as general,
+  when it holds only for a selected set of rules.
+- **Fix.**
+  1. Select the rules that any arm's check enforces, P's linter included (the union), and tempt
+     each one.
+  2. Report the result per rule and per arm, with the share of T1's rules that the set covers.
+  3. Name the lean in section 8 as "toward V and L against P, by the selection of rules", beside
+     the cost lean.
+
+#### S5. Medium. D1c's "second model" picks a model by P's failures, and the lean is not named
+
+- **Location.** Section 3 ("a third fresh task writer with another approach ..., or a second model,
+  or both"); D1c ("Recommendation: both").
+- **Problem.** A model chosen because it breaks rules where the first did not is a selection on P's
+  failures, like the pilot gate. Prompts with "a deadline" or "a larger change" also move the tasks
+  away from ordinary work. Section 8 lists neither lean.
+- **Effect.** It leans toward V and L against P. Results then hold for a model and tasks chosen for
+  temptation.
+- **Fix.** Name the second model now (the replication model of D5), before any pilot, and use it in
+  all arms. Name both leans in section 8. Report the main result per model.
+
+#### S6. Medium. The looks are "set before any data", but the sizes come from calibration
+
+- **Location.** Rule 5 ("planned looks, set in section 6 before any data"); section 6 ("estimates, to
+  be sized by calibration before any spend").
+- **Problem.** Calibration runs all three arms (row 6 reads them). If its success rates set the sizes,
+  the looks are set after data that show arm differences. This is the remaining part of R1.
+- **Fix.** Let calibration set only the pooled variance and the ICC. Record the inputs. Fix the looks
+  in an amendment before any campaign data.
+
+#### S7. Medium. The plan does not show how often a column will need a new test
+
+- **Location.** Section 6 ("this total is not an upper bound"); D7.
+- **Problem.** With a 12-point margin and a final half-width near 8 points (more with clustering
+  and adjusted levels), any true success difference between about 4 and 20 points is likely to end
+  Unclear. Round 1's difference was −19.4 points, inside that band. A label test cannot grow
+  without a new rule writer, and each new corpus is a new set of fresh sessions. The plan gives the
+  owner no estimate of how many columns will need new tests, or at what cost.
+- **Effect.** The owner decides on spend with no view of the likely total. Completion can take far
+  longer than the table shows.
+- **Fix.** For each column, give the band of true differences that is likely to end Unclear at the
+  final look, and the expected number of tests. Do this by simulation from round 1's data. Give the
+  owner a range of total cost under two or three assumed effects.
+
+#### S8. Low. Rule 6 does not say which test repeats after a disagreement
+
+- **Location.** Rule 6.
+- **Problem.** After "Unclear across replications", the plan does not say whether the next test
+  repeats the first model or corpus, the second, or both.
+- **Fix.** Say that both repeat, under the method of S1, so that neither side of the disagreement is
+  chosen after the data.
+
+### 9.6 New leans
+
+| Lean | Direction | Finding |
+|---|---|---|
+| A series of new tests until a verdict | Toward whichever outcome comes first | S1 |
+| The next test chosen and funded after its data | Toward the outcome that the chooser prefers, either arm | S2 |
+| C2's rules selected on being enforced by V and L | Toward V and L against P | S4 |
+| A second model chosen for its rule breaks | Toward V and L against P | S5 |
+
+### 9.7 What a draft 3 needs before acceptance
+
+1. An anytime-valid method, or one alpha spent over the whole series of a column (S1).
+2. A next-test rule written now, the same for every column, with funding blind to direction (S2).
+3. The union of enforced rules for C2 under D1d, and the lean named (S4).
+4. The four High findings of section 8.6 that are still open: R2, R3, R4. R1 is closed.
+
+A check of these six High fixes is enough before the owner decides D1a.
