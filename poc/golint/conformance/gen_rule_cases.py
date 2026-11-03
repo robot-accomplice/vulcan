@@ -922,6 +922,14 @@ def replaced(target, modname="go.mod"):
     return join(rawfiles({"go.mod": gomod, f"{target}/{modname}": EVIL_MOD, f"{target}/s.go": EVIL_S}), code("api/orders/extra", EVIL_USE))
 
 
+IGNORE = lambda d: "module shop\n\ngo 1.26.0\n\nignore " + d + "\n"
+
+
+def IGNORED(snippet):
+    s, o = snippet if isinstance(snippet, tuple) else (snippet, 0)
+    return {"v": [("go.mod", s, "0002", o)], "l": [("go.mod", s, "0002", o)]}
+
+
 def replace_line():
     return ("go.mod", "replace", "0002", 0)
 
@@ -990,6 +998,10 @@ CASES += [
     ("R303", "Amendment 12: a Windows UNC path", None, rawfiles({"go.mod": NESTED_GOMOD.replace("./third", "\\\\server\\share\\evil")}), foreign()),
     ("R304", "Amendment 12: a path with backslashes, relative", None, rawfiles({"go.mod": NESTED_GOMOD.replace("./third", "..\\out\\evil")}), foreign()),
     ("R305", "Amendment 12: a replace by a module path and a version passes", None, rawfiles({"go.mod": "module shop\n\ngo 1.26.0\n\nrequire example.com/nope v0.0.0\n\nreplace example.com/nope => example.com/other v1.0.0\n"}), NO),
+    # N41: an ignore directive of go.mod fails in both arms, in each form
+    ("R306", "N41: go.mod ignores a leaf", NE_RULES, join(rawfiles({"go.mod": IGNORE("./api/orders")}), extra("orders", "func init() { os.Exit(2) }\n", "os")), IGNORED("ignore")),
+    ("R307", "N41: go.mod ignores a leaf, with no ./", NE_RULES, join(rawfiles({"go.mod": IGNORE("api/orders")}), extra("orders", "func init() { os.Exit(2) }\n", "os")), IGNORED("ignore")),
+    ("R308", "N41: go.mod ignores a library, in a block", None, rawfiles({"go.mod": "module shop\n\ngo 1.26.0\n\nignore (\n\t./lib\n)\n"}), IGNORED(("\n\t./lib", 1))),
     # N22
     ("R272", "N22: a part can be named vendor", rules(rule("X", "declaration", at="library", deny_names="vendor")), LIB_VENDOR, {"v": [("lib/vendor/library.vulcan", "vendor {", "0807", 0)], "l": [("lib/vendor/v.go", "package vendor", "0807", 0)]}),
     # The baseline
@@ -1028,6 +1040,10 @@ def third_arm_cases():
     cases = [
         ("U1", "N16, u1: third/GO.MOD", {"go.mod": NESTED_GOMOD, "third/GO.MOD": EVIL_MOD, "third/s.go": EVIL_S}, [("go.mod", "replace", "0002", 0), ("third/GO.MOD", "module", "0002", 0)], [("third/s.go", "package", "0002", 0)]),
     ]
+    # N39: H6 and //go:linkname read L's main too. V has no main that a person writes.
+    keep = "\tkeeper := store.Open()\n\tpayer := billing.NewPayer(keeper)\n"
+    out.append((L, "LH1", "N39: in L, a function with no body and an assembly file in main", {"cmd/shop/main.go": main_with(keep, "func evil() int\n\n"), "cmd/shop/evil_amd64.s": ASM.replace("holeB", "evil")}, [("cmd/shop/main.go", "evil() int", "0126", 0), ("cmd/shop/evil_amd64.s", "TEXT", "0126", 0)]))
+    out.append((L, "LH2", "N39: in L, //go:linkname in main", {"cmd/shop/main.go": main_with(keep, "import _ \"unsafe\"\n\n//go:linkname evil runtime.evil\nfunc evil() int\n\n")}, [("cmd/shop/main.go", "//go:linkname", "0122", 0)]))
     for id_, desc, files, both_w, v_w in cases:
         out.append((L, id_, desc, {**files, "api/orders/extra.go": EVIL_USE}, both_w))
         out.append((V, id_, desc, {**files, "api/orders/extra.vulcan": EVIL_USE}, both_w + v_w))

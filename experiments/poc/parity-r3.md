@@ -1470,3 +1470,46 @@ A source file that is a symlink, and a file with mode 000 anywhere, give V no bu
 - Windows symlinks, which my account could not create. Junctions stand in for them.
 - On Linux: N39, N40, and the backslash fallback, which I did not run myself.
 - The cause of `i2`.
+
+## Rerun-6 fixes
+
+Made by the builder at the owner's request, after the sixth rerun. The reviewer has not reviewed these fixes. The sections above stay as they were.
+
+| Finding | Fix | Arms | Regression test | On the old code (an export of 2ab8bf2) |
+|---|---|---|---|---|
+| N39, High | `poc/golint/imports` applies H6 (a function with no body, an assembly or object file) and the `//go:linkname` check to `main` too. V has no `main` that a person writes, so V has no such place | L | `LH1` (VL0126 at the function and at the `.s` file), `LH2` (VL0122) | Both fail: L exits 0 |
+| N40, High | The shared walk of `ForeignRoots` rejects each link to a directory in the project, a symlink or a junction, at the link: K0002 in V, VL0002 in L, and each arm stops | Both | `TestLinkedPart`: a leaf's directory that is a link to `_keep`, `testdata`, `.keep`, or a place outside. A junction on Windows, a symlink on Linux. The plain project passes. `TestBuildsMeansCompiles`: a link to a directory is no success in either arm | L exits 0. V gives K0003, not at the link |
+| N41, Medium | `ForeignRoots` rejects each `ignore` directive of the root `go.mod`, as it rejects a `replace` by a local path | Both | `R306` (`ignore ./api/orders`), `R307` (`ignore api/orders`), `R308` (a block that ignores `./lib`) | Each passes in both arms |
+| N42, Low | `CountModel` has a new count `Model`: the runs with a shared model code, by arm, which means the same in each arm. The comment and `rules-file.md` say that `Decided` is L's count alone, 0 in V by definition | Both | `TestModelError` checks `Model` in each arm | The test does not build |
+| N37, Low | The row of the limits now says that a link to a directory fails because the walk rejects each link to a directory (N40). The reason about a `go.mod` is removed | Both | `TestLinkedPart` | |
+| N43, Low | Not fixed, as the owner decided. `rules-file.md` lists it as a known limit, in V alone: on a grader on Linux, a source file that is a symlink or a file with mode 000 gives V no build, and L builds | V | None | |
+
+### The choice for N40
+
+The brief gave two ways: reject a linked part directory in the shared rules code, or load each part by its import path. I chose the first, in a wider form: the walk rejects each link to a directory, not only a part's. The reasons:
+
+- It is one function for both arms, so the result is the same in each arm by construction.
+- It needs no list of parts. L reads `ForeignRoots` before its driver loads a package, and V reads it before the parts.
+- A load by import path would change only L's loader. V would still give K0003, which is another code, and the shared walk would not cover V's own walk.
+- A link to a directory that a part does not use brings nothing in today. But a part can import a package behind it, and the go command reads such a path in ways that differ by host.
+
+The cost is stricter, and the same in both arms: a project that keeps a link to a directory cannot use these rules as they are. This is judgment call 37 of `rules-file.md`. Judgment call 38 records that `ignore` fails with no rules file too, as a local `replace` does.
+
+### Tests
+
+- Windows, Go 1.27.3: `go test -count=1 -timeout 40m ./...` at the root and in `poc/golint`. Each package passes. The longest are `poc/harness/grade` at 622 s, `poc/golint/conformance` at 533 s, and `conformance` at 377 s. `TestDefaultsOnBase` and `TestCoverage` pass.
+- Linux, in WSL, Go 1.27.3: `R306` to `R308` in both arms, `LH1`, `LH2`, `TestLinkedPart` with symlinks, `TestCoverage`, and `TestModelError` pass.
+
+### Regression
+
+I reran the reviewer's 21 case scripts of the sixth rerun with no change to their cases, against binaries built from the working tree with these fixes. Then I compared them with the reviewer's output of the sixth rerun by `cmp6.py`. **694 rows compared, 0 changed.** The 123 rows tagged DIFF are the same as before. For `a8`, a step before its cases needs a patched tool of the reviewer's, which is not in my copy. So I ran the cases of `a8` without that step, and its 12 rows are among the 694. Steps of `a4`, `c1`, and `c3` that read the reviewer's other directories also stopped. They hold no compared row.
+
+### Hash of `defaults v1`
+
+No change: `sha256:14c3ca9a9ac1603d5227ff4275375f2fd38bded91be26887b921929972a6f427`. `internal/rules/defaults/v1.rules` did not change, and its `sha256` is that value. The base applications have no link to a directory, no `ignore` directive, and no assembly in L's `main`, so `TestDefaultsOnBase` passes with the same counts. `defaults v1` is not frozen.
+
+### What is not done
+
+- The reviewer has not checked these fixes.
+- T2's check of the sealed seeded cases for a local `replace`, a link, or an `ignore` is still the owner's. I read no sealed case and nothing under `C:\Users\jonat\vulcan-poc`.
+- `spec.md`'s K0002 row does not name the new forms.

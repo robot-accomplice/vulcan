@@ -16,7 +16,7 @@ import (
 // Analyzer is A2.
 var Analyzer = &analysis.Analyzer{
 	Name: "imports",
-	Doc:  "check the imports of each part: a leaf or a library imports no leaf, no code imports the manifest, no //go:linkname, no function without a body or assembly file in a leaf or a library, and in strict mode no unsafe, syscall, or cgo (VL0101, VL0118, VL0122, VL0124, VL0126, VL0204)",
+	Doc:  "check the imports of each part: a leaf or a library imports no leaf, no code imports the manifest, no //go:linkname, no function without a body or assembly file in any part, main too, and in strict mode no unsafe, syscall, or cgo (VL0101, VL0118, VL0122, VL0124, VL0126, VL0204)",
 	Run:  run,
 }
 
@@ -26,14 +26,12 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 	m, self := u.M, u.Part
-	if self.Kind != model.Main {
-		foreignCode(pass, u)
-	}
+	// H6 and //go:linkname apply to main too (audit N39). V has no main that a person writes, so in
+	// V no such code can be there; in L it would reach the build past every rule.
+	foreignCode(pass, u)
 	for _, f := range pass.Files {
-		if self.Kind != model.Main {
-			for _, name := range rules.Bodyless(f) {
-				model.Report(pass, name.Pos(), "VL0126", "%s", rules.HoleH6Message(name.Name))
-			}
+		for _, name := range rules.Bodyless(f) {
+			model.Report(pass, name.Pos(), "VL0126", "%s", rules.HoleH6Message(name.Name))
 		}
 		for _, imp := range f.Imports {
 			p, _ := strconv.Unquote(imp.Path.Value)
@@ -61,9 +59,6 @@ func run(pass *analysis.Pass) (any, error) {
 				}
 				model.Report(pass, pos, "VL0124", "strict mode: %s %s %s, which can go around the architecture rules", kindName(self), self.Dir, what)
 			}
-		}
-		if self.Kind == model.Main {
-			continue
 		}
 		for _, cg := range f.Comments {
 			for _, c := range cg.List {

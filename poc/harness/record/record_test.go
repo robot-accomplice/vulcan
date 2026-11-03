@@ -22,4 +22,8 @@ func TestModelError(t *testing.T) {
 	if c.Decided[ArmL] != 1 || c.Decided[ArmV] != 0 || c.OneArm[ArmL] != 1 || c.OneArm[ArmV] != 0 {
 		t.Errorf("counts %+v", c)
 	}
+	// N42: Model counts a shared model code in each arm, so V's run counts too.
+	if c.Model[ArmL] != 1 || c.Model[ArmV] != 1 {
+		t.Errorf("model counts %+v", c.Model)
+	}
 }

@@ -409,7 +409,7 @@ func TestBuildsMeansCompiles(t *testing.T) {
 			if m.TaskSuccess() || m.FinalCheck == nil || len(m.FinalCheck.Model) == 0 {
 				t.Errorf("a model error: success %v, check %+v", m.TaskSuccess(), m.FinalCheck)
 			}
-			// Audit N34: an embedded *.db and a link that nothing uses build in both arms.
+			// Audit N34: an embedded *.db builds in both arms.
 			embed := func(ws string) {
 				if err := writeFile(filepath.Join(ws, "api", "orders", "seed.db"), []byte("seed")); err != nil {
 					t.Fatal(err)
@@ -429,8 +429,11 @@ func TestBuildsMeansCompiles(t *testing.T) {
 					}
 				}
 			})
-			if !l.Builds || !l.TaskSuccess() {
-				t.Errorf("a link that nothing uses: builds %v, success %v", l.Builds, l.TaskSuccess())
+			// Audit N40: a link to a directory fails the shared walk, so it is no success in either arm,
+			// also when nothing uses it. TestCopyForBuild holds the copy of a link.
+			t.Logf("%s, a link to a directory: builds %v, check %+v", arm, l.Builds, l.FinalCheck)
+			if l.TaskSuccess() || l.FinalCheck == nil || !slicesContains(l.FinalCheck.Model, "model-0002") {
+				t.Errorf("a link to a directory: success %v, check %+v", l.TaskSuccess(), l.FinalCheck)
 			}
 		})
 	}

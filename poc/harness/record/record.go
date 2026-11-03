@@ -178,7 +178,12 @@ func (r *Run) ModelError() bool { return r.FinalCheck != nil && len(r.FinalCheck
 
 // ModelCounts is how many runs a model code decides, for the report of step 8.
 type ModelCounts struct {
-	// Decided is the runs that pass M3 but for a code of the shared model check.
+	// Model is the runs with a code of the shared model check, by arm. It has the same meaning in each
+	// arm, so a report can set the two side by side.
+	Model map[string]int
+	// Decided is the runs that build and pass their acceptance tests, and fail M3 only for a code of the
+	// shared model check. It is L's count alone: in V such a code stops the build, so V's count is 0 by
+	// definition (audit N42). A report does not compare it between the arms.
 	Decided map[string]int
 	// OneArm is the runs with a model code that one arm alone emits, by arm. These are a difference
 	// between the arms, not runs with no success.
@@ -187,11 +192,14 @@ type ModelCounts struct {
 
 // CountModel counts, by arm, the runs that a model code decides.
 func CountModel(runs []Run) ModelCounts {
-	c := ModelCounts{Decided: map[string]int{}, OneArm: map[string]int{}}
+	c := ModelCounts{Model: map[string]int{}, Decided: map[string]int{}, OneArm: map[string]int{}}
 	for i := range runs {
 		r := &runs[i]
 		if r.FinalCheck == nil {
 			continue
+		}
+		if r.ModelError() {
+			c.Model[r.Arm]++
 		}
 		if r.ModelError() && r.Builds && r.Acceptance.OK() {
 			c.Decided[r.Arm]++

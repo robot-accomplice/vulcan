@@ -451,7 +451,13 @@ type Foreign struct {
 // (plan-r3, amendment 12). A local path is one that modfile.IsDirectoryPath accepts: relative or
 // absolute, in the form of any host. The check reads the text alone, and asks the file system
 // nothing, so no link, junction, or other form of the path changes its result. A replace by a module
-// path and a version passes.
+// path and a version passes. An ignore directive of the root go.mod fails too (audit N41): the go
+// command leaves an ignored directory out of ./..., so no check loads it, and still builds it when
+// something imports it.
+//
+// The walk rejects each link to a directory in the project, a symlink or a junction (audit N40). The
+// go command does not follow one when it expands ./..., so L's check would not load a part behind it,
+// and go build follows it. Each arm reads the same walk, so both fail it the same way.
 //
 // The walk stays for a go.mod in any directory, and for a root vendor/modules.txt. A go.mod that
 // nothing replaces brings in nothing. It stays a fault because V's K0002 rejects a Go file in a plain
@@ -501,6 +507,9 @@ func ForeignRoots(root string) []Foreign {
 	if b, err := os.ReadFile(filepath.Join(root, "go.mod")); err == nil {
 		if f, err := modfile.Parse("go.mod", b, nil); err == nil {
 			replaces("go.mod", f.Replace)
+			for _, ig := range f.Ignore {
+				out = append(out, Foreign{"go.mod", ig.Syntax.Start.Line, fmt.Sprintf("go.mod ignores %s, so the check does not load it and a build can still hold it; remove the ignore directive", ig.Path)})
+			}
 		} else {
 			refused("go.mod", b, err)
 		}
@@ -522,6 +531,14 @@ func ForeignRoots(root string) []Foreign {
 			return nil
 		}
 		rel = filepath.ToSlash(rel)
+		// A junction is ModeIrregular on Windows, a symlink ModeSymlink. Only one that leads to a
+		// directory can hold a package; os.Stat follows it.
+		if d.Type()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+			if fi, err := os.Stat(full); err == nil && fi.IsDir() {
+				out = append(out, Foreign{rel, 1, fmt.Sprintf("%s is a link to a directory, which go ./... does not follow and a build does, so the check may not read code that the build holds; make it a plain directory", rel)})
+			}
+			return nil
+		}
 		if d.IsDir() {
 			if rel == ".git/objects" || rel == ".vulcan/build" {
 				return filepath.SkipDir
@@ -602,5 +619,5 @@ func HoleH6Message(name string) string {
 
 // HoleH6FileMessage is the message for an assembly file or an object file.
 func HoleH6FileMessage(name string) string {
-	return fmt.Sprintf("%s holds code that is not Go, so no rule can read it; a leaf or a library holds only Go code", name)
+	return fmt.Sprintf("%s holds code that is not Go, so no rule can read it; each part, main too, holds only Go code", name)
 }

@@ -747,6 +747,62 @@ func TestReplaceByFileSystem(t *testing.T) {
 	}
 }
 
+// TestLinkedPart is audit N40: a leaf's directory that is a link fails in both arms, at the link, by
+// the shared walk. The go command does not follow a link when it expands ./..., and a build does. The
+// link leads inside the project, to a directory that the go command skips, or outside it.
+func TestLinkedPart(t *testing.T) {
+	vulcan := buildVulcan(t)
+	for _, arm := range []struct {
+		name, bin string
+		check     []string
+	}{{"V", vulcan, []string{"check"}}, {"L", lintBin, []string{"./..."}}} {
+		for _, to := range []string{"", "_keep/orders", "testdata/orders", ".keep/orders", "../out/orders"} {
+			name := to
+			if name == "" {
+				name = "plain"
+			}
+			t.Run(arm.name+"/"+name, func(t *testing.T) {
+				base, err := filepath.EvalSymlinks(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				root := filepath.Join(base, "project")
+				fixture(t, arm.name, root)
+				if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
+					if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module shop\n\ngo 1.26.0\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				leaf := filepath.Join(root, "api", "orders")
+				if to != "" {
+					target := filepath.Join(root, filepath.FromSlash(to))
+					if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Rename(leaf, target); err != nil {
+						t.Fatal(err)
+					}
+					if runtime.GOOS == "windows" {
+						if out, err := exec.Command("cmd", "/c", "mklink", "/J", leaf, target).CombinedOutput(); err != nil {
+							t.Fatalf("mklink: %v\n%s", err, out)
+						}
+					} else if err := os.Symlink(target, leaf); err != nil {
+						t.Fatal(err)
+					}
+				}
+				code, out := run(t, root, arm.bin, arm.check...)
+				linked := regexp.MustCompile(`api[/\\]orders:1:1: (error K0002|VL0002)`).MatchString(out)
+				switch {
+				case to == "" && code != 0:
+					t.Errorf("the plain project fails: exit %d\n%s", code, out)
+				case to != "" && (code == 0 || !linked):
+					t.Errorf("a leaf's directory that is a link passes: exit %d\n%s", code, out)
+				}
+			})
+		}
+	}
+}
+
 // TestAgentK35 is what an agent sees during a run, with one new finding (audit k35, amendment 11).
 // V's build and test refuse it, and L's go command does not read rules. That stays, as a measured cost.
 func TestAgentK35(t *testing.T) {
