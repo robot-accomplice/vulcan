@@ -672,3 +672,343 @@ The fixes are within the plan's frame. A revised plan should:
 6. Add the missing builds and their parity audits (H11, M13).
 
 After that, a short rerun of this audit should check the fixes before the owner decides D1.
+
+## 8. Rerun on draft 2
+
+Date: 2026-11-03. Object: draft 2 of `docs/poc/plan-coverage.md` (353 lines, in the working tree,
+not committed). The same auditor, scale and constraints as above. Nothing under
+`C:\Users\jonat\vulcan-poc` was read.
+
+### 8.1 Result
+
+| | Count |
+|---|---|
+| Draft 1 findings: Closed | 20 |
+| Draft 1 findings: Partly closed | 12 |
+| Draft 1 findings: Open | 1 (M11) |
+| New findings: High | 4 |
+| New findings: Medium | 11 |
+| New findings: Low | 5 |
+
+Each finding that is Partly closed or Open has its remaining problem stated as a new finding (R1 to
+R20). So the new counts are the full list of open problems. Nothing is counted twice.
+
+**Verdict: draft 2 is not ready for the owner to accept.** It is much better than draft 1. It closes
+the structural gaps: the terminal outcome, one rule per column, the feature matrix, the harms, the
+missing builds, the amendment table, and the missing rows. Four High findings remain. R3 leans toward
+P. R2 and R4 lean toward V. R1 is a path to close a column with no information.
+
+### 8.2 Status of each draft 1 finding
+
+| Id | Status | Reason | Rest in |
+|---|---|---|---|
+| H1 | Partly closed | The terminal outcome exists. But the final size is not fixed: section 6 sizes "are estimates, to be sized by calibration", and D7 sets spend per campaign. No floor on the interval width exists | R1 |
+| H2 | Partly closed | 5 runs a task and final sizes are set. The stated half-widths leave out the clustering of runs in tasks | R5 |
+| H3 | Partly closed | Pilot in all arms, not counted, lean named, fresh rewriter. But the pilot may read P with its new linter. D1c recommends closure on an outcome with no measure of the claim | R9, R13 |
+| H4 | Partly closed | P gets an architecture linter. But it is configured from the blind team rules, while L and V use frozen defaults | R3 |
+| H5 | Partly closed | Rank 3 on calibration workspaces, L from its own runs. But calibration is 108 runs over three arms, and rank 3's thresholds are for 108 workspaces | R6 |
+| H6 | Closed | Row 7 uses rank 4's test. A3 is for P only | |
+| H7 | Partly closed | One rule a column, accepted rules kept, section 9 lists changes. But several accepted rules are one-sided or point rules, and two rules are said to come from hr3 when they do not | R2 |
+| H8 | Closed | C2 runs only if the plan-r3 gate passes. The gate is unchanged | R13 for D1d |
+| H9 | Partly closed | Section 5 lists the features per condition. But rows 11a and 11b read C1, where row 11's warnings are off | R8 |
+| H10 | Closed | Serialized messages, separate binaries, seeds that the compiler cannot catch, dead letters or D9 | |
+| H11 | Closed | The port is a phase B build, by fresh sessions, from one structure plan, with an audit | |
+| H12 | Partly closed | Every harm has a campaign. N2 and N5 rest on runs that are optional. No rule says how a harm weighs against a gain | R15 |
+| M1 | Closed | Nulls replicate, the method is named per row, disagreement is defined | R12 for T2 |
+| M2 | Closed | Margins are in section 2. Rule 12 limits phase A changes | |
+| M3 | Closed | Rows 1 (P), 5 (L) and 15 are measured again. Row 2 (L) reads T1 | |
+| M4 | Partly closed | The same tools in every arm, the same path and words. How the Go tools run on V is not stated | R10 |
+| M5 | Closed | L+gen condition. Rows 1 and 8 read different comparisons. P+ holds the guarantees | |
+| M6 | Closed | C3a measures review. One judging procedure on lowered Go. Edit lists are stated | |
+| M7 | Closed | Seeds in bodies, one prompt, C1 and C2 diffs, a size and a cost | |
+| M8 | Closed | Rows 5a to 5d. P column on A1. D8 and D11 | R7 for 5c (P) |
+| M9 | Closed | P's shared fake suite. A test defect has a labeler | |
+| M10 | Partly closed | Split, neutral seeds, fixes-off condition. The race column against P cannot differ | R7 |
+| M11 | Open | "Without" is defined, and P has a conventions file. The confound with N1 remains, and the new primary measure makes it a lean | R4 |
+| M12 | Partly closed | C6, every theory, no stop after T27. T29a still has no verdict rule | R17 |
+| M13 | Partly closed | Builds moved to phase B. But phase A still holds row 2 against P, which needs P's linter from phase B. P's verifier front end for 5c is in no phase | R11 |
+| M14 | Closed | The table of changes, one total, and C1 and C2 replace step 8 and rank 2's runs | |
+| M15 | Closed | Rows 5, 10 and 11 split. Rows 16 to 19. D10 | |
+| L1 to L6 | Closed | Rule 7, rule 8, the code-form note, the cost total, separate decisions, one script | R20 for rule 7 |
+
+### 8.3 New findings
+
+#### R1. High. "Tested, unresolved" can close a column at any size
+
+- **Location.** Rule 5 ("Terminal outcome"); section 6 ("Cost (estimates, to be sized by calibration
+  before any spend)", "A smaller size means more columns end 'Tested, unresolved'"); D1b, D7.
+- **Problem.** The final size triggers the terminal outcome. But section 6 lets calibration and the
+  spend decision change the sizes, and no floor exists on the width of the interval. With D1b at
+  "yes", a column closes at whatever size the funds allow. A column run at 20 runs, with an interval
+  of about ±25 points, closes the same way as one at 200 runs. Calibration also sees the success rate
+  of each arm, so a size chosen after it can depend on the differences between arms.
+- **Effect.** Tests that say nothing can meet the completion rule. This leans toward an early end,
+  not toward an arm. It goes against the owner's rule that a stand-in does not close an entry.
+- **Fix.**
+  1. Fix each final size in the amendment as a minimum. A smaller campaign gives no terminal
+     outcome, and its column stays open.
+  2. Let "Tested, unresolved" count only when the interval half-width at the final size is at most a
+     stated value (for example 1.5 times the margin).
+  3. Let calibration set sizes from the pooled variance only, not from the differences between arms.
+     Record the inputs.
+
+#### R2. High. The accepted rules that rule 5 keeps are one-sided or point rules, so some losses for V have no outcome
+
+- **Location.** Section 2, the "Rule" column; rule 5; section 9 ("New rules ... the margins marked
+  'Rule 5'").
+- **Problem.**
+  1. Several hr3 rules test only a gain for V. T23 (row 17): "Refuted if V is not better by a bound
+     above 0". T24 (row 16): "Refuted if V's benefit does not beat L's by a bound above 0". T22 (row
+     11d) reads a fall in turns and an arm difference, with no direction for a loss. Under these
+     rules, V worse than L reads "refuted", the same as no difference.
+  2. N1 (row 1 against L) and the "differ by more than 1 seed" rules (rows 10a, and 11c through T20)
+     read point values with no interval. With a half-width near 11 points, a point rule reads noise.
+  3. Rows 5b and 9 cite "hr3 T26 form: refuted if the arms differ by at most 1 seed of at least 20".
+     T26's accepted rule is different ("no more than 10% more seeds are found, or the arms differ by
+     more than 12 points"). The cited rule is new, and section 9 does not list it.
+  4. No rule says how "refuted" or "supported" maps to the four outcomes of the findings report.
+- **Effect.** A measured loss for V on rows 16, 17 and 11d cannot be recorded as "Loss measured".
+  This leans toward V. Point rules can give any outcome by chance, in either direction.
+- **Fix.** For each column, add a line that maps the accepted rule to Gain, Loss, No measured gain
+  and Unclear. Add the mirror condition for a loss where the accepted rule has none. Read point rules
+  on the 95% interval. List the rules of rows 5b and 9 as new rules in section 9. The amendment must
+  name each of these changes to hr3.
+
+#### R3. High. Row 2 against P: P's linter is configured from the test's own rules, and L and V are not
+
+- **Location.** Row 2, P column ("configured from the prose rules by a fresh session"); plan-r3
+  question QD ("do the frozen defaults and the checks enforce").
+- **Problem.** T1 and T2 measure L and V with `defaults v1`, frozen before the blind rules exist. So
+  L and V are out of sample. P's linter is configured from those same blind rules, so P is in sample.
+  The arms get different information about the test.
+- **Effect.** P is favored on the share of rules enforced. This is a material lean toward P, the
+  reverse of H4.
+- **Fix.** Pick one form and apply it to every arm.
+  - Option A: P's linter gets a default configuration, written before the blind rules by a fresh
+    session from published practice, as `defaults v1` was.
+  - Option B: L and V also get a team rules file, written from the same prose rules by a fresh
+    session with the same budget, with the rule kinds that exist.
+
+  Report both if the owner wants. The verdict reads the matching pair.
+
+#### R4. High. Row 12's primary measure leans toward a "Gain" for V by construction
+
+- **Location.** Row 12 ("Primary: the change in success within each arm, then those changes
+  compared"); the C1 conditions V−primer and L−primer.
+- **Problem.** Without its primer, V's agent writes a language with no training data. L's agent still
+  writes Go. So V's drop is large because V needs the primer to work at all (N1), not because its
+  tools teach more. A larger drop in V reads as "Gain measured" under the difference of differences.
+- **Effect.** Row 12 can record a gain for V that is the cost of the new language. This leans toward
+  V, and it double counts against row 1.
+- **Fix.** Make the primary measure the result with each arm's primer, against the margin, with the
+  claim stated as "the primer and tools bring V to at least L's level". Keep the ablation as a
+  secondary measure, reported within each arm. Or ablate only the hints and `explain`, and keep the
+  primer in every condition, so that the need of the language stays fixed.
+
+#### R5. Medium. The stated half-widths leave out the clustering, and some margins cannot be met at their sizes
+
+- **Location.** Section 6, "Sizes"; section 2 margins "2 rules of 28" (row 2, P) and "2 of 20 seeds"
+  (rows 10b, 11a, 11b).
+- **Problem.**
+  1. 100 runs a condition are 20 tasks × 5 runs. Rule 8 analyzes by task with a cluster bootstrap,
+     so the effective sample is near 20 paired task values, not 100 runs. If runs of one task are
+     correlated (for example ICC 0.3), the design effect is 1 + 4 × 0.3 = 2.2. The half-width at the
+     first size is then near 16 points, not 11. Pairing may win some of it back. The plan states only
+     the gain from pairing.
+  2. Row 2 against P has 28 rules and a margin of 2 rules (about 7 points). The interval on a share
+     of 28 rules is much wider. A blind rule set cannot grow without a new rule writer, so the final
+     size has no meaning here.
+  3. Seed margins need an interval method. With 20 paired seeds and 0 discordant, an exact upper
+     bound is about 14%, above a margin of 10%.
+- **Effect.** More columns end "Tested, unresolved" than the plan says. With R1, they may close with
+  little information.
+- **Fix.** State the half-widths with an ICC taken from round 1 data, and size for it. Name the
+  interval method for paired seeds (an exact method on the discordant pairs). For label tests, state
+  the final size as a second corpus, or set a margin that 28 rules can read.
+
+#### R6. Medium. Row 6 has about 36 calibration workspaces an arm, and its rule is for 108
+
+- **Location.** Row 6; section 5, "Calibration: P; L; V"; section 6 ("Calibration 108 runs, as
+  plan-r2").
+- **Problem.** Rank 3's thresholds (at least 10 of 108, at most 1 of 108) are for 108 workspaces. The
+  plan reads them per arm, on about 36 workspaces each. The margin "5 of 108" for the difference
+  also assumes 108 an arm.
+- **Effect.** The rule cannot be read as written. At 36 workspaces, "at most 1" has an upper bound
+  near 14%, not 4.3%.
+- **Fix.** Run 108 calibration workspaces in each arm that row 6 reads, or rescale the thresholds to
+  36 before any data, and list the change in section 9.
+
+#### R7. Medium. Columns where P has no common equal are fixed by construction
+
+- **Location.** Rows 5c (P), 11c (P), 16 (P), 17 (P), 18 (P).
+- **Problem.**
+  - 11c against P: P has no check-time race tool, so P rejects 0 at check time. The plan says so.
+  - 17 against P: P has no checker, so "rejections before the first pass" is 0 or undefined.
+  - 18 against P: P has no gap list, so every bypass is "not named".
+  - 16 against P: the test is "with and without the command", and P has no command.
+  - 5c against P: "P's assertions read as contracts by the same verifier" is a build for P that no
+    Go team uses, and no phase lists it. With it, P is close to L. Without it, P proves 0.
+- **Effect.** These columns close with a result known in advance. Each one leans toward V and L.
+- **Fix.** For each such column, choose before any data:
+  1. measure an outcome that exists in every arm (for example races, invented symbols, or bypasses
+     in final code, found at test time), or
+  2. record the column as "No common Go equal", and let the owner decide whether that closes it.
+
+  Do not read a check-time count where P has no check.
+
+#### R8. Medium. Rows 11a and 11b read final code in C1, where row 11's warnings are off
+
+- **Location.** Section 5, C1 ("Base only, except the feature named by the condition"; "11a, 11b in
+  final code"); section 6, phase B (row 11's warnings are a new build).
+- **Problem.** "Base" is what each arm ships today. Row 11's warnings are not in it. So C1's count of
+  duplicates and masked errors does not measure the warnings.
+- **Effect.** The final-code part of 11a and 11b measures nothing about the claim.
+- **Fix.** Read the final-code counts of 11a and 11b in C2, which has row 11's features on, against
+  a warnings-off condition in the same arm. Or add warnings-on conditions to C1. State it in
+  section 5.
+
+#### R9. Medium. The pilot gate may read P with its new linter
+
+- **Location.** Section 3 ("The gate reads P's break rate"); section 5, C2 ("P (with its linter)").
+- **Problem.** If P in the pilot has its architecture linter, the gate reads a checked arm. P then
+  seldom breaks a rule, and the gate can fail for that reason. The tasks are then judged "not
+  tempting" when the check, not the task, stopped the break.
+- **Effect.** Rows 2 and 3 can end "Not testable" because of the tool change of rule 2.
+- **Fix.** Run the pilot gate on P with prose rules only (no linter). Add the same condition to C2 as
+  P−linter. It gives the unchecked baseline that row 3 needs, and it is the arm of round 1.
+
+#### R10. Medium. Rule 2 does not say how the Go tools run on V
+
+- **Location.** Rule 2.
+- **Problem.** V's code is `.vulcan` files. V lowers them to Go with generated wrappers and `main`.
+  `staticcheck`, `errcheck` and `dupl` run on Go, so on V they read the lowered Go, with `//line`
+  positions. Findings in generated code exist only in V. The plan does not say whether they are shown
+  to the agent, filtered, or counted.
+- **Effect.** Extra noise in V's tool output leans against V. A filter that removes too much leans
+  toward V.
+- **Fix.** State how each tool runs on V. Filter findings in generated code by one written rule.
+  Report the count filtered in each arm, L's generator output included.
+
+#### R11. Medium. Phase A holds a test that needs a phase B build
+
+- **Location.** Section 6, phase A ("Plan-r3 steps 3 to 6, with a P column", rows 2, 15, 19); phase B
+  ("P's architecture linter").
+- **Problem.** Row 2 against P needs P's linter, which phase B builds. The verifier front end that
+  reads P's assertions (row 5c, P) is in no phase.
+- **Fix.** Move the P column of T1 and T2 to phase A', after the linter build. Add the 5c P build to
+  phase B, or drop it under R7.
+
+#### R12. Medium. Row 2 against L replicates on T2, which is not clean for the dependency check
+
+- **Location.** Row 2, "Repl.: Corpus (T2)"; plan-r3 section 0, and section 5 ("not for the
+  dependency check").
+- **Problem.** The dependency check was designed after the round 2 diagnostic. So T2 is in sample for
+  it. A replication on T2 can confirm a result that the design of the check brought.
+- **Effect.** It leans toward V and L on the dependency rules.
+- **Fix.** Replicate on T2 without the dependency check, as plan-r3 reports it. Or use a second fresh
+  rule set.
+
+#### R13. Medium. D1c and D1d recommend closure on outcomes that do not measure the claim
+
+- **Location.** Section 3; section 10, D1c and D1d ("Yes").
+- **Problem.** "Not testable on this model" and "Tested at the label stage" give no task result. Row
+  3's claim is about review and fixes against the check, and a label count does not measure it. The
+  owner's rule says that a count that stands in for the claim does not close an entry. The plan
+  leaves the choice to the owner, which is correct, but it recommends "yes".
+- **Effect.** The recommendation leans toward a fast close. It does not lean toward an arm.
+- **Fix.** Keep the decisions. Recommend that these outcomes appear in the report as their own entry
+  (for example "Not testable: no task tempted a break"), not under "No measured gain". Say in the
+  recommendation that they do not measure the claim.
+
+#### R14. Medium. The build effort of phase B is not estimated
+
+- **Location.** Section 6, phase B; section 12.
+- **Problem.** Phase B holds about 16 builds. Each needs fresh builders for two or three forms and a
+  parity audit. Plan-r3's one build needed six audit reruns. The plan gives run costs, but no estimate
+  of build sessions or time.
+- **Effect.** The plan is likely to take much longer than its cost table suggests. A phase that stops
+  part way can leave rows open.
+- **Fix.** Give an estimate of sessions for phase B, with audit reruns. Order the builds by the rows
+  they close, so that a stop leaves a known set of rows closed.
+
+#### R15. Medium. Two harms rest on optional runs, and no rule weighs a harm against a gain
+
+- **Location.** Section 4 (N2 in "C5c ... if the owner runs them"; N5 in "Row 6 and 5c runs");
+  rule 10.
+- **Problem.** Rank 1's runs happen only after a gain and an owner decision. So N2 and N5 can stay
+  unmeasured. "A gain on a row is reported next to each harm" gives no rule for when a harm cancels a
+  gain.
+- **Effect.** A gain on row 5c or 6 can stand next to an unmeasured harm. This leans toward V.
+- **Fix.** Measure N5 with rank 3's idiom seeds in every case. Measure N2 in C1 where annotations
+  exist. State a rule: a gain on a row with a "Loss measured" harm in the same campaign is reported
+  as "Gain with a measured harm", and the owner reads both.
+
+#### R16. Low. C2v has no author, no pilot and no run condition
+
+- **Location.** Section 5, C2v; row 7.
+- **Problem.** Rank 4 runs only "if form or holes show a gap". C2v is in the cost table with no
+  condition. Its tasks have no author and no tempt check, so it can end as round 1 did: no break in
+  any arm.
+- **Fix.** Name a fresh author, add a pilot gate like section 3, and run C2v only under rank 4's
+  condition.
+
+#### R17. Low. T29a still has no verdict rule
+
+- **Location.** Row 14; views draft T29a (a prior on a rate only).
+- **Fix.** Give T29a a measure and a margin in the views amendment, or say that row 14 closes without
+  it.
+
+#### R18. Low. Row 19 reads micro-benchmarks for an application claim
+
+- **Location.** Row 19, A8.
+- **Problem.** The claim is that an application "performs like Go, plus contract checks and port
+  dispatch". A benchmark of port calls alone shows the overhead of one call. "P with the same work" is
+  not defined.
+- **Fix.** Add one application benchmark (a request path of the base apps). Define P's same work as
+  the same code with assertions in place of contracts.
+
+#### R19. Low. Wrong section number
+
+- **Location.** Status paragraph ("Section 10 maps each finding").
+- **Fix.** It is section 11.
+
+#### R20. Low. Some columns name two tests and no primary one
+
+- **Location.** Rows 7 (P: "A3 ... then C2v"), 10a ("Then C4"), 11a and 11b ("Then C1 counts").
+- **Problem.** Rule 7 asks for one primary measure. Row 10a names "seeds rejected", so C4 is
+  secondary there. Rows 7 (P), 11a and 11b do not say which test is primary.
+- **Fix.** Name the primary test in each row.
+
+### 8.4 The checks that the coordinator asked for
+
+| Check | Result |
+|---|---|
+| Rule 5's terminal outcome | Present, but with no fixed final size and no floor on width (R1) |
+| Sizes and half-widths of section 6 | The arithmetic matches (11 and 8 points at 100 and 200 runs, unpaired, p = 0.8). It leaves out clustering (R5). The cost totals add up (about 3,600 and 7,000) |
+| The feature matrix of section 5 | Good structure. One gap (R8). P−linter is missing from C2 (R9) |
+| Rows 16 to 19 | The right claims to add. The P columns of 16, 17 and 18 are fixed by construction (R7). Row 19 is thin (R18). The rules of 16 and 17 are one-sided (R2) |
+| Rule 2, the same tools in every arm | Correct in principle. How they run on V is not defined (R10). It changes the pilot gate (R9) |
+| The outcomes in section 3 that ask the owner | Correct to ask. The recommendations should not be "yes" without saying that the outcomes do not measure the claim (R13) |
+
+### 8.5 New leans
+
+| Lean | Direction | Finding |
+|---|---|---|
+| P's linter is configured from the blind rules; L and V use frozen defaults | Toward P | R3 |
+| One-sided accepted rules have no Loss outcome | Toward V | R2 |
+| Row 12's difference of differences | Toward V | R4 |
+| Columns where P has no common equal | Toward V and L | R7 |
+| Replication on T2 for the dependency check | Toward V and L | R12 |
+| Gains next to unmeasured N2 and N5 | Toward V | R15 |
+| Generated code under the common tools | Against V, or toward V if over-filtered | R10 |
+| Closure at any size, and "yes" on D1c and D1d | Toward an early end, no arm | R1, R13 |
+
+### 8.6 What a draft 3 needs before acceptance
+
+1. Fix the final sizes as minimums, and set a width floor for the terminal outcome (R1, R5).
+2. Map each accepted rule to the four outcomes, with a mirror loss condition (R2).
+3. Give P, L and V the same information about the rules in row 2 (R3).
+4. Change row 12's primary measure (R4).
+
+The Medium findings can be fixed in the same draft. A check of the four High fixes alone is enough
+before the owner decides D1a.
