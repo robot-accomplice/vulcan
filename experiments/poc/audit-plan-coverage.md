@@ -2225,3 +2225,233 @@ point of AA2.
 
 **Arithmetic.** I summed the cost rows (13.6) and checked each `fixed` entry of section 6 against
 `fixed.txt`, and each row 18 figure against `attackers.txt`.
+
+## 14. Seventh rerun, on draft 7
+
+Object: draft 7 of `plan-coverage.md` (799 lines, working tree, not committed), and
+`experiments/poc/sim/cs-sim.py` with its ten outputs in `sim/out/`. I ran the script in a scratch
+copy, and ran one check of my own (section 14.7). Not read: anything under
+`C:\Users\jonat\vulcan-poc`, and hidden harness material.
+
+### 14.1 Result
+
+- **Of AA1 to AA6 and R17:** 2 are Closed (AA2, AA6). 5 are Partly closed: AA1 (residual AB3, AB4),
+  AA3 (residual AB1), AA4 (residual AB5), AA5 (residual AB6) and R17 (unchanged).
+- **New findings:** High 0, Medium 0, Low 7 (AB1 to AB7).
+- **Open after this rerun,** with each partly closed finding counted once by its residuals: High 0,
+  Medium 0, Low 8 (AB1 to AB7, R17).
+- **Verdict: no High and no Medium finding remains.** The plan is ready for the owner to decide D1a.
+  Each Low is a text fix or a cost range. Two of them touch a unit's definition: AB3 (how one seed
+  sits in each arm's diff) and AB6 (the cache state of a repeated timing draw). Fix these two before
+  the first batch of C3 and of A7 and A8.
+- **Leans.** I found no lean toward P, L or V in the draft 7 changes. Each new rule applies the same
+  condition in each direction. AB6 can lean, because a cold or a warm build cache can favor one arm,
+  but the direction is not known. AB7's wording leans against the plan's own note, not toward an arm.
+
+### 14.2 Status
+
+| Finding | Status | Reason |
+|---|---|---|
+| AA1 | Partly closed | Rule 6 names a seed pool of 20 writers × 10 seeds for C3a, C3b, C3c and N5, drawn with replacement, with fresh sessions for each draw. Rule 8 now matches rule 6. The batch table has a row "Seed (agent)". The `margins` row gives 5 (8) and 12 (31) batches. The cost adds C3 (480 sessions a batch), N5 and 84 pool sessions. All the arithmetic is right (14.4). Residuals: one seed across the arms' diffs is not defined (AB3); N5's unit conflicts with rule 14 and section 4 (AB4). New, from the fix: the cost rests on a base rate of 0.8 (AB2) |
+| AA2 | Closed | Rule 5 says "a nominal 95%", says that coverage given a verdict is lower, and says that a missing note is not evidence. Rate columns get the count of writers with a nonzero mean and "not informative" under 10. `writer_note` applies rule 5's note rule exactly, over three seeds. The plan's table matches the output. Wording residue: AB7 |
+| AA3 | Partly closed | Rule 6 and rows 2 and 5c make T1 and the 29 clauses history. Row 2's writers get round 2's brief and T1's labeler procedure. Residual: the batch table and section 11's R12 row still count T1 as a unit (AB1) |
+| AA4 | Partly closed | D15 reads the spread at the end of calibration's tenth batch. Only C1, C4, C5 and C7 can get 40 writers. Section 3 and rule 14 match. D15 says that its input is weak near 10 points. Residuals: the pool cost still assumes 40 writers for all 7 pools, and D15 has no rule if calibration stops before batch 10 (AB5) |
+| AA5 | Partly closed | Rule 6 has a third kind, "agent columns without writers", for rows 15, 18 and 19. Rule 5 names their verdict wording. `margins` simulates ln 1.20 and ln 1.10 at a batch of 20. Row 18 is in phase C. Row 11c has one procedure in every arm. Residuals: the cache state of a repeated timing draw, "machine 1", and the timing runs out of the cost (AB6) |
+| AA6 | Closed | Rule 6 replaces a writer that fails the check, and records the count. The cost has a labelers row. `fixed_minus` tests −X, and the plan's figures match its output. Rule 6 writes "the Z3 solver's `rlimit`" |
+| R17 | Partly closed | Unchanged. C6 waits for T29a's measure and margin |
+
+### 14.3 AA2: the note, the rate rule and `writer_note`
+
+1. **The note rule in the script.** `sc_writer_note` computes `meets` as Gain with a lower writer
+   bound above X, Loss with an upper bound below −X, or Within margin with both bounds inside ±X. The
+   note is a verdict that does not meet this. That is rule 5's text, word for word. At a population
+   difference of exactly +X, every verdict is wrong for writers in general, so "wrong, no note" is
+   the count of verdicts that meet the condition. Right.
+2. **The three-seed table.** Every entry matches `writer_note.txt`: 102 of 147, 193 of 226 and 217 of
+   259 notes; 45, 33 and 42 of 600 wrong with no note; per seed 5% to 10%, 4% to 6.5% and 3.5% to
+   10.5%. Seeds 20261109 and 20261110 at a spread of 10 points give my own section 13.8 counts
+   exactly (48 and 28, 40 and 30). At 15 and 20 points the counts differ from 13.8, because
+   `writer_note` starts a fresh generator for each spread and my check did not. Both are valid draws.
+3. **"About 5% to 8%".** The pooled rates are 5.5%, 7.0% and 7.5%. So the range is right as a
+   summary. But the plan says that this "is above the 5% of rule 5". At 15 points, 33 of 600 has a
+   95% binomial interval of about 3.9% to 7.6%, which contains 5%. At 10 and 20 points the intervals
+   are about 5.6% to 9.9% and 5.2% to 9.3%. See AB7.
+4. **The rate rule.** "Fewer than 10 of the writers" does not say whether the count is of all 20
+   writers or of the writers with a draw. The rule applies only to a fixed list of rows (3, 6b, 7,
+   13b, 16, N3, N4, N6). Other pool columns can also be near 0, for example N5 or 6a. See AB7.
+
+### 14.4 AA1: seed pools, batch and cost
+
+- **The pools.** 20 writers × 10 seeds = 200 seeds a pool. 4 pools × 20 writers + 4 checks = 84
+  sessions. Right.
+- **The batch.** 20 draws, each read once in each condition under each model. The `margins` row uses
+  `success_units` with one run a model and both models in each unit. That is the batch table's
+  design. Its figures, 5 (8) at true 0 and 12 (31) at X / 2, match `margins.txt`.
+- **C3's cost.** 20 draws × 2 models × 12 conditions (C3a 6: three arms, with and without a passed
+  check; C3b 3; C3c 3) = 480 sessions. 5 to 12 batches give 2,400 to 5,760. Right.
+- **N5's cost.** 20 × 2 arms × 2 models = 80 runs a batch; 5 to 12 batches give 400 to 960. Right.
+- **The total.** The lows sum to 38,950 and the highs to 74,970. "About 39,000 to 75,000" is right.
+- **The base rate.** The `margins` header states base 0.8 for every success row. The fixed-outcome
+  table uses base 0.5, "which gives the most variance". The seeded agent row uses 0.8. My check
+  (14.7) at base 0.5 gives 8 (13) and 23 (51) batches. See AB2.
+
+### 14.5 Other checks
+
+- **AA3.** Rule 6 calls T1 and the 29 clauses history, written "from other briefs". But the next
+  sentence gives row 2's fresh writers round 2's brief, which is T1's brief. The two sentences
+  conflict in words, not in design. The batch table still reads "The first read at 10 writers (T1
+  and 9 fresh)". Section 11's R12 row still says "the sequence reads T1 and fresh rule sets". See AB1.
+- **AA4.** `rates.txt` shows that row 6b at a true rate of 0 closes at exactly batch 10 (90th
+  percentile 10), and later at a higher rate. So calibration reaches its tenth batch unless the owner
+  stops it. D15 does not say what happens then. The task pool cost row still reads "about 150 to 290".
+  With 40 writers in C1, C4, C5 and C7 only, the top is 4 × 40 + 3 × 20 + 7 checks = 227. See AB5.
+- **AA5.** Rule 6 makes rows 15 and 19 draw from a fixed set with replacement, and runs each draw
+  again. Rule 6's "no cache" applies to "agent columns: each batch draws from the pool", and rows 15
+  and 19 have no pool. A repeated check or request with a warm build cache does not have the mean of
+  a first run. Row 11c names "machine 1 of rule 7", but rule 7 does not number the machines. The cost
+  has no row for the timing runs. See AB6.
+- **AA6.** `fixed_minus.txt`: 1 and 2 false in 200 at X 10 points, 3 and 2 at X 5 points, 0 and 1 for
+  rules. The plan states these. The scenario drops the 10-point spread and the 40-seed row. That is
+  a fair mirror of the rows that set the cost.
+- **Seeds in C3.** Rule 6 says that "C3's seed writers plant each seed in a diff drawn at random from
+  the campaign's diffs". A seed's D compares arms (for example found in V minus found in L), so the
+  seed must exist in a diff of each arm. Row 4 says "the same seeds in equal code in each arm". Rows 3
+  (review part) and 5d do not. See AB3.
+- **N5.** Rule 6 gives N5 a new seed pool. Rule 14 still says that N5's test is "the calibration
+  workspaces". Section 4 still says "rank 3's idiom seeds", which are existing seeds of hr3 rank 3,
+  not draws from a new pool. The cost counts 2 arms, L and "V's stricter mode", but section 5's
+  calibration has P, L and V, with no stricter mode. See AB4.
+
+### 14.6 New findings
+
+#### AB1. Low. The batch table and section 11 still count T1 as a unit
+
+- **Location.** Section 6, batch table, row "Rule (fixed-outcome)"; section 11, row R12; rule 6,
+  "History, not units"; section 6, phase A'.
+- **Problem.**
+  1. The batch table says "The first read at 10 writers (T1 and 9 fresh)". Rule 6 says that T1 is
+     history and not a unit.
+  2. Section 11's R12 row says "the sequence reads T1 and fresh rule sets".
+  3. Rule 6 says that T1 was written "from other briefs", and then gives the fresh writers round 2's
+     brief, which is T1's brief.
+  4. Phase A' names "Plan-r3 T1 with the P column", but not row 2's fresh rule writers.
+- **Effect.** No lean. A reader can include T1 in the sequence, which is what AA3 asked to stop.
+- **Fix.** Write "10 fresh writers" in the batch table. Restate R12. Say that T1 is history because it
+  was written before this rule, under an earlier model and with no corpus draw. Add row 2's fresh
+  rule writers to phase A'.
+
+#### AB2. Low. The seeded agent columns' cost rests on a base rate of 0.8
+
+- **Location.** Section 6, `margins` row "12 points, seeded agent draws"; cost rows C3 and N5.
+- **Problem.**
+  1. The row uses base 0.8, as every `margins` success row does. A reviewer's rate of finding a
+     seeded defect, or an agent's rate of faults on an idiom seed, has no stated value. The
+     fixed-outcome table uses base 0.5 because it gives the most variance.
+  2. At base 0.5, my check gives 8 (13) batches at true 0 and 23 (51) at X / 2, against 5 (8) and 12
+     (31). C3 is then about 3,800 to 11,000 sessions, not 2,400 to 5,800. N5 is about 640 to 1,840
+     runs. The total becomes about 41,000 to 81,000.
+- **Effect.** No lean, and no effect on validity. The cost can be low by up to about 6,000 sessions.
+- **Fix.** Use base 0.5 for the seeded agent row, as the fixed-outcome table does, or give both
+  rates and the cost range from each.
+
+#### AB3. Low. One seed across the arms' diffs is not defined for C3a and C3c
+
+- **Location.** Rule 6 ("C3's seed writers plant each seed in a diff drawn at random"); rows 3
+  (review part), 4 and 5d.
+- **Problem.** A seed's D compares two arms. Each arm has its own diff of a C2 task, and V's diff is
+  in `.vulcan`. Rule 6 names one diff. Row 4 says "the same seeds in equal code in each arm", but rows
+  3 and 5d do not. So it is not stated whether a writer plants one seed in each arm's diff of the same
+  drawn task, or in one arm's diff only.
+- **Effect.** No known lean, but the unit's D is not defined unless each arm gets the seed. If the
+  writer plants a seed in each arm's form, the planting can differ in difficulty by arm.
+- **Fix.** In rule 6, say: draw one task at random, take its diff in each arm, and plant the same
+  seed in each, by one writer, with the check session confirming that the seeds are equal. Name the
+  limit of the planting in section 8.
+
+#### AB4. Low. N5's unit conflicts in three places
+
+- **Location.** Rule 6 (N5 has a seed pool); rule 14 ("rows 6a, 6b and N5, whose test is the
+  calibration workspaces"); section 4, N5 ("rank 3's idiom seeds"); section 5, calibration; section
+  6, N5 cost ("2 arms").
+- **Problem.**
+  1. Rule 14 still ties N5 to the calibration workspaces.
+  2. Section 4 uses rank 3's existing idiom seeds. They were not written by the 20 pool writers. If
+     they are kept, they are history, as T1 is.
+  3. N5 compares L with "V's stricter mode". Section 5 lists calibration's conditions as P, L and V,
+     with no stricter mode. The cost counts 2 arms.
+- **Effect.** No lean. N5 has no single defined unit or condition list.
+- **Fix.** Make N5's unit the seed pool of rule 6, and rank 3's idioms history. Restate rule 14. Add
+  "V (stricter mode)" to calibration's conditions in section 5, or name the campaign that runs it.
+
+#### AB5. Low. Two residues of D15's change
+
+- **Location.** Section 6, cost row "Task pools"; D15.
+- **Problem.**
+  1. The task pool row says "about 150 to 290" sessions. Under draft 7's D15, only 4 pools can get
+     40 writers. The top is then about 230, not 290.
+  2. D15 reads the spread at the end of calibration's tenth batch. Calibration reaches it unless the
+     owner stops the campaign earlier (rule 6, funding per campaign). D15 does not say what happens
+     then.
+- **Effect.** No lean. A small error in the cost, and a gap if calibration stops early.
+- **Fix.** Write "about 150 to 230". In D15, say that the pools keep 20 writers if calibration stops
+  before its tenth batch.
+
+#### AB6. Low. Repeated timing draws have no cache rule, and two small gaps
+
+- **Location.** Rule 6, "Agent columns without writers"; rows 15 and 19; rule 6, row 11c ("machine 1
+  of rule 7"); section 6, cost.
+- **Problem.**
+  1. Rows 15 and 19 draw from a fixed set with replacement, and run each draw again. Rule 6's "no
+     cache" is in the rule for pool draws. It is not stated for rows 15 and 19. A repeated check
+     with a warm Go build cache, or a warm V lowering cache, is faster than a first run. Then a unit's
+     mean depends on the draws before it, which breaks rule 5's assumption. The choice of a cold or a
+     warm cache can also favor one arm.
+  2. Rule 7 does not number the machines, so "machine 1" is not defined.
+  3. The timing runs of rows 15 and 19 are not in the cost. They are machine runs with no agent, so
+     they are cheap, but the record should say so.
+- **Effect.** A possible lean on rows 15 and 19, direction not known. The other two are text gaps.
+- **Fix.** State the cache state of every timing run, the same in every arm (for example: a cold
+  cache for each run, or one warm-up run before each timed run). Name the two machines in rule 7.
+  Add one cost line for the timing runs.
+
+#### AB7. Low. Two wording points in rule 5 and section 6
+
+- **Location.** Rule 5, "On rate columns near 0"; section 6, after the `writer_note` table; section
+  12.
+- **Problem.**
+  1. "Fewer than 10 of the writers" does not say of which writers: all 20, or the writers with a
+     draw. The rule applies to a fixed list of rows. A pool column off the list can also be near 0
+     (N5, 6a). There it gets a narrow interval and no count.
+  2. The plan says that the rate of a wrong verdict with no note "is above the 5% of rule 5". At a
+     spread of 15 points, 33 of 600 has a binomial interval of about 3.9% to 7.6%, which contains
+     5%. The 5% of rule 5 is about the pool, not about writers in general, so the two are not the
+     same quantity.
+- **Effect.** No lean toward an arm. Item 2 makes the note look weaker than the data show.
+- **Fix.** Write "fewer than 10 of the 20 writers". Apply the count rule to every agent column with
+  a pool. Write "about 5% to 8%, with binomial intervals from about 4% to 10%", and drop "above the
+  5% of rule 5", or say that the two rates are of different things.
+
+### 14.7 The checks that I ran
+
+**Reproduction.** I copied `experiments/poc/sim` to a scratch folder and ran the script there in two
+processes at once: `python cs-sim.py margins fixed_minus writer_note`, and the other seven scenarios.
+Each scenario starts a fresh generator from seed 20261105, so a split run gives the same files.
+All ten files in `out/` were byte-identical to `experiments/poc/sim/out/` (checked with `cmp`). The
+run took about 26 minutes, from 13:53 to 14:19, in the two processes.
+
+**My check (AB2).** It imports `solve_delta`, `success_units`, `run_sequences` and `summarize` from
+the plan's script, unchanged. It runs the `margins` design of the seeded agent row (one run a model,
+both models in each unit, batch 20, X 12 points, 50 simulations, a cap of 60 batches) at base 0.8
+and at base 0.5, seed 20261105.
+
+| Base | True 0 | True X / 2 |
+|---|---|---|
+| 0.8 | 6 (8) | 14 (30) |
+| 0.5 | 8 (13) | 23 (51), 3 open at the cap |
+
+At base 0.8 my figures differ a little from `margins.txt` (5 (8) and 12 (31)), because the
+`margins` generator has run the rows before it. The step from 0.8 to 0.5 is the point of AB2.
+
+**Arithmetic.** I summed the cost rows (14.4), checked C3's 12 conditions against section 5 and rows
+3, 4 and 5d, checked the three-seed table and `fixed_minus` figures against their outputs, and
+checked each `margins` row of section 6 against `margins.txt`.
