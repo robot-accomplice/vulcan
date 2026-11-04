@@ -1949,3 +1949,279 @@ the two models of L's count minus V's. X = 1 bypass, R = 5, 3 units a batch.
 | 2.0 | 1.0 (difference = X) | Within margin, 3; open, 97; more than 200 batches |
 
 The Poisson means are my assumption. The holes stage of hr3 section 5 can replace them.
+
+## 13. Sixth rerun, on draft 6
+
+Object: draft 6 of `plan-coverage.md` (728 lines, working tree, not committed), and
+`experiments/poc/sim/cs-sim.py` with its eight outputs in `sim/out/`. I ran the script in a scratch
+copy, and ran one check of my own with two more seeds (section 13.8). Not read: anything under
+`C:\Users\jonat\vulcan-poc`, and hidden harness material.
+
+### 13.1 Result
+
+- **Of Z1 to Z4 and R17:** 2 are Closed (Z3, Z4). 3 are Partly closed: Z1 (residual AA2, AA4), Z2
+  (residual AA1, AA3) and R17 (unchanged).
+- **New findings:** High 0, Medium 2 (AA1, AA2), Low 4 (AA3, AA4, AA5, AA6).
+- **Open after this rerun,** with each partly closed finding counted once by its residuals: High 0,
+  Medium 2 (AA1, AA2), Low 5 (AA3, AA4, AA5, AA6, R17).
+- **Verdict: no High finding remains.** The plan is ready for the owner to decide D1a when AA1 is
+  fixed, because without it four columns (rows 3 review, 4, 5d, and N5) have no unit, pool, batch or
+  cost. AA2 is a matter of wording and reporting: the plan's "77% to 91%" comes from one seed, and
+  my three seeds give 58% to 91%. The rest are Low.
+- **Leans.** I found no new lean toward P, L or V in the draft 6 changes. The writer-level note
+  and the writer unit apply the same condition in each direction. One limit is not symmetric in
+  the test, not in the rule: the `fixed` scenario tests false verdicts at +X only (13.5).
+
+### 13.2 Status
+
+| Finding | Status | Reason |
+|---|---|---|
+| Z1 | Partly closed | Rule 5 writes "for this pool (N writers)" and gives the writer-level interval, as asked. D15 is a rule fixed before data, and it reads a spread, not a direction. Residuals: the interval's coverage given a verdict, and the size of the "77% to 91%" claim (AA2); D15's place in the order of work (AA4) |
+| Z2 | Partly closed | Rule 6 makes the writer the unit for the ten no-agent rows. Theorem 3 holds for it (13.4). Residuals: the seeded agent columns lost their pools (AA1); T1 and the 29 existing clauses sit in a writer sequence that they were not drawn from (AA3) |
+| Z3 | Closed | Section 3 has C2's pool by 20 writers, a pilot of 10 drawn tasks that leave the pool, and a new pool as a new estimand after a failed gate. C2v takes the same rules. Rule 6's pool check reads only the brief and the tasks. D15's interplay with the build order is new (AA4) |
+| Z4 | Closed | `attackers` simulates row 18. The cost adds 12 to 34 batches × 12 sessions, about 150 to 410. Section 11's W1 row now names the fixed split of writers. Phase A' still calls row 18 "no agents" (AA5) |
+| R17 | Partly closed | Unchanged. C6 waits for T29a's measure and margin |
+
+### 13.3 Z1: rule 5, the writer-level interval and D15
+
+1. **The wording.** Rule 5 states "for this pool (N writers)" on agent columns only, and no such
+   words on fixed-outcome columns. That is right for each estimand.
+2. **The writer-level interval is a sound secondary, but its "95%" does not hold where it is read.**
+   - It is computed over the pool's 20 writers, each writer's mean over its drawn units, with
+     equal weight per writer. This matches the pool's estimand, because each writer has 20 tasks.
+   - It is read once, at the close. But the close is a stopping time of the sequence, and the
+     sequence closes when the pool's mean is far from the margin. So, given a verdict, the writer
+     means are a selected sample. The `writers` output shows it: the interval holds the population
+     value in 187 to 194 of all 200 runs, but in only 44 of 57 runs with a verdict at a spread of 10
+     points.
+   - No verdict reads it, so the selection does not touch rule 5's bound. It does touch the note.
+     See AA2.
+3. **D15** is fixed before data. It reads a standard deviation of writer means, which has no sign,
+   so it cannot select a direction. Its place in the order of work and its precision are open
+   (AA4). Rule 14 does not yet allow it (AA4).
+4. **Does `writers` support "77% to 91%"?** As one seed's result, yes: 44 of 57, 61 of 67 and 87 of
+   96. "Shows the step" is counted as "holds the population value". That implies the note, so the
+   count is a lower bound of the note's rate. In my check, the two counts were equal in every run.
+   But the counts are small. Two other seeds give 28 of 48 (58%) and 30 of 40 (75%) at a spread of
+   10 points (13.8). See AA2.
+
+### 13.4 Z2: does theorem 3 hold for writers as units?
+
+Yes, under the plan's own conditions:
+- Each writer is a fresh session from one brief, with no state shared with other writers. So the
+  writers' D values are independent, with one mean. That is the condition of theorem 3.
+- Each seed is evaluated once in each condition. If the outcome is fixed, the writer's D is a
+  function of the writer. If it is random (11c against P), it is a random function that is new for
+  each writer. Both give independent units with one mean. Rule 6 says this correctly.
+- The first read at 20 writers (rules: 10) is valid, because the sequence is valid at every time.
+  Reading late only removes chances to stop.
+- The check of each writer's seeds against the brief reads no arm output, so it is a fixed filter.
+  The estimand is then "writers whose seeds pass the check". Rule 6 does not say what happens to a
+  writer that fails the check. A replacement by a fresh writer is valid. Leaving the slot empty is
+  also valid. The plan should name one (AA6).
+
+**T1 as the first rule writer.** T1 was written for plan-r3 from round 2's brief (plan-r3 line
+146), probably under an earlier model version, and plan-r3's gate reads its result before the fresh
+writers exist. Its outcome does not change row 2's design, so this is not a choice after data. But
+theorem 3 needs T1 to have the same mean as the fresh writers. That holds only if the fresh writers
+get round 2's brief and T1's labeler procedure. The plan does not say so. Rule 7 also draws each
+writer's corpus half "before it writes", which T1 cannot meet. Row 5c has the same problem with the
+29 existing clauses of hr3 rank 1 step 1. See AA3.
+
+**11c against P.** `go test -race -count=20` once per seed is a valid unit (above). Its detection
+rate depends on the machine, `GOMAXPROCS` and load, and the plan does not fix them. Section 2 also
+says that `go test -race` "runs in every arm", so V's and L's outcomes in that column are random
+too, not only P's, as rule 6 says. See AA5.
+
+**Is the list of fixed-outcome columns complete and correct?** For no-agent rows, yes: 2, 5a, 5b,
+5c, 9, 10a, 10b, 11a, 11b and 11c. Rows 6a and 6b read a rewriter on agent workspaces, so they are
+agent columns, as the plan has them. But the list leaves a gap on the agent side: draft 5's "about
+10 seed pools" are gone, and the seeded agent columns C3a, C3b, C3c and N5 now have no rule. See
+AA1.
+
+### 13.5 Is the `fixed` scenario a fair test?
+
+Mostly yes.
+- **The truth.** `solve_delta_writers` sets the population mean of the clipped difference at
+  exactly the target, over the writer spread. At true X every verdict is false, and the script
+  counts both Gain and Within. That is the right target.
+- **The reads.** `run_sequences(..., first=first)` reads at 20 writers, then every 10 (rules: at
+  10). Writers at the close are 10 × batches. The plan's table converts this correctly.
+- **The data model.** Each seed's outcomes in A and B are independent Bernoulli draws, given the
+  seed's rate. A real check on a fixed seed is likely correlated across arms (an easy seed is caught
+  in both). Independence gives more variance, so the writer counts are high, not low. This does not
+  touch validity.
+- **One direction only.** The scenario tests +X, not −X. The method is symmetric and base 0.5 is
+  symmetric, so I expect the same at −X. But the burden of proof should be the same, and `success`
+  tests both. Add −X (AA6).
+- **The 40-seed result.** 40 seeds a writer save only about 10% of writers. The plan's reason is
+  right: with a small variance, the plug-in bet hits the truncation of 1/2. So the cost of the
+  fixed-outcome columns is set partly by the truncation, which is a choice, not a need. The plan
+  could state this beside the cost.
+
+### 13.6 Section 6 table and cost
+
+- **Table.** Every entry matches `fixed.txt`: for example seeds at X 10 points, spread 20: 100
+  (150) at 0, 210 (more than 400) at X / 2, 1 false. Row 10a: 4 / 1 / 4 false at true X. Rules: 1 /
+  0 / 0.
+- **Cost.** 8 seed rows × 90 to 210 = 720 to 1,680; row 10a 220 to 880; row 2 60 to 110. That is
+  1,000 to 2,670 writers, plus one check per 10 writers, 100 to 267: about 1,100 to 2,940. The plan's
+  "about 1,100 to 2,900" is right. The writers are per row, because the columns of one row share
+  them. Row 5a at 12 points uses the 10-point figures, which overstates it a little.
+- **Not counted.** A rule set needs a labeler who writes the shapes (plan-r3's T1 procedure). Row 9
+  needs a labeler of test defects. At 60 to 110 rule writers, that is 60 to 110 more sessions (AA6).
+- **Runs and review sessions.** The sum of the rows is 36,750 to 70,010. The plan gives about
+  37,000 to 70,000. Right.
+
+### 13.7 New findings
+
+#### AA1. Medium. The seeded agent columns lost their pools, and rule 8 conflicts with rule 6
+
+- **Location.** Rule 6 (two kinds of column); rule 8 ("Seeded tests and label tests use the writer
+  as the unit"); rows 3 (review part, C3a), 4 (C3b), 5d (C3c); section 4, N5; section 6, batch
+  table and cost ("Task pools", "Fixed-outcome writers").
+- **Problem.**
+  1. Draft 5 had "about 10 seed pools × 20" writers. Draft 6 replaces the seed pools with writer
+     units on the no-agent rows only. C3a, C3b, C3c and N5 also read seeds, but through agent
+     sessions (reviewers, or agent runs), so their outcome varies from run to run.
+  2. Rule 6 makes them agent columns, with "20 writers of 20 tasks each". They have seeds, not
+     tasks. No pool of seeds is named, and the cost's "7 task pools" does not include them.
+  3. Rule 8 says that seeded tests use the writer as the unit. That puts them in the writer design,
+     against rule 6.
+  4. The batch table has a row for fixed-outcome seeds only. C3's batch of "about 300 sessions" has
+     no stated number of seeds or writers.
+- **Effect.** No lean. Four columns (rows 3 review, 4, 5d and N5) have no defined unit, estimand,
+  batch or writer cost. As written, they cannot be run by the rules, and their bound is not
+  defined.
+- **Fix.**
+  1. Choose one design for seeded agent columns. Either (a) a sealed pool of seeds by 20 writers,
+     drawn with replacement, each draw with a fresh reviewer or agent run (the agent rule); or (b)
+     the writer as the unit, with one fresh run per seed (the fixed-outcome rule, which is valid for
+     random outcomes too, as rule 6 says).
+  2. Restate rule 8 to match.
+  3. Add the seed writers to the cost and the batch table.
+
+#### AA2. Medium. The writer-level note is weaker than the plan says, and its rate comes from one seed
+
+- **Location.** Rule 5 ("What a verdict states"); section 6, `writers` table and text ("77% to
+  91%"); section 11, row Z1.
+- **Problem.**
+  1. The interval is called a 95% interval. It is read at the close, which is a stopping time, and
+     given a verdict at the margin it held the population value in only 58% to 91% of runs over three
+     seeds, the plan's and my two (13.8).
+  2. The plan's "77% to 91%" comes from 57, 67 and 96 verdicts in one seed. Two more seeds give 58%
+     and 75% at a spread of 10 points. Over the three seeds the rate is 70% at 10 points, 88% at 15
+     and 89% at 20.
+  3. A reader will take a verdict without the note as one that reaches writers in general. At the
+     margin, a verdict that is wrong for the population and has no note occurs in 4% to 7% of runs
+     (three-seed means), and in up to 10% in one seed at a spread of 10 points. That is near or above
+     the 5% of rule 5.
+  4. On a rate column near 0 (row 6b), most writer means are 0. The t-interval is then very
+     narrow or of zero width, and the note does not appear, whatever the step.
+- **Effect.** No lean: the note's condition is the same in each direction. But the note can show
+  "step shown" more often than a reader expects.
+- **Fix.**
+  1. In rule 5, say that the interval is read at the close and that, given a verdict, its coverage
+     is lower than 95%. Do not call the absence of the note evidence that the step is shown.
+  2. In section 6, give the rate over several seeds, or with its binomial interval, and add the
+     rate of "wrong for the population, no note".
+  3. On rate columns, state that the writer-level interval is not informative near 0, or report the
+     count of writers with a nonzero mean beside it.
+
+#### AA3. Low. T1 and the 29 existing clauses are not draws from the writer sequence
+
+- **Location.** Rule 6 ("T1 is its first writer"); row 2; row 5c (hr3 rank 1 step 1: "With the
+  existing 29 clauses"); rule 7 (corpus half drawn "before it writes").
+- **Problem.**
+  1. T1 comes from round 2's brief, through plan-r3, probably under an earlier model version. The
+     fresh writers' brief is not stated. If it differs, T1 has another mean, and theorem 3's
+     condition fails at the first read, where T1 is 10% of the units.
+  2. T1 was written before any corpus draw, so rule 7's split cannot apply to it.
+  3. Row 5c's unit is a writer, but hr3 rank 1 step 1 uses 29 existing clauses plus one fresh
+     writer. The 29 clauses have no writer from the brief. The plan does not say where they go.
+- **Effect.** No lean. A small bias at the first reads, and a rule that one unit cannot meet.
+- **Fix.** State that the fresh rule writers get round 2's brief and T1's labeler procedure, and
+  draw T1's half by the same seed now. Or treat T1 as history, like T2. For row 5c, report the 29
+  clauses as history, and start the writer sequence with fresh writers only.
+
+#### AA4. Low. D15 meets pools that the build order writes before calibration, and rule 14 does not allow it
+
+- **Location.** D15; section 6, build order steps 2 and 8 (C2's tasks and pilot, C2v's tasks);
+  phase order (calibration in phase C); rule 14; section 3.
+- **Problem.**
+  1. C2's pool and pilot, and C2v's pool, are made in phase B. Calibration runs in phase C. D15 says
+     that "every task pool of a campaign that has not started" gets 40 writers when the spread is
+     above 10 points. C2 has not started, but its pool exists and its pilot has read runs. The plan
+     does not say whether that pool is rewritten, or whether the new pool gets a new pilot.
+  2. Section 3 fixes 20 writers for C2 and C2v, without D15's exception.
+  3. Rule 14 says that calibration "may set only the pooled variance and the correlation". D15
+     lets it set the writer count.
+  4. D15 does not say at which calibration batch the spread is read. After 10 batches of 12 draws,
+     each of 20 writers has about 6 units. Each writer mean then has a run and task noise of about
+     the same size as the 10-point threshold, so the rule is close to a coin flip near 10 points.
+- **Effect.** No lean: the spread has no sign. But an open choice remains after pilot data, and a
+  rule with a weak input.
+- **Fix.** Read D15's spread at a fixed calibration batch, and write C2's and C2v's pools after it;
+  or state that pools written before D15 keep 20 writers. Add D15 to rule 14's exceptions. State the
+  spread estimate's standard error at the read.
+
+#### AA5. Low. Rows 15, 18 and 19 do not fit rule 6's agent-column rule, and two related gaps
+
+- **Location.** Rule 6 ("agent runs, and the timing runs of rows 15 and 19"); rows 15, 18, 19;
+  section 6, phase A' and the `margins` table; rule 6 and row 11c.
+- **Problem.**
+  1. Rule 6 says every agent column has a sealed pool by 20 writers of 20 tasks. Rows 15 and 19
+     have changes and request paths, and row 18 has attacker sessions. No pool or writer is named
+     for them, and the cost has none. Rule 5's "for this pool (N writers)" has no N there.
+  2. The `margins` row for ln 1.20 (row 15) uses a batch of 50 units. The timing batch is 20. Row
+     19's ln 1.1 at a batch of 20 is not simulated. So "every margin of the plan" is not quite true.
+  3. Phase A' lists "row 18's holes" under "No agents". Row 18 uses attacker sessions.
+  4. Row 11c against P: the race detector's result depends on the machine, `GOMAXPROCS` and load,
+     which rule 6 does not fix. And `go test -race` runs in every arm, so V's and L's outcomes in
+     that column are random too.
+- **Effect.** No lean. Some columns have an unstated unit or a cost from the wrong batch.
+- **Fix.** Name the unit of rows 15, 18 and 19 in rule 6 (for example: "a fixed set of changes or
+  paths, each run again; no pool"), and drop "for this pool" there. Simulate ln 1.20 and ln 1.10 at
+  a batch of 20. Move row 18 to phase C. Fix the machine and `GOMAXPROCS` for 11c.
+
+#### AA6. Low. Small gaps in rule 6 and section 6
+
+- **Location.** Rule 6; section 6, cost and `fixed` scenario.
+- **Problem.**
+  1. Rule 6 does not say what happens to a writer whose seeds fail the brief check.
+  2. The cost does not count labelers: one per rule set (plan-r3's procedure), and row 9's labeler.
+     That is about 60 to 110 more sessions.
+  3. The `fixed` scenario tests false verdicts at +X only.
+  4. Rule 6 writes "(Z3's `rlimit`)". Z3 there is the solver, but Z3 is also an audit finding,
+     named in the same rule set. A reader can confuse the two.
+- **Fix.** Name the replacement rule. Add the labelers to the cost. Add −X to `fixed`. Write "the Z3
+  solver's `rlimit`".
+
+### 13.8 The checks that I ran
+
+**Reproduction.** I copied `cs-sim.py` to a scratch folder and ran `python cs-sim.py`. All eight files in `out/` were byte-identical to `experiments/poc/sim/out/`. The run took 65 minutes on this machine, with my check running beside it, not 15.
+
+**My check (AA2).** It imports `writer_units`, `run_sequences`, `writer_interval` and
+`solve_delta_writers` from the plan's script, unchanged. It runs the pool design at a population
+difference of exactly +X = 12 points, base 0.6, 200 simulations, a cap of 30 batches. For each
+verdict, it applies rule 5's exact note rule: the writer-level interval does not meet the verdict's
+own condition. Seeds 20261109 and 20261110. The plan's own seed is 20261105, from `writers.txt`.
+
+| Writer spread | Seed | Verdicts | Note appears | Holds the population value | Wrong for the population, no note (of 200) |
+|---|---|---|---|---|---|
+| 10 points | 20261105 (plan) | 57 | at least 44 (77%) | 44 | at most 13 (6.5%) |
+| 10 points | 20261109 | 48 | 28 (58%) | 28 | 20 (10%) |
+| 10 points | 20261110 | 40 | 30 (75%) | 30 | 10 (5%) |
+| 15 points | 20261105 (plan) | 67 | at least 61 (91%) | 61 | at most 6 (3%) |
+| 15 points | 20261109 | 79 | 69 (87%) | 69 | 10 (5%) |
+| 15 points | 20261110 | 61 | 52 (85%) | 52 | 9 (4.5%) |
+| 20 points | 20261105 (plan) | 96 | at least 87 (91%) | 87 | at most 9 (4.5%) |
+| 20 points | 20261109 | 88 | 75 (85%) | 75 | 13 (6.5%) |
+| 20 points | 20261110 | 103 | 93 (90%) | 93 | 10 (5%) |
+
+In both of my seeds, "note appears" and "holds the population value" were equal in every run. So
+the plan's measure is a fair proxy for the note. The spread of the rates between seeds is the
+point of AA2.
+
+**Arithmetic.** I summed the cost rows (13.6) and checked each `fixed` entry of section 6 against
+`fixed.txt`, and each row 18 figure against `attackers.txt`.
