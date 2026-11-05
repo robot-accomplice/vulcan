@@ -2699,3 +2699,247 @@ At base 0.8, the X 5 points row matches `margins.txt` exactly. It starts from th
 **Other.** I summed the cost rows (15.3), computed the exact intervals (15.4), compared each `margins`
 row of section 6 with `margins.txt`, compared the three-seed table with `writer_note.txt`, and searched
 the plan for every "T1", "N5", "cold" and "machine".
+
+## 16. Ninth rerun, on draft 9
+
+Object: draft 9 of `plan-coverage.md` (853 lines, working tree, not committed), and
+`experiments/poc/sim/cs-sim.py` with its ten outputs in `sim/out/`. I ran the script in a scratch
+copy (section 16.6). Not read: anything under `C:\Users\jonat\vulcan-poc`, and hidden harness
+material.
+
+### 16.1 Result
+
+- **Of AC1 to AC7 and R17:** 3 are Closed (AC1, AC3, AC7). 5 are Partly closed: AC2 (residual AD1,
+  AD2), AC4 (residual AD3), AC5 (residual AD4), AC6 (residual AD5, AD6) and R17 (unchanged).
+- **New findings:** High 0, Medium 0, Low 8 (AD1 to AD8).
+- **Open after this rerun,** with each partly closed finding counted once by its residuals: High 0,
+  Medium 0, Low 9 (AD1 to AD8, R17).
+- **Verdict: no High and no Medium finding remains. The plan is ready for the owner to decide
+  D1a.** The eight new findings are text fixes, cost notes and procedure gaps in the timing rows
+  (AD1, AD2, AD8). None changes a verdict rule. Fix AD1, AD2 and AD8, or name them as limits, before
+  phase A, because phase A is the first phase that runs the timing rows.
+- **The AC1 fix works.** Row 15 now measures an incremental check. Rule 6 restores the same cache
+  state before each run, in each arm. The cold full check is gone from rule 6, row 15 and the
+  section 8 lean row.
+- **Leans.** AD1 (cache list, arm order, load) and AD2 (steady-state count) can lean toward an arm.
+  The direction is not known in either case. AD3 can lean in a direction that is not known. AD4 and
+  AD5 raise the cost estimate and lean toward no arm. I found no lean toward P, L or V in AD6 to
+  AD8.
+- **No simulation figure changed.** All ten files in a scratch run are byte-identical to `sim/out/` (checked with `cmp`). The C1 cost of AC6 is an arithmetic error in the
+  plan, not in the script (AD5).
+
+### 16.2 Status
+
+| Finding | Status | Reason |
+|---|---|---|
+| AC1 | Closed | Rule 6 restores each cache of the arm's check "to its state just after one full check of the unchanged base app", then applies the one-file change and times the check. Row 15 reads "from the warm cache of rule 6". The cold full check does not appear in rule 6, section 2 or section 8. The findings report row "Incremental builds and per-leaf tests" now matches the test. Section 8 names the lean, with direction "not known". Residual points about the completeness of the restored list are in AD1 |
+| AC2 | Partly closed | Item 3 (machines) is closed: rule 7 fixes machine 1 and machine 2 "with their hardware and system fixed for the whole column", and a change makes a new column. Item 4 (duration) is closed as a justified deferral: no run has been timed, and the first phase A run gives a figure before batch 2. Item 2 (row 19) is closed in form: a fresh process, 100 warm-up requests, the median of the next 100. Residual: the count of 100 has no check (AD2). Item 1 (caches) names five caches and then "any other cache that the arm's tool writes". The list is open-ended, and the arm order, the load and the file cache of the system stay open (AD1) |
+| AC3 | Closed | Rule 14 lists rows 6a, 6b and N5, with the reason for N5. Rule 6, section 4 (row N5) and section 5 (row "Calibration") agree |
+| AC4 | Partly closed | Rule 6 now fixes the run ("the first run, under the main model") and a task draw by a seed fixed before the writers write. Row 4 reads "the same seed planted in each arm's own diff". Rule 6 says that the C3 pools are written after C1 and C2. Section 8 names the limit. Residual: the first run of a drawn task may not exist (AD3) |
+| AC5 | Partly closed | Section 6 states one convention above the cost tables. The timing rows now follow it (4 to 6 and 9 to 20 batches, as `margins.txt`), and the C3 tail is in a note. Three other places do not follow it (AD4) |
+| AC6 | Partly closed | The numbers match `margins.txt`: 10 (18) and 26 (72). The header line of `margins.txt` now says which rows use base 0.5. The C1 cost at base 0.5 is wrong (AD5), the C2 figure that feeds the total is not in the plan (AD5), and section 11 still calls the new figures placeholders (AD6) |
+| AC7 | Closed | Both rates are right, and each is labelled with the quantity it measures (16.4). Rule 5, section 6 and section 12 give both. Section 6 says which one rule 5 means |
+| R17 | Partly closed | Unchanged. C6 waits for T29a's measure and margin |
+
+### 16.3 AC6: the numbers
+
+- **Against `margins.txt`.** The new row "success X 5 points, base 0.5" gives median 10 and 90th
+  percentile 18 at true 0, and 26 and 72 at true +0.025. The plan's table reads "10 (18)" and "26
+  (72)". Right. The base 0.8 row of the same X reads 7 (12) and 15 (30), as the plan says.
+- **The header.** Line 1 of `margins.txt` reads "success rows use base 0.8 unless the row name says
+  base 0.5". The code sets base 0.5 for kinds `s1h` and `sh` only (`cs-sim.py` lines 257 to 258).
+  Right.
+- **The row at X / 2.** 1 of 50 simulations reached "Gain" at true +0.025. That is a false verdict
+  at half the margin, and 1 in 50 is within 5%. I counted it as noise.
+- **C1 at base 0.5: the plan says 18,800 to 31,600. This is not right (AD5).** The sums
+  6 × 1,800 + 10 × 800 = 18,800 and 6 × 1,800 + 26 × 800 = 31,600 add the 10 and 26 batches of the
+  5-point columns to the 6 shared batches. Both numbers are batches in total, not batches after the
+  sixth. The base 0.8 line subtracts the 6: it reads 7 to 24 after the sixth, from 13 and 30 in
+  total. The longest C1 column at base 0.5 is still row 8 against L (13 to 30 batches in total). So
+  the C1 cost is the same as at base 0.8: 16,400 to 30,000.
+- **The total with the 5-point rows at base 0.5: the plan says 45,000 to 88,000.** I could rebuild it
+  only with the wrong C1 figure and a C2 figure that the plan does not print. C2 at base 0.5: N4
+  takes 10 to 26 batches in total, so 6 × 1,600 + 4 × 600 = 12,000 and 6 × 1,600 + 20 × 600 =
+  21,600. The base 0.5 total of the plan (40,590 to 80,010, which I summed again row by row) plus the
+  two changes (C1 +2,400 and +1,600, C2 +1,800 and +6,600) gives 44,790 to 88,210. That rounds to the
+  plan's figure. With C1 as I read it, the total is 42,390 to 86,610 (about 42,000 to 87,000). The
+  base 0.8 and base 0.5 totals (38,950 to 74,970 and 40,590 to 80,010) are right.
+- **C3 tail.** 31 × 480 = 14,880 and 60 × 480 = 28,800. The note in section 6 is right.
+
+### 16.4 AC7: the rates
+
+I compared the table with `writer_note.txt`.
+- **Verdicts:** 59 + 48 + 40 = 147; 85 + 76 + 65 = 226; 97 + 92 + 70 = 259. Right.
+- **No note:** 45, 33 and 42 of 600 = 7.5%, 5.5% and 7.0%. Right. They equal verdicts minus notes
+  (147 − 102, 226 − 193, 259 − 217).
+- **Per-simulation ranges over the seeds:** 5% to 10%, 4% to 6.5%, 3.5% to 10.5%. Right.
+- **Given a verdict:** 45 of 147 = 31%, 33 of 226 = 15%, 42 of 259 = 16%. Right. The ranges over the
+  seeds are 25% to 42%, 12% to 16% and 10% to 22%. I computed them from the per-seed lines. Right.
+- **Exact intervals (Clopper-Pearson):** over all 600: 5.5% to 9.9%, 3.8% to 7.6% and 5.1% to 9.3%.
+  Given a verdict: 23.3% to 38.7%, 10.3% to 19.9% and 11.9% to 21.3%. The plan says "about 4% to 10%"
+  and "23% to 39%, 10% to 20% and 12% to 21%". Right.
+- **One small point.** Rule 5 and section 12 give "about 15% to 31%" with no interval. The union of
+  the exact intervals is 10% to 39%. Section 6 gives the intervals. I count this as a note, not a
+  finding, because section 6 holds them and says which rate rule 5 means.
+
+### 16.5 New findings
+
+#### AD1. Low. The restored cache list is open-ended, and the arm order and the load are not fixed
+
+- **Location.** Rule 6 ("Agent columns without writers", row 15); section 8, row "Row 15 restores a
+  warm cache"; rule 7 (machines).
+- **Problem.**
+  1. Rule 6 says "no arm keeps a warmer cache than another". Section 8 says that "a cache outside
+     this list, or the file cache of the system, can leave one arm warmer". The two sentences do not
+     agree. Rule 6 states a fact. Section 8 shows that it is a goal.
+  2. The list ends with "any other cache that the arm's tool writes". A person finds such a cache
+     only by looking for it. The record lists the caches after the fact. A cache that nobody listed
+     stays warm and carries state from one run to the next. This also breaks "no run depends on an
+     earlier one".
+  3. V's lowered Go files and the build outputs of each arm sit in the working tree. Rule 6 does not
+     say whether the restore covers them. A kept output directory is a warm state too.
+  4. Rule 6 does not fix the order of the arms in a pair. The arms share the Go toolchain and the
+     `staticcheck` binary. The arm that runs second can find them in the file cache of the system.
+  5. Row 11c says "no other load" for its machine. Rows 15 and 19 do not. Another run on the same
+     machine at the same time adds noise, and can add more of it to one arm than to another.
+- **Effect.** The direction of any lean is not known. Items 1 to 3 make the claim of rule 6 stronger
+  than the procedure can show. Items 4 and 5 can lean toward the arm that runs second, or toward the
+  arm that runs on the less loaded machine.
+- **Fix.** Restore from one image of the whole machine state (a container or a disk snapshot), taken
+  after one full check of the base app, in every arm. Then the list does not matter. Or change the
+  words in rule 6 to "a goal, with these listed caches" and keep the section 8 text. Fix the arm
+  order by a schedule drawn before the batch, and add "no other load" to rows 15 and 19. Record the
+  cache hits of each run (for example the output of `go build -x` and the `staticcheck` cache
+  statistics), so that a warm arm shows in the record.
+
+#### AD2. Low. Row 19's steady state is a fixed count with no check
+
+- **Location.** Rule 6 ("Row 19 runs in steady state ... 100 warm-up requests"); section 8, row "Row 19
+  runs in steady state".
+- **Problem.** The text uses 100 warm-up requests and 100 timed requests for every path in every arm.
+  The words "steady state" claim that the time no longer drifts after 100 requests. Nothing tests
+  this. A path with a slow start, such as a first connection or a garbage-collector cycle, may need
+  more. The arms can differ in how fast they settle, and section 8 names this difference as the
+  lean.
+- **Effect.** The lean is toward the arm that settles slower, and it stays if 100 is not enough. The
+  direction is not known.
+- **Fix.** In phase A, record the time of requests 1 to 300 for a sample of paths in each arm. Keep
+  100 only if the medians of requests 101 to 200 and of 201 to 300 agree within a bound that the
+  plan states now. Or use a stated rule, such as "warm up until three windows of 50 requests agree".
+
+#### AD3. Low. The first run of a drawn task may not exist
+
+- **Location.** Rule 6 ("Agent columns: a sealed pool, written first": "takes the diff of that task's
+  first run, under the main model, in each arm"); section 2, rows 3 (review part), 4, 5d; section 8,
+  the C3 row.
+- **Problem.** A seed writer draws one task at random from the pool of 400. A campaign draws 50 tasks
+  a batch, with replacement. After 6 batches (300 draws), about 53% of the 400 tasks have run at
+  least once, by 1 − (1 − 1/400)^300. After 15 batches, about 98%. A drawn task can therefore have no
+  run in one arm or in all arms. Rule 6 does not say what the writer does then. A redraw is a choice
+  made after data, and the rule does not fix it. Also, the run must exist under the main model in
+  every arm. A condition leaves a campaign when no open column reads it (rule 6), so some arms may
+  stop running early. C1 and C2 also use different pools, and the plan does not say which pool each
+  of C3a, C3b and C3c draws from.
+- **Effect.** The draw is not defined for about half of the tasks after a short campaign. No known
+  lean. If the writer redraws by choice, the choice can lean in a direction that is not known.
+- **Fix.** Say in rule 6: the draw is from the tasks that have a first run under the main model in
+  every arm of the campaign, and a seed fixed before the writers write makes the draw. State which
+  pool each of C3a, C3b and C3c uses.
+
+#### AD4. Low. Three cost places do not follow the convention of section 6
+
+- **Location.** Section 6, the sentence "One convention in every cost row (AC5)", and the rows for
+  C2v and C5, for C2, and for row 18.
+- **Problem.** The convention is the median at a true difference of 0 to the median at X / 2.
+  1. C2v ("Row 7, 12 points: 2 to 6") and C5 ("Rows 13a, 13b: 2 to 6"). For task success at X 12
+     points, `success.txt` gives 3 (6) at +6 points. The median is 3 and the 90th percentile is 6. The
+     top of 6 is the 90th percentile. Row 13a (ln 1.15) gives 2 to 4 in `margins.txt`.
+  2. C2 ("N3 (10 points), row 3 (12 points): 2 to 8"). No output file gives 8 for these columns. I
+     found no source. It does not change the C2 estimate, because N4 sets the end of C2.
+  3. Row 18 ("12 to 34 batches"). The top is the case L 2 and V 0.5, which is a difference of 1.5
+     and a Gain. At X / 2 (L 1 and V 0.5) the median is 22. By the convention, row 18 is 12 to 22
+     batches (about 150 to 270 sessions).
+- **Effect.** No lean. The high end of the total is too high by about 1,800 to 5,400 runs (C2v and C5
+  at a top of 3 or 4, not 6) and by about 140 sessions (row 18). The sentence "one convention in
+  every cost row" is not true.
+- **Fix.** Use the medians (C2v 2 to 3, C5 2 to 4, row 18 12 to 22), or say which rows use the 90th
+  percentile. Give the source of the "2 to 8", or simulate the column.
+
+#### AD5. Low. The C1 and C2 cost at base 0.5 has an arithmetic error and a missing figure
+
+- **Location.** Section 6, cost estimate, rows C1 and C2, and the total row.
+- **Problem.** See 16.3. The C1 figure of 18,800 to 31,600 counts 10 to 26 batches after the sixth,
+  where the base 0.8 line counts 7 to 24 after the sixth. At base 0.5 row 8 against L still sets the
+  end of C1 (13 to 30 batches in total), so the C1 cost does not change. The C2 estimate shows no
+  base 0.5 figure, but the total of "about 45,000 to 88,000" needs one (12,000 to 21,600). A reader
+  cannot rebuild the total from the table.
+- **Effect.** No lean. The C1 line is too high by about 2,400 (low end) and 1,600 (high end). The
+  total reads 45,000 to 88,000. A correct sum, with C1 as I read it, is 42,000 to 87,000.
+- **Fix.** Write C1 at base 0.5 as "the same as at base 0.8: row 8 sets the end". Add a C2 line at
+  base 0.5: "4 to 20 batches after the sixth: about 12,000 to 21,600 runs". Correct the total.
+
+#### AD6. Low. Two rows of section 11 describe the plan before draft 9
+
+- **Location.** Section 11, rows AB6 and AC6.
+- **Problem.**
+  1. The AB6 row reads "every timing run starts cold in every arm". Rule 6 now says the reverse (row
+     15 from a warm cache in a fixed state; row 19 in steady state). Section 11 is the map from a
+     finding to the change that answers it. The row names a change that draft 9 replaced. The AC1 row
+     says so, but the AB6 row stays.
+  2. The AC6 row reads "base 0.5 ranges for C1 and C2 (placeholders until the simulation is added)".
+     The simulation is added, and `margins.txt` holds the figures. The word is out of date.
+- **Effect.** No lean. A reader of section 11 finds two statements that contradict the rules.
+- **Fix.** Change the AB6 row to "Rule 6, changed by AC1 and AC2". Delete "(placeholders until the
+  simulation is added)" from the AC6 row, and correct its C1 figure (AD5).
+
+#### AD7. Low. Rows 15, 18 and 19 are in no campaign, and rule 6 funds by campaign
+
+- **Location.** Rule 6 ("Funding is per campaign, all or none"); section 5 (the campaign table);
+  section 6, rows "Attacker" and "Timing" of the batch table, and the "Timing runs" cost row. This is
+  not new in draft 9. It came in with AA5.
+- **Problem.** Section 5 lists no campaign that closes row 15, row 18 or row 19. Rule 6 says the
+  owner funds "a campaign's next batch" from a memo. These three columns have batches (20 draws, 3
+  pairs) but no campaign. So no rule says who funds batch 2 and later, or what the memo sees. The
+  "Timing runs" row says "the record states the total machine time before batch 2", but it names no
+  reader and no decision.
+- **Effect.** No lean. A funding choice after batch 1 with no rule can select a column by its
+  direction. Rule 6 closes this for campaigns, by the sealed interval and the direction-blind memo.
+- **Fix.** Add two lines to section 5: a timing campaign (rows 15 and 19) and an attacker campaign
+  (row 18). Funding then follows rule 6.
+
+#### AD8. Low. Row 15's "check" is not defined for each arm, and phase A precedes the builds
+
+- **Location.** Section 2, row 15 ("log of check time"); section 6, phase A ("A7, A8, on the base
+  apps"); build order item 1 (P's linter) and item 6 (warnings and fixes). This is not new in draft 9,
+  but the AC1 restore list depends on it.
+- **Problem.** Rule 6 restores "every cache that the arm's check uses". The plan does not say what
+  the check is in each arm. Rule 2 gives P `go vet`, `staticcheck`, `errcheck`, `exhaustive`, `dupl`,
+  `gopls` and an architecture linter. Section 5 says the base includes "P's linter configuration".
+  Phase A runs before the linter exists (build order item 1 is in phase B). Phase B also adds V's
+  warnings and fixes. So the check that phase A times may not be the check that C1 to C7 run.
+- **Effect.** No known lean. The verdict is about "this set of changes" on the base apps, and which
+  check it times is open. The caches to restore depend on the answer.
+- **Fix.** Define the check of row 15 as one command per arm, and list its tools. Either move A7 after
+  the builds that change the check, or state that phase A times the check "as shipped today", and
+  list the caches of that check.
+
+### 16.6 The checks that I ran
+
+**Reproduction.** I copied `experiments/poc/sim` to a scratch folder and ran the script there
+(`python cs-sim.py`, all ten scenarios in one process). A second process in another copy ran
+`margins fixed_minus writer_note`, to save time. Each scenario starts a fresh generator from seed
+20261105, so a split run gives the same files. All ten files in `out/` were byte-identical to `experiments/poc/sim/out/`, checked with `cmp`. This includes `margins.txt` with its new last row. The run was split over five processes, and the whole run took about 25 minutes.
+
+**Other.**
+- I read rules 5, 6, 7 and 14, and sections 2, 4, 5, 6, 8, 10, 11 and 12 of draft 9. I searched the
+  plan for every "cold", "warm", "incremental" and "N5", and the findings report for "incremental".
+- I summed the cost rows at base 0.8 and base 0.5 (38,950 to 74,970 and 40,590 to 80,010), and
+  rebuilt the two totals of 16.3.
+- I checked the timing cost: row 15, 3 arms × 20 draws × 2 machines = 120 a batch, × 4 to 6 batches =
+  480 to 720; row 19, 2 arms × 20 × 2 = 80 a batch, × 9 to 20 batches = 720 to 1,600. Right.
+- I checked the status paragraph of the plan: draft 8 had no High, 1 Medium (AC1) and 7 Low open.
+  This matches section 15.1.
+- I computed the exact intervals of 16.4 with SciPy.
+- I did not time any build or request path, so I did not test whether a restored cache removes the
+  carry-over between runs. AD1 and AD2 are claims about what the procedure shows, not measured
+  effects.
