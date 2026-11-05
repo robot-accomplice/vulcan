@@ -2943,3 +2943,268 @@ I compared the table with `writer_note.txt`.
 - I did not time any build or request path, so I did not test whether a restored cache removes the
   carry-over between runs. AD1 and AD2 are claims about what the procedure shows, not measured
   effects.
+
+## 17. Tenth rerun, on draft 10
+
+Object: draft 10 of `plan-coverage.md` (882 lines, working tree, not committed), and
+`experiments/poc/sim/cs-sim.py` with its ten outputs in `sim/out/`. The script (changed 10:29) and
+`margins.txt` (written 10:36) are older than the ninth rerun (committed 11:09). I reran the
+`attackers` scenario in a scratch copy. The output was byte-identical to `sim/out/attackers.txt`
+(`cmp`). Not read: anything under `C:\Users\jonat\vulcan-poc`, and hidden harness material.
+
+### 17.1 Result
+
+- **Of AD1 to AD8 and R17:** 6 are Closed (AD1, AD3, AD4, AD5, AD6, AD7). 3 are Partly closed: AD2
+  (residual AE6), AD8 (residual AE1, AE3) and R17 (unchanged).
+- **New findings:** High 0, Medium 0, Low 7 (AE1 to AE7).
+- **Open after this rerun,** with each partly closed finding counted once by its residuals: High 0,
+  Medium 0, Low 8 (AE1 to AE7, R17).
+- **Verdict: no High and no Medium finding remains. The plan is ready for the owner to decide
+  D1a.** None of AE1 to AE7 changes a verdict rule or a simulation figure. Fix AE1 to AE6, or name
+  them as limits, before the dry run of phase A, because that run is the first to use the timing
+  rows. Fix AE7 before the C3 seed writers start.
+- **The cost arithmetic is right.** I rebuilt all three totals (17.3).
+- **Leans.** AE4 (the common tools dilute the ratio) leans toward Within margin in both directions.
+  AE5 (restore and drop order) can lean toward the arm with the larger restored caches. AE6 (the
+  warm-up rule) can lean toward the arm that settles slower. The direction of AE5 and AE6 is not
+  known. AE3 and AE7 have no lean that I can name. AE1 and AE2 lean toward no arm. I found no lean
+  toward P, L or V that I can prove from the text.
+- **No simulation figure changed.**
+
+### 17.2 Status
+
+| Finding | Status | Reason |
+|---|---|---|
+| AD1 | Closed | The five items are answered. (1) The sentence "no arm keeps a warmer cache" is gone; rule 6 says that every cache of the list "starts in the same kind of state". (2) The list is closed, and each path that a check writes during one full check must be in it, or the build is not accepted (rule 4). (3) The build outputs and V's lowered Go files are in the list. (4) The arms of a draw run in an order fixed by a seed before batch 1. (5) Rows 15 and 19 run with no other load. Section 8 names the file-cache lean. The order of the restore and the drop is open (AE5) |
+| AD2 | Partly closed | The count of 100 is replaced by a rule: blocks of 50, stop at the first block (from the second) within 5% of the block before, at most 8 blocks, a count of unsettled paths per arm. The rule is fixed before data. The rule compares neighbouring blocks only, so a slow drift passes (AE6) |
+| AD3 | Closed | Rule 6 now names the pool (C3a from C2's, C3b and C3c from C1's) and fixes the run: one run for the seed writer, in each arm, under the main model. The run is not a campaign run, so no draw depends on a campaign. Sections 2, 5, 6 and 8, and the cost row (60 writers × 3 arms = 180 runs), agree. A run can end with no usable diff (AE7) |
+| AD4 | Closed | C2v 2 to 3, C5 2 to 4, row 3 of C2 2 to 3, row 18 12 to 22, and the N3 note all match `success.txt`, `margins.txt` and `attackers.txt` (17.3). The "2 to 8" is gone |
+| AD5 | Closed | C1 at base 0.5 is "the same as at base 0.8". The C2 line at base 0.5 is added (12,000 to 21,600). The total is 42,000 to 82,000, and I rebuilt it (17.3) |
+| AD6 | Closed | Section 11 row AB6 now reads "changed by AC1 and AC2". Row AC6 no longer says "placeholders", and it gives the C1 figure as in AD5 |
+| AD7 | Closed | Section 5 has a timing campaign (rows 15, 19) and an attacker campaign (row 18). Rule 6 funds each as any campaign, and the cost row names the reader of the machine-time total (the memo session). The seal of that total is open (AE2) |
+| AD8 | Partly closed | Rule 6 now gives one command an arm, with its tools, and the record writes the commands before phase A'. A7 and A8 move to phase A' after builds 1, 5 and 6. Residual: the dry run in phase A has no defined check, and two arms do not exist yet (AE1). Build 6 is not in "Base" (AE3) |
+| R17 | Partly closed | Unchanged. C6 waits for T29a's measure and margin |
+
+### 17.3 The cost arithmetic
+
+I read each line against the output files.
+- **C1, base 0.8:** 6 × 1,800 + (13 − 6 = 7 to 30 − 6 = 24) × 800 = 16,400 to 30,000. Right. At base
+  0.5 the 5-point columns take 10 to 26 batches (`margins.txt`), inside row 8's 13 to 30. Right.
+- **C2:** base 0.8: 6 × 1,600 + (1 to 9) × 600 = 10,200 to 15,000. Base 0.5: N4 takes 10 to 26, so
+  9,600 + (4 to 20) × 600 = 12,000 to 21,600. Right.
+- **Other lines.** C2v 2 to 3 × 600 = 1,200 to 1,800. C5 2 to 4 × 1,200 = 2,400 to 4,800. C7 4 to 8
+  × 600 (`rates.txt`) = 2,400 to 4,800. C3 5 to 12 × 480 = 2,400 to 5,760; at base 0.5 8 to 21 ×
+  480 = 3,840 to 10,080. N5 5 to 12 × 80 = 400 to 960; at base 0.5, 640 to 1,680. Row 18 12 to 22 ×
+  12 = 144 to 264. Calibration 10 to 22 × 216 = 2,160 to 4,752 (`rates.txt`: 10 at 0, 22 at 1
+  point). All right.
+- **Totals.** I summed the 11 lines. Base 0.8: 38,950 to 70,630 (plan: about 39,000 to 71,000).
+  Base 0.5 for C3 and N5: 40,590 to 75,670 (plan: 41,000 to 76,000). With the C2 line at base 0.5
+  too: 42,390 to 82,270 (plan: 42,000 to 82,000). All right.
+- **The 180 seed-writer runs** are not in the total. They would add 0.2% to 0.5%, so the rounded
+  figures do not change. The total row is labelled "Runs and review sessions", and the 180 runs sit
+  in the seed-pool row. I count this as a note.
+- **AD4's median convention.** The median at a true difference of 0 to the median at X / 2 holds for
+  every simulated row. Two rows have no simulation: N3 (the text says so) and C6 ("2 to 6 batches",
+  from the views draft, with no source in `sim/out/`). The sentence "Every cost row follows it" is
+  then not true for C6. This is not new in draft 10. I count it as a note, because section 6 gives
+  C6 its own line and the views draft holds its design.
+- **Timing cost.** Row 15: 3 arms × 20 × 2 = 120 a batch × 4 to 6 = 480 to 720. Row 19: 2 × 20 × 2
+  = 80 × 9 to 20 = 720 to 1,600. Right.
+
+### 17.4 The draft 10 choices that the writer named
+
+- **Phase A as a dry run.** The idea is sound: it removes a verdict that would have used a check that
+  did not yet exist (AD8). The execution has two gaps (AE1, AE2). Rule 13 still talks about "a phase
+  A result" that drops a later condition. Phase A now has no column, so the rule has nothing to
+  act on (AE2).
+- **C3 diffs from runs for the seed writers.** This closes AD3. It removes the dependence on a
+  campaign. The lean (one run an arm, one sample of difficulty) is named in section 8 with direction
+  "unknown". I agree with "unknown". Two small gaps are in AE7.
+- **Drop of the file cache before each row 15 run.** The lean is named (section 8) as "toward the arm
+  that reads fewer cache files from disk". The order of the steps is not fixed (AE5). The direction
+  is not fully unknown: an arm with a larger set of restored caches (V has the lowering cache and
+  the lowered Go files; P has a linter cache; L has an analyzer cache) reads more from disk. I
+  cannot say which arm that is before the parity audit lists the paths.
+- **`gopls check` in the check.** Rule 2 still lists `gopls` and does not name the `check`
+  subcommand. Rule 6 names `gopls check` in the command of each arm. The command is the same in
+  every arm, so I found no unequal change to an arm's check by the name alone. Two effects remain
+  (AE4): the files that the command reads can differ by arm, and the added time is common to every
+  arm.
+- **Timing and attacker campaigns.** Closes AD7. See AE2 for the seal.
+- **Cost totals.** Right (17.3).
+
+### 17.5 New findings
+
+#### AE1. Low. The dry run of phase A has no defined check, and two arms do not exist yet
+
+- **Location.** Section 6, phase A ("A7, A8, on the base apps ... no new build"); rule 6 ("The record
+  writes the three commands before phase A'"); section 6, cost row "Timing runs" ("The first phase A
+  run in each arm gives one").
+- **Problem.**
+  1. Rule 6 writes the commands for phase A', not for phase A. The dry run needs a command in each
+     arm. The plan does not give one.
+  2. P's command includes "its architecture linter" (build 1). P in row 19 is "the same code with
+     assertions in place of contracts" (build 5; row 19 and section 5). Phase A has "no new build".
+     So the dry run cannot run row 15 as defined in arm P, and cannot run row 19 in arm P.
+  3. The cost row says that the first phase A run gives the duration, and that the memo session reads
+     it. The dry run times a different check from A7 and A8 (no linter, no assertions). So the
+     figure that the memo reads sizes a different run.
+- **Effect.** No lean toward an arm. The machine-time figure can be too low, and the funding choice
+  then rests on it. The risk is a waste, not a bias.
+- **Fix.** Say what the dry run runs in each arm (for example "the check as shipped today, in the
+  arms that have one, and arm P without the linter and the assertions"), and call its figure a lower
+  bound. Or drop the dry run and size the machine time from the first batch of A', which is the
+  first run that has all three commands.
+
+#### AE2. Low. The dry-run times and the machine-time total are not sealed, and rule 13 is stale
+
+- **Location.** Rule 6 ("The running interval of an open column is sealed"; the memo session sees
+  "not the direction"); section 6, cost row "Timing runs"; rule 13.
+- **Problem.**
+  1. The dry run produces times on the same measure as rows 15 and 19, in each arm. The seal in rule
+     6 covers "the running interval of an open column" and its secondary sequences. It does not cover
+     the dry run, which is not a column. The owner and the memo session can read the per-arm times
+     and see which arm is faster before they fund the campaign. Rule 6 says that "no choice made
+     after data can select a column by its direction". A total over the arms hides the direction. A
+     per-arm figure shows it. The plan does not say which one the record states.
+  2. Rule 13 reads "A phase A result may drop a later condition only if its own column is already
+     closed". Phase A has no column now. The phase where columns close without agents is A'. The
+     rule does not name it.
+- **Effect.** No lean toward an arm in a verdict. A funding choice for the timing campaign can use
+  direction. The cost of the timing campaign is machine time only, so the stake is small.
+- **Fix.** Write that the dry run's times are sealed like an open interval, that the record gives the
+  total over all arms (never per arm), and that no column reads the dry run. Change rule 13 to
+  "A phase A' result".
+
+#### AE3. Low. Row 15's check seems to include build 6, but section 5 puts build 6 outside "Base"
+
+- **Location.** Section 6, phase A' ("A7 and A8, after builds 1, 5 and 6"); build order item 6;
+  section 5 (row "Timing": "Features on: Base"; row C2: "Base, fixes (11d) and row 11's warnings").
+- **Problem.** Build 6 makes "the warnings and fixes of row 11". Section 5 lists fixes and warnings
+  as features beyond Base in C2. Section 5's timing row says "Base" only. So one of two things is
+  true. (a) The check of V and L runs with the row 11 warnings on, and then "Base" in the timing row
+  is wrong. (b) The check runs without them, and then A7 does not need build 6. Build 1 (P's linter)
+  and build 5 (P's assertions) are explained by P's check and P's row 19 code. Nothing explains build
+  6.
+- **Effect.** No known lean toward an arm. If the warnings are on in V and L but not in P (P has
+  `dupl` and `errcheck` as common tools), the check of V and L does more work than the base check.
+  That leans against V and L on time. If they are off, A7 waits for no reason.
+- **Fix.** State which of the two holds, and write the check of each arm with the warnings on or off
+  to match.
+
+#### AE4. Low. The per-file tools and the common tools can change row 15's measure, and no lean is named
+
+- **Location.** Rule 6 (the three commands of row 15); rule 2 (`gopls`); section 8.
+- **Problem.**
+  1. To my knowledge, `gopls check` and `dupl` take file or directory arguments. Rule 6 does not say
+     which files an arm passes for a one-file change. In P and L the file is the changed Go file. In
+     V the change is in a `.vulcan` file, and the tools run on the lowered Go (rule 2). The lowering
+     can rewrite several Go files. The files that `gopls check` reads can then differ by arm in
+     number, and the time differs with them.
+  2. Every arm runs the same common tools. Their time is a cost of the same kind in every arm, so it
+     adds to P and to V alike. The ratio of check times moves toward 1, and the margin of ln 1.2 is
+     a ratio. Adding `gopls check` adds one more such term. It leans toward Within margin, in both
+     directions. Section 8 has a lean for the cache, and none for the choice of tools.
+  3. Rule 2 lists `gopls`. Rule 6 lists `gopls check`. The two names differ.
+- **Effect.** Item 1 can lean against the arm that changes more files, which is V when the lowering
+  fans out. Item 2 leans toward Within margin. Neither is large from the text alone. I did not time a
+  check.
+- **Fix.** Say in rule 6 which files each tool reads for a change (the changed file, plus the files
+  that the lowering rewrites, by the same rule in every arm), and record the count of files per run.
+  Add a line to section 8 for the common-tool dilution. Use one name for the `gopls` command in
+  rules 2 and 6.
+
+#### AE5. Low. The order of restore, drop and change is not fixed, and "each timing run" has two readings
+
+- **Location.** Rule 6 ("Before each timing run, the record restores ... The record also drops the
+  file cache ... before each timing run ... Then the record applies the one-file change"); section 8
+  (row 15); section 11 (rows AD1 and AC1).
+- **Problem.**
+  1. The text gives three steps and does not order the first two. If the restore comes after the
+     drop, the copy of the caches fills the file cache of the system. The arm with the larger
+     restored caches is then warmer on disk, and the drop does not do its job. If the drop comes
+     last, the restored caches are cold. The two orders measure different things.
+  2. "Each timing run" appears in a paragraph for rows 15 and 19. Section 8 and section 11 say "each
+     row 15 run". For row 19 the drop matters little (the warm-up follows). The text should say
+     which.
+  3. "One fixed method that it names" must work on both machines. Machines with different systems
+     need two methods. Rule 7 says only that the hardware and the system are fixed for the column.
+- **Effect.** The direction is not known. A restore after the drop leans toward the arm with the
+  larger restored caches. A drop before the one-file change also leaves the changed file in the file
+  cache, which is the same in every arm.
+- **Fix.** Write the order: restore, then drop, then change the file, then time. Say "each row 15
+  run". State that the two machines use the same system, or name the method for each and treat it as
+  part of the machine in rule 7.
+
+#### AE6. Low. The warm-up rule of row 19 compares neighbouring blocks only, and a slow drift passes
+
+- **Location.** Rule 6 (row 19: "The warm-up ends at the first block, from the second, whose median
+  time is within 5% of the median of the block before it"); section 8 (row 19); section 11 (AD2).
+- **Problem.** A slow decay changes the median of a block by less than 5% from one block to the next,
+  and the rule then stops while the total drift is still above 2%. The difference of two 50-request
+  medians also has a noise of its own. I simulated an illustration (my model, not a measurement of
+  the base apps). A request takes `1 + A·exp(−n/τ)` times a lognormal noise, with a start-up excess
+  A of 1.0 (the first request takes twice the steady time). I ran 3,000 simulated runs per case with
+  the plan's rule. I then measured the excess left in the 100 timed requests after the stop.
+
+  | Time constant τ (requests) | Noise (log sd per request) | Runs that stop with more than 2% of excess left in the timed window |
+  |---|---|---|
+  | 60 | 0.1 | 0% |
+  | 60 | 0.3 | 12% |
+  | 100 | 0.3 | 83% |
+  | 200 | 0.3 | 97% |
+  | 60 | 0.5 | 23% (13% do not settle in 8 blocks) |
+
+  Section 8 says that the rule leans "less than a fixed count would". My simulation does not support
+  that for slow settling: the rule stops early in most runs of the slow cases. (The 2% bound is mine.
+  The margin of row 19 is ln 1.1, about 10%.)
+- **Effect.** The arm that settles slowly keeps a drift in its timed window, and its time is read too
+  high. The direction depends on which arm settles slower and is not known.
+- **Fix.** Compare a window to a window that is farther back, for example the last two blocks against
+  the two blocks before them, or require three agreeing blocks in a row (the form that I proposed in
+  AD2). Or fit the drift and bound it. Fix the bound before data. In phase A', record requests 1 to
+  300 for a sample of paths in each arm, and compare the median of requests 101 to 200 with that of
+  201 to 300, so that a residual drift shows.
+
+#### AE7. Low. A seed writer's run can end with no usable diff, and the P arm of a C2 task is not defined
+
+- **Location.** Rule 6 ("A fresh session makes one run of that task, under the main model, in each
+  arm, for the seed writer only ... so the diff always exists"); section 11 (AD3 row).
+- **Problem.**
+  1. The run always exists. The diff may not be usable. A run can hit its budget (the harm of N3), or
+     fail to edit, or edit one line. Ten seeds need ten places to go. The text says "the diff always
+     exists" and does not say what the writer does with an empty or very small diff.
+  2. For a task of C2's pool, arm P has two conditions in C2 (P with its linter, P without). The seed
+     writer's run is "in each arm". The text does not say which P. C3a has "with and without a
+     passed check" in each arm, and that check differs between P with the linter and P without.
+- **Effect.** No known lean. A writer who redraws a task after a bad run makes a choice after data,
+  and a rule that tells the writer nothing leaves that choice open.
+- **Fix.** State that the seed writer takes the run as it is, and that a writer who cannot plant ten
+  seeds in the diff plants fewer, with the count recorded per arm. Or draw again by a fixed rule,
+  written before any run. Name the P of C3a (P with its linter, because that is the P that a Go team
+  runs).
+
+### 17.6 The checks that I ran
+
+**Reproduction.** I reran the `attackers` scenario in a scratch copy (`python cs-sim.py attackers`,
+about 30 seconds). The output was byte-identical to `sim/out/attackers.txt`. The script has not
+changed since the ninth rerun (file times: script 10:29, `margins.txt` 10:36, audit commit 11:09). I
+did not rerun the other scenarios, as the task allows.
+
+**Other.**
+- I read rules 1, 2, 5, 6, 7, 13 and 14, and sections 2, 3, 5, 6, 8, 10, 11 and 12 of draft 10. I
+  searched the plan for "cold", "warm", "warmer", "file cache", "gopls", "phase A" and "no other
+  load". The word "warmer" is gone. "Cold" appears only in the section 8 and rule 6 statements that a
+  cold full check is not measured.
+- I summed the cost lines and rebuilt the three totals (17.3), and checked the timing-run costs.
+- I checked every AD4 median against `success.txt`, `margins.txt`, `attackers.txt` and `rates.txt`.
+- I checked the status paragraph: draft 9 had no High, no Medium and 9 Low open. This matches 16.1.
+- I simulated the warm-up rule (AE6) with NumPy in the scratch folder, with seed 1.
+- **Notes that I did not count as findings.** (a) Row 15 lists the columns "Against L, against P"
+  and names the measure "P minus V" only. Rule 5's sign rule gives L minus V for the L column, and
+  the cost rows run L. Not new in draft 10. (b) The 180 seed-writer runs are not in the total (17.3).
+  (c) C6 and N3 have no simulated batch range (17.3). (d) After batch 15 in C1, only row 8 still
+  needs L+gen and V, so the estimate of 800 runs a batch for later batches is high. This error is
+  safe and leans toward no arm.
+- I did not time any build, check or request path. AE4 and AE5 are claims about the procedure, not
+  measured effects. AE6 rests on my model.
