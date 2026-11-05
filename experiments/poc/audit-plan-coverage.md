@@ -2455,3 +2455,247 @@ At base 0.8 my figures differ a little from `margins.txt` (5 (8) and 12 (31)), b
 **Arithmetic.** I summed the cost rows (14.4), checked C3's 12 conditions against section 5 and rows
 3, 4 and 5d, checked the three-seed table and `fixed_minus` figures against their outputs, and
 checked each `margins` row of section 6 against `margins.txt`.
+
+## 15. Eighth rerun, on draft 8
+
+Object: draft 8 of `plan-coverage.md` (820 lines, working tree, not committed), and
+`experiments/poc/sim/cs-sim.py` with its ten outputs in `sim/out/`. I ran the script in a scratch
+copy, and ran one check of my own (section 15.7). Not read: anything under
+`C:\Users\jonat\vulcan-poc`, and hidden harness material.
+
+### 15.1 Result
+
+- **Of AB1 to AB7 and R17:** 4 are Closed (AB1, AB2, AB5, AB7). 4 are Partly closed: AB3 (residual
+  AC4), AB4 (residual AC3), AB6 (residual AC1, AC2) and R17 (unchanged). AB2 and AB7 also gave
+  rise to new points in the same area (AC5, AC6, AC7).
+- **New findings:** High 0, Medium 1 (AC1), Low 6 (AC2 to AC7).
+- **Open after this rerun,** with each partly closed finding counted once by its residuals: High 0,
+  Medium 1 (AC1), Low 7 (AC2 to AC7, R17).
+- **Verdict: no High finding remains. One Medium remains (AC1). The plan is ready for the owner to
+  decide D1a once AC1 is fixed, or accepted as a named limit.** AC1 comes from the AB6 fix. Rule 6
+  now clears the build caches before every timing run. Row 15 claims "incremental builds". A run
+  with a cleared cache measures a full check, not an incremental one. The fix is one sentence in
+  rule 6. It must come before phase A, the first phase. The six Low findings are text fixes and
+  cost notes.
+- **Leans.** AC1 can lean against whichever arm gains most from a warm cache. Rule 6 names V's
+  lowering cache, so a lean against V is possible. A warm Go build cache in P is the mirror case.
+  AC2 (item 2) and AC4 can lean in a direction that is not known. I found no lean in the other
+  changes. Each new rule applies the same condition in each direction.
+- **The margins header.** The first line of `out/margins.txt` says "success rows use base 0.8". The
+  last row is base 0.5, and its name says so. This changes no figure. It is a wrong description,
+  not a wrong result. See AC6.
+
+### 15.2 Status
+
+| Finding | Status | Reason |
+|---|---|---|
+| AB1 | Closed | The batch table reads "10 fresh rule writers". Phase A' lists row 2's fresh rule writers and T1 as history. Rule 6 gives the reason: T1 "was written under an earlier model and with no corpus draw". R12's row says T1 is history. The old words "from other briefs" are gone. No place counts T1 as a unit (checked with a search for every "T1") |
+| AB2 | Closed | Every figure matches `margins.txt` and the cost arithmetic (15.3). The plan gives both bases. New points in the same area: the percentile convention (AC5) and the other success rows (AC6) |
+| AB3 | Partly closed | Rule 6 says: draw one task, take its diff in each arm, plant the same seed in each, and the check session confirms that the seeds are equal. Section 8 names the limit, with direction "Unknown". Residual: "its diff" does not say which run's diff (AC4) |
+| AB4 | Partly closed | N5's unit is the seed pool. Rank 3's idiom seeds are history. Section 5 lists "L and V (stricter mode)" for N5, and the cost has 2 arms. Rule 14 no longer lists N5. Residual: N5 runs in the calibration campaign, and rule 14 still says that only rows 6a and 6b count from calibration (AC3) |
+| AB5 | Closed | The task pool row reads "about 150 to 230". The top is 4 × 40 + 3 × 20 + 7 checks = 227. D15 keeps 20 writers if calibration stops before its tenth batch. Section 3 and rule 14 match |
+| AB6 | Partly closed | Rule 6 states the cache state (cold, in every arm). Rule 7 names machine 1 and machine 2. The cost has a timing row. Residuals: the cold state removes what the "incremental" claim needs (AC1); the rule names two caches only, and says nothing of row 19's runtime state (AC2) |
+| AB7 | Closed | Rule 5 applies the count rule to every agent column with a pool and reads "fewer than half (10 of 20)". The binomial intervals are right (15.4). Section 6 says that the 5% of rule 5 and the no-note rate are not the same quantity. Section 12 gives "about 5% to 8%, with binomial intervals from about 4% to 10%". New point: the denominator (AC7) |
+| R17 | Partly closed | Unchanged. C6 waits for T29a's measure and margin |
+
+### 15.3 AB2: the numbers
+
+- **Against `margins.txt`.** The base 0.5 row gives 8 (14) at true 0 and 21 (more than 60) at X / 2.
+  The plan's table matches. The base 0.8 row gives 5 (8) and 12 (31). It matches. All other rows of
+  the plan's table match the file.
+- **C3.** 8 × 480 = 3,840 and 21 × 480 = 10,080. The plan says "about 3,800 to 10,100". Right.
+- **N5.** 8 × 80 = 640 and 21 × 80 = 1,680. The plan says "about 640 to 1,700". Right.
+- **The total.** The rows other than C3 and N5 sum to 36,150 (lows) and 68,210 (highs). Add C3 and N5
+  at base 0.8: 38,950 and 74,970. At base 0.5: 40,590 and 80,010. The plan says "about 39,000 to
+  75,000" and "about 41,000 to 80,000". Right.
+- **The convention.** The top of each C3 and N5 range is the median at X / 2. At base 0.5, 6 of 50
+  simulations stay open at the cap of 60, and the 90th percentile is "more than 60". So the top is
+  a typical value, not an upper bound. Section 6 says "typical" in the table header, so this is
+  stated, but see AC5.
+- **The header line.** `margins.txt` line 1 says "success rows use base 0.8". The row named "base
+  0.5" uses kind `s1h`, which sets base 0.5 in the code. Its results differ from the base 0.8 row
+  (8 (14) against 5 (8)), so the code does use 0.5. The line is a wrong description. It changes no
+  figure.
+
+### 15.4 AB7: the intervals
+
+I computed exact (Clopper-Pearson) intervals for the three pooled counts of `writer_note.txt`:
+45 of 600 gives 5.5% to 9.9%; 33 of 600 gives 3.8% to 7.6%; 42 of 600 gives 5.1% to 9.3%. The union is
+3.8% to 9.9%. "About 4% to 10%" is right. The rate over all 1,800 simulations is 120, or 6.7% (5.6%
+to 7.9%), and the 5% of rule 5 is outside it. The per-seed ranges in the plan's table match the
+file (5% to 10%, 4% to 6.5%, 3.5% to 10.5%).
+
+### 15.5 New findings
+
+#### AC1. Medium. Rule 6 clears the caches that the "incremental" claim depends on
+
+- **Location.** Rule 6, "Agent columns without writers" ("Every timing run starts cold"); section 2,
+  row 15; findings report row "Fast verification" ("Incremental builds and per-leaf tests"); spec
+  R7.
+- **Problem.**
+  1. The claim of row 15 is incremental builds. Its primary measure is the check time "per one-file
+     change". With the Go build cache and V's lowering cache cleared before each run, the check
+     rebuilds everything. Its time is the time of a full check. The one-file change hardly affects
+     it. The verdict then speaks about cold full checks, and the row closes on it.
+  2. The owner's rule says that a count that stands in for the claim does not close a row. A cold
+     full check stands in for an incremental one.
+  3. My AB6 text offered "a cold cache for each run" as one example. It has this cost. The other
+     example, one warm-up run before each timed run, keeps the claim but makes a run depend on the
+     warm-up.
+- **Effect.** The row 15 verdict can be right and still not test the claim. The direction of any lean
+  is not known. A cold state removes the advantage of any arm that relies on a cache. Rule 6 names
+  V's lowering cache, so a lean against V is possible. P's Go build cache is the mirror case. A
+  cold full check may also be dominated by the build of dependencies, which both arms share. That
+  would pull the log ratio toward 0 and toward "Within margin". I did not measure this.
+- **Fix.** For row 15, restore the same cache snapshot before each run: the state after a check of the
+  base commit, in every arm. Then apply the one-file change, and time the check. Each run is
+  independent, because the snapshot is the same. Keep a cold full check as a secondary. Or state
+  that row 15 tests cold full checks, and narrow the claim in the report.
+
+#### AC2. Low. The cold state is incomplete, and row 19 has no runtime state
+
+- **Location.** Rule 6, "Agent columns without writers"; rule 7 (machines); section 6, timing row.
+- **Problem.**
+  1. Rule 6 clears two caches: the Go build cache and V's lowering cache. Other tools may keep
+     their own caches: `staticcheck` and `gopls` (to my knowledge, each has its own cache
+     directory), the module cache, and the operating system's file cache. The words "so no run
+     depends on an earlier one" are then not shown for P's tools. I did not test this.
+  2. Row 19 measures the time of a request path of a running app. A build cache has no part in it.
+     The rule does not say whether a run is a first request after a process start, or a steady
+     state after warm-up. The two differ in time, and the arms may differ in this way too.
+  3. Rule 7 names the machines "machine 1" and "machine 2". It does not say how they differ, or that
+     their hardware is fixed for the whole column. Machine is a replication level, so a change of
+     machine in the middle of a column changes the estimand.
+  4. The timing cost row says "machine time only". With a cold full check in each run, a run can take
+     minutes, and 1,200 to 5,300 runs is a large machine time. The row gives no duration.
+- **Effect.** No known lean for items 1, 3 and 4. Item 2 can lean, and the direction is not known.
+- **Fix.** Name every cache that a tool in any arm keeps, or run each timing run in a clean container
+  or from a snapshot. For row 19, state the process state (a fixed number of warm-up requests, then
+  a fixed number of timed requests). Fix the two machines for the column. Add a duration to the
+  cost row.
+
+#### AC3. Low. N5 runs in the calibration campaign, and rule 14 does not list it
+
+- **Location.** Rule 14; section 4, row N5 ("Calibration, on N5's seed pool"); section 5, row
+  "Calibration".
+- **Problem.** Rule 14 says that no calibration run counts in a main result, except rows 6a and 6b.
+  Draft 8 removed N5 from this exception (the AB4 fix). But sections 4 and 5 still place N5 in the
+  calibration campaign, and N5 is a column with a verdict. Read literally, rule 14 drops N5's runs.
+  Rule 14 also says that calibration sets only variance, correlation and D15's count. N5 sets a
+  verdict.
+- **Effect.** No lean. The design is clear from sections 4 and 5, but two rules disagree.
+- **Fix.** Write in rule 14: "rows 6a and 6b, whose test is the calibration workspaces, and N5, whose
+  test is its own seed pool, which runs in the calibration campaign". Or move N5 to a campaign of its
+  own in sections 4 and 5. The first is the smaller change.
+
+#### AC4. Low. "Its diff" does not say which run's diff, and row 4 says "equal code"
+
+- **Location.** Rule 6 ("takes its diff in each arm"); section 2, rows 3 (review part), 4 and 5d;
+  section 5, row C3.
+- **Problem.**
+  1. A task has many runs in each arm: 2 runs under each of 2 models, drawn many times. Rule 6 says
+     "its diff". It does not say which run's diff the writer plants in. A writer who chooses the diff
+     can choose an easy one in one arm.
+  2. Row 4 says "the same seeds in equal code in each arm". The diffs are not equal code. Each arm's
+     agent wrote its own. Only the seed is equal.
+  3. The C3 pool is written after C1 and C2 have run, from their diffs. The set of available diffs
+     depends on how many batches C1 and C2 ran. Phase C's order states this. Rule 6 does not.
+- **Effect.** Item 1 can lean in a direction that is not known, because the writer chooses the diff.
+  Item 2 is wording. Section 8 names the planting limit, but not the choice of the run.
+- **Fix.** Say in rule 6: the diff is one run of the task in each arm, drawn by a seed fixed before
+  the writers write. Change row 4 to "the same seed in each arm's own diff". State in rule 6 that the
+  C3 seed pools are written after the diffs exist.
+
+#### AC5. Low. The new cost rows use two percentile conventions
+
+- **Location.** Section 6, cost estimate rows "C3", "N5" and "Timing runs".
+- **Problem.** The C3 and N5 tops are the median at X / 2 (12, 21). The timing tops are the 90th
+  percentile at X / 2: row 15 has "4 to 11" (median 6, 90th percentile 11), and row 19 has "9 to 50"
+  (median 20, 90th percentile 50). The estimate's header says "typical". With the median, row 15 is
+  4 to 6 batches (480 to 720 runs) and row 19 is 9 to 20 (720 to 1,600). With the 90th percentile,
+  C3 is up to 31 batches at base 0.8 (about 14,900 sessions), and more than 60 at base 0.5 (more than
+  28,800).
+- **Effect.** No lean. Cost ranges of unlike kinds sit side by side. The C3 range shows less of its
+  tail than the timing range does.
+- **Fix.** Use one convention in the new rows, and say which. Give the C3 tail in a note.
+
+#### AC6. Low. Base-rate sensitivity covers the seeded rows only, and the header line is wrong
+
+- **Location.** Section 6, `margins` table and the sentence after it; `cs-sim.py`, `margins` header
+  line; section 6 cost, row C1.
+- **Problem.**
+  1. The plan tests base 0.5 for the seeded rows, and keeps base 0.8 for the task success rows. The
+     base of the task success rows is also unknown before calibration. At base 0.5, my check (15.7)
+     gives 10 (16) batches at true 0 and 28 (69) at X / 2 for X 5 points (row 1 against L, N1),
+     against 7 (12) and 15 (30) at base 0.8. C1's top could rise by up to about 3,000 runs (4 more
+     batches than the 24 of the estimate, 800 runs each). The 12-point rows change little (3 (7) at
+     base 0.8, 4 (9) at base 0.5, at X / 2).
+  2. The header line of `margins.txt` says "success rows use base 0.8". The last row uses 0.5. The
+     row name says so.
+- **Effect.** No lean. The cost can be low by a small amount (item 1). Item 2 is a wrong
+  description in an output file, and it matters for no figure. It can confuse a reader of the file
+  alone.
+- **Fix.** Add one sentence to section 6: the 5-point success rows at base 0.5 take 10 to 28 batches.
+  Change the header line to "base 0.8, except the rows that name another base". This changes the
+  header of `margins.txt`, so regenerate that file.
+
+#### AC7. Low. The no-note rate is per simulation, and rule 5 promises a rate per verdict
+
+- **Location.** Rule 5 ("Its limit": "Section 6 gives the rate at which a verdict wrong for writers in
+  general carries no note"); section 6, `writer_note` table and text; section 12.
+- **Problem.** The 5% to 8% in section 6 and section 12 is the count of wrong verdicts with no note
+  over all 600 simulations. Only 147, 226 and 259 of the 600 reached a verdict. At a population
+  difference of exactly +X, every verdict is wrong. So, given a verdict, the rate of no note is
+  45 of 147 (31%), 33 of 226 (15%) and 42 of 259 (16%). Their exact intervals are 23% to 39%, 10% to
+  20% and 12% to 21%. A reader who holds a verdict asks this second question, and rule 5 describes
+  it. The table has both counts, but the text gives only the first rate.
+- **Effect.** No lean. The note looks stronger than it is for a reader who holds a verdict. The case
+  is the edge case (a true difference of exactly X), but it is the case that the table tests.
+- **Fix.** Add the per-verdict rates (15% to 31%) beside the per-simulation rates in section 6 and
+  section 12. Say which one rule 5 means.
+
+### 15.6 Other checks
+
+- **Status paragraph.** Its counts for drafts 5, 6 and 7 match sections 12, 13 and 14 of this audit.
+- **Section 11.** The AB1 to AB7 rows describe the changes that I found in the text. The Y2 row still
+  says "about 37,000 to 70,000", and the AA1 row gives the base 0.8 figures. Both describe the plan
+  at the time of those findings. I did not count them as errors.
+- **Batch and pool arithmetic.** 4 seed pools × 20 writers + 4 checks = 84 sessions. Seven task pools:
+  C1, C2, C2v, C4, C5, C7 and calibration. D15's read at 10 batches × 12 draws = 120 draws, 6 a
+  writer. Right.
+- **Timing cost.** Row 15: 20 draws × 2 machines × 3 arms = 120 a batch, 4 to 11 batches = 480 to
+  1,320. Row 19: 20 × 2 × 2 = 80 a batch, 9 to 50 batches = 720 to 4,000. Right.
+- **Is the timing row right to sit outside the total?** Yes, as the total is defined: "Runs and review
+  sessions" of the agent campaigns. The pool, labeler and writer rows sit below the total too, and no
+  row gives a grand total. The reason in the plan for timing ("machine time only") differs from the
+  reason for those rows (sessions of a different kind). The duration is missing (AC2, item 4).
+- **N5 and "stricter mode".** The term comes from hypotheses-r3 (row N5 and the T5 gate). The plan
+  does not define it, and build order item 7 does not list it. It is probably the trap mode of rank
+  3. I did not check that.
+
+### 15.7 The checks that I ran
+
+**Reproduction.** I copied `experiments/poc/sim` to a scratch folder and ran the script there in two
+processes: `python cs-sim.py margins fixed_minus writer_note`, and the other seven scenarios.
+Each scenario starts a fresh generator from seed 20261105, so a split run gives the same files.
+All ten files in `out/` were byte-identical to `experiments/poc/sim/out/` (checked with `cmp`). This
+includes `margins.txt` with its new last row. The run took about 26 minutes, from 10:00 to 10:26, in
+the two processes.
+
+**My check (AC6).** It imports `solve_delta`, `success_units`, `run_sequences` and `summarize` from
+the plan's script, unchanged. It runs the plan's task batch (50 tasks, 2 runs a model, both models in
+each unit, 50 simulations, seed 20261105) at X 5 points (cap 100) and X 12 points (cap 60), at base 0.8
+and base 0.5.
+
+| X | Base | True 0 | True X / 2 |
+|---|---|---|---|
+| 5 points | 0.8 | 7 (12) | 15 (30) |
+| 5 points | 0.5 | 10 (16) | 28 (69), 2 open at the cap |
+| 12 points | 0.8 | 2 (3) | 3 (7) |
+| 12 points | 0.5 | 2 (3) | 4 (9) |
+
+At base 0.8, the X 5 points row matches `margins.txt` exactly. It starts from the same generator state.
+
+**Other.** I summed the cost rows (15.3), computed the exact intervals (15.4), compared each `margins`
+row of section 6 with `margins.txt`, compared the three-seed table with `writer_note.txt`, and searched
+the plan for every "T1", "N5", "cold" and "machine".
