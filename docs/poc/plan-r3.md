@@ -3,6 +3,9 @@
 Status: accepted by the owner, 2026-10-30, with the amendments in section 9. Steps 1 to 7 go ahead.
 Step 8 waits (section 8, decision 3).
 
+Amended 2026-11-05 by [plan-coverage.md](plan-coverage.md), draft 10, accepted by the owner (D1a).
+Changed here: steps 4, 6 and 8, the cost in section 7, and the gate of section 5 (a conditional text, which waits on D1d).
+
 ## 0. Why this plan
 
 Round 2 stopped at step 3 ([labels-r2.md](../../experiments/poc/labels-r2.md)). Of 28 team rules
@@ -152,6 +155,8 @@ quietly removed: it stays on or goes off by a decision that is written down.
 checks run as each arm ships. If not, no tasks are written and the round stops again, and its
 record says what was covered, by class. The bar is not lowered, and rules are not replaced.
 
+**Conditional change (decision D1d of [plan-coverage.md](plan-coverage.md); not yet decided).** If the owner decides D1d yes, a failed gate no longer leaves the round's tasks unwritten. C2 then runs on the union of the rules that any arm's check enforces. Until the owner decides, the gate text above stays in force.
+
 **Report on T1 and T2, whatever the outcome:** the sets S, G, U, and N, by class; the share of each
 class that moved compared with no defaults; and which default enforced each rule. A rule may land
 in S only because of a default that the team would have turned off, so QN is read next to it.
@@ -184,20 +189,21 @@ values and behavior are not what these rule kinds state. U stays empty.
 | 1. The wishlist of defaults | A fresh session (section 4) | Each wanted rule has a source |
 | 2. The rules file, `init`, `--rules`, `rules diff`, `rules upgrade`, `rules lock`, the rule kinds, the fix of holes H6 and H7, in both checkers; conformance cases | Builder or a fresh session | The same cases pass in L and V; a deleted rule stops firing; H6 and H7 are rejected in both |
 | 3. Parity audit of step 2 | A fresh session | No open High finding |
-| 4. Freeze `defaults v1`, commit its hash; templates made by `init` | Builder | |
+| 4. Freeze `defaults v1` and P's linter configuration together, before the blind rules are seen; commit the hash of `defaults v1`; templates made by `init` | Builder | P's configuration: [plan-coverage.md](plan-coverage.md), row 2 against P |
 | 5. T1: fresh rule writer, then labeler; T3 | Fresh sessions | **The gate of section 5** |
 | 6. T2 and QN; the record in `experiments/poc`, summary in the README | Builder (ids and counts only) | |
 | 7. The owner reads the result, and decides whether the runs are worth their cost | Owner | |
-| 8. From here, as plan-r2 steps 4 to 9: tasks, audit, seal, pilot, calibration, sizing, main runs, replication, results | As plan-r2 | Its gates |
+| 8. Campaigns C1 and C2 of [plan-coverage.md](plan-coverage.md), in place of plan-r2 steps 4 to 9 | As plan-coverage.md | Its gates |
 
 The harness needs little: `PROTECTED` lists the rules file and the lock (F7), and `harness validate`
-runs on the templates that `init` makes. Arm P keeps the team's rules as prose, as in round 2. A
+runs on the templates that `init` makes. Arm P keeps the team's rules as prose, as in round 2, and also gets the tools of
+[plan-coverage.md](plan-coverage.md), rule 2. T1 reports a P column. A
 default that matches no team rule is not graded in any arm.
 
 ## 7. Cost
 
 Steps 1 to 6 are sessions and local checks, with no provider spend beyond them. Step 8 costs what
-plan-r2 estimated (about 370 runs, plus the replication), under its cost gate. The funds are not
+[plan-coverage.md](plan-coverage.md) gives for campaigns C1 and C2 (its section 6), funded as its rule 6 says. The funds are not
 committed until step 7.
 
 ## 8. Decisions for the owner

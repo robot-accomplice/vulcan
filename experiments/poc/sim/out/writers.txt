@@ -1,0 +1,17 @@
+population difference +0.12 = X; base 0.6; batch 50; 200 sims; cap 30
+pool: 20 writers x 20 tasks, drawn with replacement; false is against the pool's own mean
+writer interval (Z1): 95% t-interval over the 20 writer means, read once where the column closes
+writer sd 0.00, one writer a batch: false 4 of 200; {'gain': 0, 'loss': 0, 'within': 4, 'open': 196, 'empty': 0}  batches, all sims: median >30, p90 >30
+writer sd 0.00, sealed pool: false against the pool 2 of 200; verdicts 4 (all false against the population); pool mean sd 0.002; {'gain': 2, 'loss': 0, 'within': 2, 'open': 196, 'empty': 0}  batches, all sims: median >30, p90 >30
+  writer interval holds the population value: 189 of 200; in the verdicts, 0 of 4; median width 0.030
+writer sd 0.10, one writer a batch: false 82 of 200; {'gain': 40, 'loss': 0, 'within': 42, 'open': 118, 'empty': 0}  batches, all sims: median >30, p90 >30
+writer sd 0.10, sealed pool: false against the pool 0 of 200; verdicts 57 (all false against the population); pool mean sd 0.017; {'gain': 30, 'loss': 0, 'within': 27, 'open': 143, 'empty': 0}  batches, all sims: median >30, p90 >30
+  writer interval holds the population value: 187 of 200; in the verdicts, 44 of 57; median width 0.080
+writer sd 0.15, one writer a batch: false 144 of 200; {'gain': 77, 'loss': 0, 'within': 67, 'open': 56, 'empty': 0}  batches, all sims: median 5, p90 >30
+writer sd 0.15, sealed pool: false against the pool 0 of 200; verdicts 67 (all false against the population); pool mean sd 0.024; {'gain': 29, 'loss': 0, 'within': 38, 'open': 133, 'empty': 0}  batches, all sims: median >30, p90 >30
+  writer interval holds the population value: 194 of 200; in the verdicts, 61 of 67; median width 0.115
+writer sd 0.20, one writer a batch: false 168 of 200; {'gain': 86, 'loss': 3, 'within': 78, 'open': 32, 'empty': 1}  batches, all sims: median 3, p90 >30
+writer sd 0.20, sealed pool: false against the pool 1 of 200; verdicts 96 (all false against the population); pool mean sd 0.035; {'gain': 48, 'loss': 0, 'within': 48, 'open': 104, 'empty': 0}  batches, all sims: median >30, p90 >30
+  writer interval holds the population value: 191 of 200; in the verdicts, 87 of 96; median width 0.149
+writer sd 0.10, sealed pool, population difference 0: false against the pool 0; {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 2, p90 4
+  writer interval holds 0: 193 of 200; inside +-X: 172; median width 0.144

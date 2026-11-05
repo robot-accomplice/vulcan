@@ -4,6 +4,9 @@ Status: **draft for the owner**, 2026-11-03. Not accepted. It changes no plan, n
 accepted theory. [hypotheses-r3.md](hypotheses-r3.md) stays as accepted. The numbers T27 to T30
 continue its list, so that an amendment can take them in as they are.
 
+Amended 2026-11-05 by [plan-coverage.md](plan-coverage.md), draft 10, accepted by the owner (D1a).
+Changed here: the outcome names in section 3, and a note on T29a. This draft is still not accepted as row 14's design. That waits on decision D6.
+
 Every prior here is a **prediction by the session that wrote it**, to be measured. No result is
 wanted. "A declared model gives no measured gain over plain Go for these views" is an acceptable end.
 
@@ -76,8 +79,8 @@ set before any data:
 |---|---|
 | Gain measured | The interval lies above +X |
 | Loss measured | The interval lies below −X |
-| No measured gain | The interval lies within ±X |
-| Unclear | Anything else. One more batch, sized before it is run, then read the same way |
+| Within margin | The interval lies within ±X |
+| Open | Anything else. The column goes on by rules 5 and 6 of [plan-coverage.md](plan-coverage.md) |
 
 The same X, the same size, and the same replication apply to each direction and to each pair of
 conditions. A verdict that only one run shows is not a result.
@@ -122,6 +125,8 @@ conditions. A verdict that only one run shows is not a result.
 Drift has two meanings. The test keeps them apart.
 
 **T29a. A view that goes stale.**
+
+*Amended 2026-11-05, conditional on decision D6:* if the owner decides D6 yes, T29a gets one primary measure and a margin X, set in the views amendment before campaign C6 starts ([plan-coverage.md](plan-coverage.md), R17). That plan does not set their values.
 
 - **Claim.** A view generated from the model cannot be stale. A view written by hand goes stale
   under agent work.

@@ -1,0 +1,41 @@
+seeds: 10 a writer; X 0.1; first read at 20 writers, then every 10; base 0.5; 200 sims; cap 40 batches of 10
+  writer sd 0.00, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 9, p90 11
+  writer sd 0.00, true +0.050: {'gain': 0, 'loss': 0, 'within': 199, 'open': 1, 'empty': 0}  batches, all sims: median 16, p90 28
+  writer sd 0.00, true +0.100: {'gain': 0, 'loss': 0, 'within': 0, 'open': 200, 'empty': 0}  batches, all sims: median >40, p90 >40; false 0
+  writer sd 0.10, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 9, p90 12
+  writer sd 0.10, true +0.050: {'gain': 0, 'loss': 0, 'within': 194, 'open': 6, 'empty': 0}  batches, all sims: median 16, p90 29
+  writer sd 0.10, true +0.100: {'gain': 0, 'loss': 0, 'within': 0, 'open': 200, 'empty': 0}  batches, all sims: median >40, p90 >40; false 0
+  writer sd 0.20, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 10, p90 15
+  writer sd 0.20, true +0.050: {'gain': 0, 'loss': 0, 'within': 171, 'open': 29, 'empty': 0}  batches, all sims: median 21, p90 >40
+  writer sd 0.20, true +0.100: {'gain': 0, 'loss': 0, 'within': 1, 'open': 199, 'empty': 0}  batches, all sims: median >40, p90 >40; false 1
+seeds: 40 a writer; X 0.1; first read at 20 writers, then every 10; base 0.5; 200 sims; cap 40 batches of 10
+  writer sd 0.00, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 8, p90 9
+  writer sd 0.00, true +0.050: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 14, p90 18
+  writer sd 0.00, true +0.100: {'gain': 0, 'loss': 0, 'within': 0, 'open': 200, 'empty': 0}  batches, all sims: median >40, p90 >40; false 0
+  writer sd 0.10, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 8, p90 10
+  writer sd 0.10, true +0.050: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 15, p90 20
+  writer sd 0.10, true +0.100: {'gain': 0, 'loss': 0, 'within': 0, 'open': 200, 'empty': 0}  batches, all sims: median >40, p90 >40; false 0
+  writer sd 0.20, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 9, p90 11
+  writer sd 0.20, true +0.050: {'gain': 0, 'loss': 0, 'within': 198, 'open': 2, 'empty': 0}  batches, all sims: median 18, p90 29
+  writer sd 0.20, true +0.100: {'gain': 2, 'loss': 0, 'within': 1, 'open': 197, 'empty': 0}  batches, all sims: median >40, p90 >40; false 3
+seeds: 10 a writer; X 0.05; first read at 20 writers, then every 10; base 0.5; 200 sims; cap 120 batches of 10
+  writer sd 0.00, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 22, p90 34
+  writer sd 0.00, true +0.025: {'gain': 0, 'loss': 0, 'within': 188, 'open': 12, 'empty': 0}  batches, all sims: median 50, p90 104
+  writer sd 0.00, true +0.050: {'gain': 0, 'loss': 0, 'within': 4, 'open': 196, 'empty': 0}  batches, all sims: median >120, p90 >120; false 4
+  writer sd 0.10, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 25, p90 39
+  writer sd 0.10, true +0.025: {'gain': 0, 'loss': 0, 'within': 171, 'open': 29, 'empty': 0}  batches, all sims: median 60, p90 >120
+  writer sd 0.10, true +0.050: {'gain': 0, 'loss': 0, 'within': 1, 'open': 199, 'empty': 0}  batches, all sims: median >120, p90 >120; false 1
+  writer sd 0.20, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 33, p90 51
+  writer sd 0.20, true +0.025: {'gain': 0, 'loss': 0, 'within': 132, 'open': 68, 'empty': 0}  batches, all sims: median 88, p90 >120
+  writer sd 0.20, true +0.050: {'gain': 2, 'loss': 0, 'within': 2, 'open': 196, 'empty': 0}  batches, all sims: median >120, p90 >120; false 4
+rules: 28 a writer; X 0.14; first read at 10 writers, then every 10; base 0.5; 200 sims; cap 40 batches of 10
+  writer sd 0.00, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 6, p90 6
+  writer sd 0.00, true +0.070: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 10, p90 12
+  writer sd 0.00, true +0.140: {'gain': 0, 'loss': 0, 'within': 1, 'open': 199, 'empty': 0}  batches, all sims: median >40, p90 >40; false 1
+  writer sd 0.10, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 6, p90 7
+  writer sd 0.10, true +0.070: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 10, p90 14
+  writer sd 0.10, true +0.140: {'gain': 0, 'loss': 0, 'within': 0, 'open': 200, 'empty': 0}  batches, all sims: median >40, p90 >40; false 0
+  writer sd 0.20, true +0.000: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 6, p90 8
+  writer sd 0.20, true +0.070: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 11, p90 16
+  writer sd 0.20, true +0.140: {'gain': 0, 'loss': 0, 'within': 0, 'open': 200, 'empty': 0}  batches, all sims: median >40, p90 >40; false 0
+Batches are counted in steps of 10 writers from the start: writers at a close = 10 x batches.

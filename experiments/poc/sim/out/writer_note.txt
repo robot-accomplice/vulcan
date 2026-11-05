@@ -1,0 +1,13 @@
+population difference +X = 0.12; base 0.6; pool 20 x 20; 200 sims a seed; cap 30
+writer sd 0.10, seed 20261105: verdicts 59; note 44; wrong with no note 15 of 200
+writer sd 0.10, seed 20261109: verdicts 48; note 28; wrong with no note 20 of 200
+writer sd 0.10, seed 20261110: verdicts 40; note 30; wrong with no note 10 of 200
+writer sd 0.10, three seeds: note on 102 of 147 verdicts; wrong with no note 45 of 600
+writer sd 0.15, seed 20261105: verdicts 85; note 72; wrong with no note 13 of 200
+writer sd 0.15, seed 20261109: verdicts 76; note 64; wrong with no note 12 of 200
+writer sd 0.15, seed 20261110: verdicts 65; note 57; wrong with no note 8 of 200
+writer sd 0.15, three seeds: note on 193 of 226 verdicts; wrong with no note 33 of 600
+writer sd 0.20, seed 20261105: verdicts 97; note 76; wrong with no note 21 of 200
+writer sd 0.20, seed 20261109: verdicts 92; note 78; wrong with no note 14 of 200
+writer sd 0.20, seed 20261110: verdicts 70; note 63; wrong with no note 7 of 200
+writer sd 0.20, three seeds: note on 217 of 259 verdicts; wrong with no note 42 of 600

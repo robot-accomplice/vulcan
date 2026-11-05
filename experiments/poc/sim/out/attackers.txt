@@ -1,0 +1,7 @@
+row 18: batch 3 pairs (12 sessions); X 1.0; R 5; 100 sims; cap 200
+L 1.0, V 1.0: {'gain': 0, 'loss': 0, 'within': 100, 'open': 0, 'empty': 0}  batches, all sims: median 13, p90 15
+L 1.0, V 0.5: {'gain': 0, 'loss': 0, 'within': 100, 'open': 0, 'empty': 0}  batches, all sims: median 22, p90 29
+L 0.5, V 0.5: {'gain': 0, 'loss': 0, 'within': 100, 'open': 0, 'empty': 0}  batches, all sims: median 12, p90 14
+L 2.0, V 0.5: {'gain': 100, 'loss': 0, 'within': 0, 'open': 0, 'empty': 0}  batches, all sims: median 34, p90 47
+L 2.0, V 1.0: {'gain': 0, 'loss': 0, 'within': 0, 'open': 100, 'empty': 0}  batches, all sims: median >200, p90 >200
+The Poisson means are assumptions; the holes stage of hr3 section 5 replaces them.

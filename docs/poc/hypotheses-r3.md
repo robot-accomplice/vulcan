@@ -4,6 +4,9 @@ Status: accepted by the owner as the list of theories to test, 2026-10-30, with 
 section 9. Nothing here is built yet. It answers the question that [plan-r3.md](plan-r3.md) leaves
 open (its section 0 and its decision 3).
 
+Amended 2026-11-05 by [plan-coverage.md](plan-coverage.md), draft 10, accepted by the owner (D1a).
+Changed here: every stop rule of section 6, and ranks 2, 3 and 4; the tests of T16, T20, T22, T23, T24 and T25; the harms of section 4.
+
 Every prior in this document is a **prediction by the session that wrote it**, to be measured. No
 result is wanted. "No language feature beats a well-built linter here" is an acceptable end, and
 section 7 says what follows from it.
@@ -382,8 +385,9 @@ The topics and remote ports of §5.5 are deferred. T16 to T18 need that work fir
   limit.
 - **Moves.** D, and part of C, for invariants on messages.
 - **Cost.** Compiler: §5.5.2 is written, but not built. Agents: small.
-- **Test.** *Measure:* seeded incompatible changes rejected, across at least 20 seeds. *Refuted if*
-  the arms differ by more than 1 seed.
+- **Test.** *Measure:* seeded incompatible changes rejected, across at least 20 seeds. *Margin:* X 5
+  points on seeds ([plan-coverage.md](plan-coverage.md), row 10a, rule 5). *Hr3 reading, reported and
+  read by no verdict:* the arms differ by more than 1 seed.
 - **Prior (prediction).** 90% equal.
 
 #### T17. Proved idempotency and ordering
@@ -437,9 +441,10 @@ The topics and remote ports of §5.5 are deferred. T16 to T18 need that work fir
 - **Moves.** D.
 - **Cost.** Compiler: from a simple walk to a region system. Agents: rejected ordinary shapes, such as
   a shared store behind a lock, unless a `Guarded[T]` form is learned.
-- **Test.** *Measure:* attacker bypasses, seeded races rejected, and false rejections on base apps.
-  *Refuted if* bypass counts are within 1, and false rejections are not lower in V. *Size:* at least 20
-  seeds.
+- **Test.** *Measure:* seeded races rejected, per seed. *Margin:* X 10 points
+  ([plan-coverage.md](plan-coverage.md), row 11c, rule 5). Attacker bypasses and false rejections on base
+  apps are secondary. *Hr3 reading, reported and read by no verdict:* bypass counts are within 1, and
+  false rejections are not lower in V. *Size:* at least 20 seeds.
 - **Prior (prediction).** 20%. Agents appear to make few such faults in this kind of service, but no
   measurement here isolates them.
 
@@ -472,8 +477,10 @@ The topics and remote ports of §5.5 are deferred. T16 to T18 need that work fir
 - **Cost.** Build: about 10 to 20 lines per fix, with tests. Agents: none, but a fix that is applied
   without thought can hide the rule's reason.
 - **Test.** *Measure:* M5 and M6 of plan-r2 (recovery within two check runs), with and without fixes,
-  in both arms. *Refuted if* the turns from rejection to pass do not fall by at least 20%, or the arms
-  differ by more than 12 points. *Size:* the tempting tasks of plan-r2.
+  in both arms. *Margin:* V against V-fixes, X ln 1.25 on turns
+  ([plan-coverage.md](plan-coverage.md), row 11d, rule 5). *Hr3 reading, reported and read by no verdict:*
+  the turns from rejection to pass fall by less than 20%, or the arms differ by more than 12 points.
+  *Size:* the tempting tasks of plan-r2.
 - **Prior (prediction).** 45% that it helps, 90% equal. Current messages already say how to fix.
 
 #### T23. One way to write a thing, and a small primer
@@ -484,8 +491,9 @@ The topics and remote ports of §5.5 are deferred. T16 to T18 need that work fir
   new form costs learning. Those two costs are what the test compares.
 - **Moves.** No class.
 - **Cost.** Primer space, in both arms.
-- **Test.** *Measure:* rejections before the first pass, and first-attempt pass rate. *Refuted if* V
-  is not better by a bound above 0, with at least 12 points. *Size:* plan-r2, section 7.
+- **Test.** *Measure:* rejections before the first pass, and first-attempt pass rate. *Margin:* X 12 points,
+  with rule 5's mirror loss ([plan-coverage.md](plan-coverage.md), row 17). *Hr3 reading, reported and read
+  by no verdict:* V is not better by a bound above 0, with at least 12 points. *Size:* plan-r2, section 7.
 - **Prior (prediction).** 15%. Measured in the same runs as T21.
 
 #### T24. Typed holes
@@ -498,7 +506,9 @@ The topics and remote ports of §5.5 are deferred. T16 to T18 need that work fir
 - **Moves.** No class. It is a cost theory.
 - **Cost.** Compiler: bidirectional checks, and a server. Agents: one new command to use.
 - **Test.** *Measure:* `undefined:` build failures, and turns, with and without the hole command, in
-  both arms. *Refuted if* V's benefit does not beat L's by a bound above 0. *Size:* 20 ordinary tasks.
+  both arms. *Margin:* X 12 points, with rule 5's mirror loss
+  ([plan-coverage.md](plan-coverage.md), row 16). *Hr3 reading, reported and read by no verdict:* V's
+  benefit does not beat L's by a bound above 0. *Size:* 20 ordinary tasks.
 - **Prior (prediction).** 10% for a V gain over L. 35% that it helps either arm.
 
 #### T25. Local reasoning
@@ -510,8 +520,9 @@ The topics and remote ports of §5.5 are deferred. T16 to T18 need that work fir
 - **Moves.** No class.
 - **Cost.** Build: small, in both arms. Neither has it today (O8 of plan-r2).
 - **Test.** *Measure:* input tokens to the first passing check after the first edit, with and without
-  the command. *Refuted if* the arms differ by a ratio bound below 0.87 either way. *Size:* 20 ordinary
-  tasks, and a larger application than Stockroom-lite.
+  the command. *Margin:* X ln 1.15 ([plan-coverage.md](plan-coverage.md), row 13a, rule 5).
+  *Hr3 reading, reported and read by no verdict:* the arms differ by a ratio bound below 0.87 either way.
+  *Size:* 20 ordinary tasks, and a larger application than Stockroom-lite.
 - **Prior (prediction).** 85% equal. 35% that it helps either arm at this application size.
 
 #### T26. Tests derived from contracts
@@ -539,6 +550,8 @@ which form carries the cost.
 | N4 | Agents pass a strong check by weakening the thing checked: a contract removed, a marker added | **Linter-equal.** Both arms can edit their contracts. Decision 6 fails a changed configuration only | All, against | Silent loss of a rule | A scripted diff of contracts and lists against the base. Refuted if under 5% of runs weaken one | 50% |
 | N5 | Text that looks like Go and means something else misleads a model trained on Go | **Language-only.** It is T8's and T5's price | None | Silent faults | Seeded Go idioms that rely on wrapping or aliasing: agent faults in V's stricter mode against L. Refuted if the rates are within 12 points | 40% |
 | N6 | One central file (`system.vulcan`, or `arch.go` and `main.go`) causes conflicts between parallel agents | **Linter-equal.** Both forms centralize wiring | None | Merge failures | Merge failures in chains of changes, across parallel runs. Refuted if under 5% conflict | 30% |
+
+Amended 2026-11-05: each harm is a column of [plan-coverage.md](plan-coverage.md), read by rule 5 with the margin of its section 4. The one-arm and point thresholds in the "Test" column above are the hr3 reading. The record reports them beside the verdict, and no verdict reads them.
 
 ## 5. Test stages
 
@@ -570,8 +583,18 @@ and the diagnostic's summary, and no rule text.
 
 ## 6. Ranked shortlist
 
-Each stop rule has three outcomes with the same burden. "Replicated" means that a second corpus or
-second model gives the same outcome.
+Each stop rule has three outcomes with the same burden.
+
+Amended 2026-11-05 ([plan-coverage.md](plan-coverage.md)):
+- Each rank is read by columns of that plan, by its rule 5. The accepted threshold of a stop rule sets
+  the column's X. The accepted condition is the hr3 reading: the record reports it beside the verdict,
+  and no verdict reads it. A mirror loss exists for each column, with the same burden as the gain.
+- "No measured gain" reads as Within margin. "Unclear" reads as Open: the column goes on by rules 5 and
+  6 of that plan, and not by one more set of data sized after the result.
+- "Replicated" no longer means a second batch after a result. Replication by corpus and by model is
+  inside the sequence of every column (its rule 7).
+- Some columns of that plan have no hr3 reading. Their X values are set by its section 2, and hr3 sets
+  none. Rows 5b and 9 (10 points each) are new rules there. They are not T26 (its R2).
 
 ### Rank 1: T5, with T4 inside it. Static proof, and whether a stricter body meaning helps
 
@@ -599,13 +622,13 @@ language.
 
 **Stop rule.**
 
-| Outcome | Condition (replicated on a second corpus writer) | Next |
+| Outcome | Condition (the hr3 reading; X is 10 points, row 5c) | Next |
 |---|---|---|
 | T4 supported | At least 30% of clauses proved, and at least 2 more class C or D rules rejected | Keep the verifier, in both forms |
 | T4 not supported | Under 30% proved, or at most 1 more rule rejected | Stop the proof work. Contracts stay at run time |
 | T5 supported | V's share exceeds L's by at least 10 points, with the 95% interval above 0 | Go on to runs of the stricter mode, and count N5 |
 | T5 no measured gain | The 95% interval lies within ±10 points | Stop the stricter mode. No language case from proofs |
-| T5 unclear | Anything else | One more corpus, sized before it is written. Then read it as above; unclear stays reported as unclear |
+| T5 unclear | Anything else | Open: the column goes on by rules 5 and 6 of [plan-coverage.md](plan-coverage.md) |
 
 ### Rank 2: T21. The cost of a correct program, and N1
 
@@ -618,11 +641,12 @@ primer within the budget. A fresh session writes it, and a parity audit reads it
 **Test.**
 
 1. Recount pieces for V, L, and L with the generator, counting what an agent must read and write.
-2. Grow the ordinary tasks of plan-r3 step 8 from 8 to 20. This adds about 180 runs (12 tasks, 3 arms,
-   5 runs). Measure input tokens, turns, and success, paired per task. A pilot replaces the spread that
+2. Run this as part of campaign C1 of [plan-coverage.md](plan-coverage.md) (row 8), with the conditions L,
+   L+gen and V. X is ln 1.05. In place of 20 tasks, 3 arms and 5 runs, C1 draws tasks in batches from its
+   pool. Measure input tokens, turns, and success, paired per task. A pilot replaces the spread that
    came from round 1's faulty budget.
 
-**Stop rule** (replicated on a second model).
+**Stop rule** (the hr3 reading; replication on a second model is inside the sequence).
 
 | Outcome | Condition | Next |
 |---|---|---|
@@ -630,6 +654,8 @@ primer within the budget. A fresh session writes it, and a parity audit reads it
 | No measured gain | The 90% interval of the ratio lies within 0.95 to 1.05 | Cost gives no case for the language. Use the generator |
 | Gain for L | V costs more than L with the generator, with a one-sided 95% bound above 1.05 | N1 outweighs the saved syntax. Report it as a result against the language |
 | Unclear | Anything else | Report the interval. More runs only if sized before they start |
+
+Against P, the same C1 reads P+ against V with X ln 1.15 (row 8 there). Hr3 has no reading for it.
 
 ### Rank 3: T8. Safer meanings in bodies
 
@@ -639,8 +665,9 @@ question. Its gate adds no agent run.
 **Build.** A research rewriter that adds a trap to integer `+`, `-`, `*`, and narrowing conversions in
 any Go workspace, about 200 lines. A second mode checks `append` aliasing at run time.
 
-**Test.** After plan-r3 or plan-r2 calibration, re-run the holdout tests on the 108 final workspaces, plain
-and rewritten. Count the runs where a trap fires or a test result changes. Classify each as a real
+**Test.** In the calibration of [plan-coverage.md](plan-coverage.md), in arms P, L and V, in batches of 36
+workspaces, re-run the holdout tests on the final workspaces, plain and rewritten. Count the runs where
+a trap fires or a test result changes. Classify each as a real
 fault or a false alarm, with a fresh session. Also run the rewriter on the base applications, and on
 idioms that rely on wrapping (N5). The tasks were not written for this class, so the count is a floor
 for what agents write, and holdout tests can miss a fault.
@@ -652,6 +679,8 @@ for what agents write, and holdout tests can miss a fault.
 | Supported | At least 10 of 108 runs show a real fault (lower 95% bound about 5%) | Run a second model. If it repeats, T8 joins the stricter mode of rank 1 |
 | No measured gain | At most 1 of 108 runs (upper 95% bound about 4.3%) | Stop. Section 1's only Language-only theory has no measured base rate here |
 | Unclear | 2 to 9 of 108 | Report the count, and repeat on a set of tasks written for no feature, sized before it runs |
+
+Amended 2026-11-05: the table above is the hr3 reading. Two columns of that plan read the test, and its rule 11 does not net them: faults shown (row 6a, X 5 points) and false alarms (row 6b, a harm, X 2 points). The hr3 counts are 10 of 108 faults, and at most 1 of 108 false alarms.
 
 ### Rank 4: T7. Illegal states that cannot be built
 
@@ -667,11 +696,12 @@ analyzer of zero-value sites. Primers stay within 5% of each other.
 1. *Form,* on 20 neutral rule instances from a fresh writer.
 2. *Holes:* an attacker per arm, repeated 3 times.
 3. *Use:* in ordinary tasks, how often an agent chooses the new form with no prompt.
-4. *Runs,* only if form or holes show a gap, on tasks where value rules can be broken.
+4. *Runs,* in every case, on tasks where value rules can be broken: campaign C2v of
+   [plan-coverage.md](plan-coverage.md) (row 7), with X 12 points. Form and holes are secondary.
 
 **Stop rule.**
 
-| Outcome | Condition (replicated) | Next |
+| Outcome | Condition (the hr3 reading; replication is inside the sequence) | Next |
 |---|---|---|
 | Supported | Plan-r2 verdict 3 on value rules: V better than L by more than 12 points, with the bound above 0 | Keep the feature in the language |
 | No measured gain | Form ratio under 1.25 and bypass counts within 1, or verdict 2 in runs | Keep L's analyzers, if they move rules. No language case |

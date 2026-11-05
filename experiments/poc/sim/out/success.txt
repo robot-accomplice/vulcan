@@ -1,0 +1,13 @@
+success, both models in each unit, 2 runs a model, batch 50, X 0.12, 200 sims, cap 30
+base 0.8 true +0.00: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 2, p90 2
+base 0.8 true +0.04: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 2, p90 4
+base 0.8 true +0.06: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 3, p90 6
+base 0.8 true +0.08: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 6, p90 13
+base 0.8 true +0.10: {'gain': 0, 'loss': 0, 'within': 123, 'open': 77, 'empty': 0}  batches, all sims: median 24, p90 >30
+base 0.8 true +0.12: {'gain': 0, 'loss': 0, 'within': 2, 'open': 198, 'empty': 0}  batches, all sims: median >30, p90 >30
+base 0.8 true -0.12: {'gain': 0, 'loss': 4, 'within': 2, 'open': 194, 'empty': 0}  batches, all sims: median >30, p90 >30
+base 0.8 true -0.22: {'gain': 0, 'loss': 200, 'within': 0, 'open': 0, 'empty': 0}  batches, all sims: median 2, p90 4
+base 0.6 true +0.15: {'gain': 167, 'loss': 0, 'within': 0, 'open': 33, 'empty': 0}  batches, all sims: median 14, p90 >30
+base 0.6 true +0.18: {'gain': 200, 'loss': 0, 'within': 0, 'open': 0, 'empty': 0}  batches, all sims: median 4, p90 8
+base 0.6 true +0.21: {'gain': 200, 'loss': 0, 'within': 0, 'open': 0, 'empty': 0}  batches, all sims: median 3, p90 4
+base 0.6 true -0.10: {'gain': 0, 'loss': 0, 'within': 66, 'open': 134, 'empty': 0}  batches, all sims: median >30, p90 >30

@@ -1,0 +1,10 @@
+model A +0.22, model B +0.02, equal-weight mean +0.12 = X; base 0.6; 200 sims, cap 30
+  in each unit (draft 4): {'gain': 0, 'loss': 0, 'within': 1, 'open': 199, 'empty': 0}  batches, all sims: median >30, p90 >30
+  alternating batches, A first (draft 3): {'gain': 22, 'loss': 0, 'within': 0, 'open': 178, 'empty': 0}  batches, all sims: median >30, p90 >30
+  alternating batches, B first (draft 3): {'gain': 0, 'loss': 0, 'within': 37, 'open': 163, 'empty': 0}  batches, all sims: median >30, p90 >30
+model A +0.32, model B -0.08, equal-weight mean +0.12 = X; base 0.6; 200 sims, cap 30
+  in each unit (draft 4): {'gain': 2, 'loss': 0, 'within': 1, 'open': 197, 'empty': 0}  batches, all sims: median >30, p90 >30
+  alternating batches, A first (draft 3): {'gain': 115, 'loss': 0, 'within': 0, 'open': 85, 'empty': 0}  batches, all sims: median 1, p90 >30
+  alternating batches, B first (draft 3): {'gain': 0, 'loss': 0, 'within': 132, 'open': 68, 'empty': 0}  batches, all sims: median 2, p90 >30
+Every verdict at a true mean of exactly X is false; 'within' and 'gain' both count.
+Check of audit 10.8 case 2 (A +0.22, B +0.02 at base 0.8): +0.22 is not reachable there.

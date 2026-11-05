@@ -1,0 +1,9 @@
+seeds: 10 a writer; X 0.1; true -X; first read at 20 writers; 200 sims; cap 40
+  writer sd 0.00: {'gain': 0, 'loss': 1, 'within': 0, 'open': 199, 'empty': 0}  batches, all sims: median >40, p90 >40; false 1
+  writer sd 0.20: {'gain': 0, 'loss': 0, 'within': 2, 'open': 198, 'empty': 0}  batches, all sims: median >40, p90 >40; false 2
+seeds: 10 a writer; X 0.05; true -X; first read at 20 writers; 200 sims; cap 120
+  writer sd 0.00: {'gain': 0, 'loss': 2, 'within': 1, 'open': 197, 'empty': 0}  batches, all sims: median >120, p90 >120; false 3
+  writer sd 0.20: {'gain': 0, 'loss': 1, 'within': 1, 'open': 198, 'empty': 0}  batches, all sims: median >120, p90 >120; false 2
+rules: 28 a writer; X 0.14; true -X; first read at 10 writers; 200 sims; cap 40
+  writer sd 0.00: {'gain': 0, 'loss': 0, 'within': 0, 'open': 200, 'empty': 0}  batches, all sims: median >40, p90 >40; false 0
+  writer sd 0.20: {'gain': 0, 'loss': 0, 'within': 1, 'open': 199, 'empty': 0}  batches, all sims: median >40, p90 >40; false 1

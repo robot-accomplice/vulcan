@@ -1,0 +1,10 @@
+200 runs a condition a batch (both models); X 0.12; base 0.8; 200 sims; cap 40
+20 tasks x 5 runs a model, true +0.00: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 4, p90 4  (runs a condition at the median: 800)
+20 tasks x 5 runs a model, true +0.08: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 10, p90 15  (runs a condition at the median: 2000)
+20 tasks x 5 runs a model, true -0.22: {'gain': 0, 'loss': 200, 'within': 0, 'open': 0, 'empty': 0}  batches, all sims: median 5, p90 6  (runs a condition at the median: 1000)
+34 tasks x 3 runs a model, true +0.00: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 2, p90 3  (runs a condition at the median: 408)
+34 tasks x 3 runs a model, true +0.08: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 6, p90 12  (runs a condition at the median: 1224)
+34 tasks x 3 runs a model, true -0.22: {'gain': 0, 'loss': 200, 'within': 0, 'open': 0, 'empty': 0}  batches, all sims: median 3, p90 4  (runs a condition at the median: 612)
+50 tasks x 2 runs a model, true +0.00: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 2, p90 2  (runs a condition at the median: 400)
+50 tasks x 2 runs a model, true +0.08: {'gain': 0, 'loss': 0, 'within': 200, 'open': 0, 'empty': 0}  batches, all sims: median 6, p90 12  (runs a condition at the median: 1200)
+50 tasks x 2 runs a model, true -0.22: {'gain': 0, 'loss': 200, 'within': 0, 'open': 0, 'empty': 0}  batches, all sims: median 2, p90 3  (runs a condition at the median: 400)

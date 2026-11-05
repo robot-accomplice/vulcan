@@ -1,0 +1,8 @@
+row 6b: unit = minus the mean of two false alarms (one a model); batch 36; X 0.02; 100 sims; cap 60
+false-alarm rate 0.000: {'gain': 0, 'loss': 0, 'within': 100, 'open': 0, 'empty': 0}  batches, all sims: median 10, p90 10
+false-alarm rate 0.005: {'gain': 0, 'loss': 0, 'within': 100, 'open': 0, 'empty': 0}  batches, all sims: median 13, p90 17
+false-alarm rate 0.010: {'gain': 0, 'loss': 0, 'within': 100, 'open': 0, 'empty': 0}  batches, all sims: median 22, p90 34
+false-alarm rate 0.020: {'gain': 0, 'loss': 1, 'within': 1, 'open': 98, 'empty': 0}  batches, all sims: median >60, p90 >60
+N6: merge success model, base 0.9, 2 chains a model; batch 50; X 0.05; 50 sims; cap 100
+true +0.000: {'gain': 0, 'loss': 0, 'within': 50, 'open': 0, 'empty': 0}  batches, all sims: median 4, p90 6
+true +0.025: {'gain': 0, 'loss': 0, 'within': 50, 'open': 0, 'empty': 0}  batches, all sims: median 8, p90 19

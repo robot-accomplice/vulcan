@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vulcan Evaluation Findings</title>
+<style>
+:root {
+  --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5d5b55; --line: #dedad0; --card: #ffffff;
+  --accent: #2f5d8a; --ok: #2e7d4f; --warn: #a86a00; --bad: #b3261e; --chip: #efece4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161614; --fg: #e9e7e1; --muted: #a8a59c; --line: #34332f; --card: #1f1f1c;
+    --accent: #8db6dd; --ok: #6cc28f; --warn: #e0a84a; --bad: #ef7d74; --chip: #2a2a26;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614; --fg: #e9e7e1; --muted: #a8a59c; --line: #34332f; --card: #1f1f1c;
+  --accent: #8db6dd; --ok: #6cc28f; --warn: #e0a84a; --bad: #ef7d74; --chip: #2a2a26;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 28px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; }
+h2 { font-size: 19px; margin: 36px 0 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+h3 { font-size: 16px; margin: 20px 0 6px; }
+p, li { max-width: 72ch; }
+.meta { color: var(--muted); font-size: 13px; }
+a { color: var(--accent); }
+code { font: 13px ui-monospace, Consolas, monospace; background: var(--chip); padding: 1px 4px; border-radius: 3px; }
+.wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 4px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 7px 9px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 16px 0; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.tile .k { color: var(--muted); font-size: 12.5px; }
+.tile .v { font-size: 20px; font-weight: 600; margin-top: 2px; }
+.chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px; background: var(--chip); white-space: nowrap; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+.bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; margin: 6px 0 2px; border: 1px solid var(--line); }
+.bar span { display: block; height: 100%; }
+table.principles { min-width: 900px; }
+table.principles td:nth-child(4), table.principles td:nth-child(5) { min-width: 120px; }
+.callout { background: var(--card); border-left: 3px solid var(--accent); padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Vulcan evaluation: findings</h1>
+<p class="meta">Last updated 2026-11-05 (plan draft 4; rerun-6 fixes in <code>bd7fe7d</code>, seventh parity rerun passed; plan draft 10 accepted, amendment made, not committed) at <code>main</code> commit <code>cd5ad96</code> (not pushed). Sources: <code>README.md</code>, <code>docs/status.md</code>, <code>docs/poc/plan-r3.md</code>, <code>docs/poc/hypotheses-r3.md</code>, <code>experiments/poc/parity-r3.md</code>. This page summarizes those records. If they disagree, the records are correct.</p>
+
+<div class="callout">
+<strong>Where we are.</strong> Rounds 1 and 2 found no measured gain of Vulcan over plain Go, or over the same model as a Go linter. Round 3 builds a default ruleset and tests it blind. Its step 3, the parity audit of the two arms, passed its gate on the seventh rerun (<code>29750f4</code>). No High or Medium finding is open. One Low remains (N44). The next step is to freeze <code>defaults v1</code>, which has not been done yet.
+</div>
+
+<h2>Where we are, by principle</h2>
+<p>Each row is a claim from the README, the premise (spec §1.1), or the failure map (spec §3). "Against L" compares Vulcan with the same model as a Go linter, and tests the language. "Against plain Go" tests whether the model is worth its cost. A blank result means nothing has measured it yet. It does not mean the claim is false.</p>
+<div class="wrap"><table class="principles">
+<tr><th>Principle</th><th>Claim</th><th>Evidence so far</th><th>Against L</th><th>Against plain Go</th><th>Next test</th></tr>
+
+<tr><td><strong>Bodies are plain Go</strong><br><span class="meta">README; spec §4, R8</span></td>
+<td>A model can use what it knows of Go, so a new language costs little</td>
+<td>Round 1: V succeeded in 28 of 36 runs, plain Go in 35 of 36. All 9 failures were runs that the turn budget stopped, which a harness fault set to about 26 turns. One model</td>
+<td><span class="chip">Not tested</span></td>
+<td><span class="chip bad">Worse once</span><br><span class="meta">tight budget, harness fault</span></td>
+<td>T21 and harm N1 (cost of a new language)</td></tr>
+
+<tr><td><strong>The compiler enforces the architecture</strong><br><span class="meta">README; spec §5, §5.4d</span></td>
+<td>Boundaries between leaves, ports and wires are checked on each change</td>
+<td>Desk test: every PoC check is "Same in Go". Round 1: strict mode enforces 2 of 16 rules and rejects 9 of 36 seeded cases. Round 2: V and L each enforce the same 3 of 28 team rules. Round 3: defaults state 8 of 210 wanted rules (strict test)</td>
+<td><span class="chip">No difference</span><br><span class="meta">rounds 1–2</span></td>
+<td><span class="chip">Not tested</span><br><span class="meta">L gives the same checks in Go</span></td>
+<td>Round 3 T1 on blind rules, after the step 3 gate</td></tr>
+
+<tr><td><strong>Architecture rules leave review</strong><br><span class="meta">premise H1, H2</span></td>
+<td>Rule-breaking changes are rejected before review, and the model fixes them against the compiler</td>
+<td>Round 1: no arm broke a rule in product code, so the round could not test it. Round 2 stopped before tasks</td>
+<td><span class="chip">Not tested</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Round 3 T2, sealed seeded cases; step 8 agent runs</td></tr>
+
+<tr><td><strong>No gain on reading or logic defects</strong><br><span class="meta">premise H3</span></td>
+<td>Vulcan does not make a reviewer read less, or reduce defects that no rule covers</td>
+<td>A prediction, not a claim of gain. Not measured</td>
+<td><span class="chip">Not tested</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Needs a plan</td></tr>
+
+<tr><td><strong>Contracts</strong><br><span class="meta">README; spec §7, R6</span></td>
+<td><code>requires</code>, <code>ensures</code> and invariants run in every build, with exact arithmetic, and reviewers can audit them</td>
+<td>The PoC checks contracts at run time. Exact arithmetic (C08) and the proof rule are not built. Round 2: 0 of 7 class C (value) rules enforced by either check. Analysis: T4 Linter-equal, T5 Linter-partial</td>
+<td><span class="chip">No difference</span><br><span class="meta">at check time</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Shortlist rank 1: T5 with T4, a verifier and two body meanings. Waits for the Z3 download</td></tr>
+
+<tr><td><strong>Safer body meanings</strong><br><span class="meta">hypotheses T8</span></td>
+<td>A meaning that Go does not give (for example, integers that trap) catches defects</td>
+<td>The only theory rated Language-only, and a close call: under a looser line, 0 theories are</td>
+<td><span class="chip">Not tested</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Rank 3: a trap rewriter on round 1's 72 final workspaces</td></tr>
+
+<tr><td><strong>Illegal states can't be built</strong><br><span class="meta">hypotheses T7</span></td>
+<td><code>enum</code>, <code>match</code> and <code>nozero</code> remove states that a linter can only report</td>
+<td>Not built in V. Analysis: Linter-partial, the largest form gap in rule classes C and D</td>
+<td><span class="chip">Not tested</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Rank 4</td></tr>
+
+<tr><td><strong>Less work for a correct program</strong><br><span class="meta">hypotheses T21</span></td>
+<td>The same guarantee in fewer tokens and turns</td>
+<td>A count, not a verdict. Stockroom-lite source in pieces: P 22,691, L 25,797, V 22,093. L is 16.8% larger than V for the same behavior and contracts</td>
+<td><span class="chip">Not tested</span><br><span class="meta">count: L source 16.8% larger</span></td>
+<td><span class="chip">Not tested</span><br><span class="meta">count: about equal size, P has fewer guarantees</span></td>
+<td>Rank 2: a generator for L, a recount, 20 tasks</td></tr>
+
+<tr><td><strong>Fast verification</strong><br><span class="meta">spec §8, R7</span></td>
+<td>Incremental builds and per-leaf tests</td>
+<td>Check after a one-file change: P 0.9 s, L 1.4 s, V 4.6 s (parity-r2)</td>
+<td><span class="chip bad">V slower</span></td>
+<td><span class="chip bad">V slower</span></td>
+<td>Needs a plan</td></tr>
+
+<tr><td><strong>Tests with fakes bound to ports</strong><br><span class="meta">spec §8</span></td>
+<td>Fakes are checked against port contracts</td>
+<td>The PoC wraps each fake, so its contracts are checked. Desk test: the same in Go, through the constructor</td>
+<td><span class="chip">Not tested</span><br><span class="meta">analysis: no difference</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Needs a plan</td></tr>
+
+<tr><td><strong>Crossing processes</strong><br><span class="meta">spec §5.5</span></td>
+<td>Topics, remote ports, dead letters and <code>topics.lock</code> keep services compatible</td>
+<td>Not built in the PoC. Analysis: T16 and T17 Linter-equal, T18 Linter-partial</td>
+<td><span class="chip">Not built</span></td>
+<td><span class="chip">Not built</span></td>
+<td>Development plan, milestone 5</td></tr>
+
+<tr><td><strong>Compiler intelligence</strong><br><span class="meta">spec §9, R2, R3</span></td>
+<td>Diagnostics that explain and propose fixes, and warnings for duplication, masked errors and races</td>
+<td>Neither checker emits a machine-applicable fix. Analysis: T22 Linter-equal, T20 (race freedom) Linter-partial</td>
+<td><span class="chip">Not tested</span><br><span class="meta">analysis: no difference</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Needs a plan</td></tr>
+
+<tr><td><strong>Tools teach the model</strong><br><span class="meta">README; spec §10, R8</span></td>
+<td>A primer of at most 4,000 tokens</td>
+<td><code>vulcan guide</code> is built, at about 2,400 tokens. Arm L has an equal primer. Its effect alone is not measured</td>
+<td><span class="chip">Not tested</span><br><span class="meta">L has a primer too</span></td>
+<td><span class="chip">Not tested</span></td>
+<td>Part of T21 and the step 8 runs</td></tr>
+
+<tr><td><strong>Small context for the model</strong><br><span class="meta">spec §10, R1, R4</span></td>
+<td><code>context</code> gives a minimal context pack, and <code>query</code> an exact symbol index against invented APIs</td>
+<td>Not built: <code>context</code>, <code>query</code> and <code>audit</code> exit 2 (deferred)</td>
+<td><span class="chip">Not built</span></td>
+<td><span class="chip">Not built</span></td>
+<td>Needs a plan</td></tr>
+
+<tr><td><strong>The architecture can be seen</strong><br><span class="meta">README "draw it"; spec §9, R6</span></td>
+<td>The structure can be extracted, drawn, diffed and documented, and that helps an agent and a reviewer</td>
+<td>Not built: <code>diagram</code>, <code>doc</code> and <code>archdiff</code> are deferred. A draft (T27 to T30) proposes the tests, and isn't accepted</td>
+<td><span class="chip">Not built</span></td>
+<td><span class="chip">Not built</span></td>
+<td>Views draft, which needs the owner's amendment</td></tr>
+</table></div>
+<div class="callout"><strong>When the initial evaluation is complete (owner, 2026-11-03).</strong> Only when no row has a "Not built" or "Not tested" entry. Analysis alone and counts that stand in for the claim don't close a row. Nor does a result that stays unclear, a test the model can't be tempted into, or a gate that stops a test. Only a verdict closes a row. <strong>Open now: 14 of 15 rows.</strong> Only fast verification is measured in both columns. Where a feature must be built to test a row, arms L and P get their best equal form too, so the build doesn't lean toward V. The draft plan that closes each row is <a href="../../docs/poc/plan-coverage.md"><code>docs/poc/plan-coverage.md</code></a>. It is not accepted. Its independent audit (<code>audit-plan-coverage.md</code>, commit <code>6f5980c</code>) found 12 High, 15 Medium and 6 Low, and says it is not ready to accept. The main gaps: no row has an outcome that ends it, the run sizes are too small to close on task success, some tests can't fail by construction, and the plan replaces accepted stop rules without saying so. It also names four claims that have no row. Draft 2 answers each finding. It splits rows 5, 10 and 11 into parts, adds four rows (type information on unfinished programs, one way to write a thing, the gap list, and performance), and sets a final size and an outcome that ends each column. Its estimated cost is about 3,600 to 14,000 runs and sessions. Two reruns of the audit (<code>4aa8c89</code>, <code>6dffbf2</code>) leave 6 High, 14 Medium and 6 Low open. The main ones: running new tests until one gives a verdict raises the error rate unless it is controlled over the whole series; the next test must not be chosen after its data; some accepted rules can't record a loss for V; P's linter is configured from the test's own rules; and row 12's measure favors V by its design. <strong>Draft 3</strong> (not committed, under audit) answers each one. Each column now reads one confidence sequence that stays valid however many batches are added. Replication happens inside that sequence. The next batch has a fixed design, and funding is per campaign, from a memo that does not show any interval's direction. A simulation (<code>sim/cs-sim.py</code>) shows that a column on task success needs 4 to 20 batches of 100 runs a condition before it reaches a verdict. A difference close to the margin can stay open. The estimated cost rises to about 16,000 to 78,000 runs and sessions. Round 1 had 72 runs. The third audit rerun (<code>9a5c2d7</code>) closes 21 of the 26 open findings and partly closes the other 5. It finds 9 new: 1 High, 6 Medium, 2 Low. The High one, W1: when batches alternate between models, the method's error rate is not held. The auditor's simulation gave 17% to 31% false verdicts, where 5% is the bound. The fix is to run both models on every task. Among the Medium findings: C1's small margins (5 points, a 5% token ratio) need about 30 batches, so C1 alone could cost 27,000 to 38,000 runs. Draft 3 is not ready to accept. <strong>Draft 4</strong> (not committed, under check) answers W1 to W9. Both models now run on every task. Each batch is 50 tasks with 2 runs per model, chosen because it reached verdicts in about half the runs. A loss or harm smaller than the margin is now called "Within margin". The intervals of open columns stay sealed until each column closes. The revised simulation backs W1: alternating models by batch gave 11% to 66% false verdicts, and running both models on every task gave 0.5% to 1.5%. The cost estimate is now about 27,000 to 55,000 runs and sessions. A column whose true difference lies near its margin can need much more. The fourth audit rerun (<code>1125484</code>) closes 7 of the 10 findings it checked, partly closes 3, and finds 5 new: 1 High, 1 Medium, 3 Low. It withdraws its earlier case-2 numbers as unreachable. The new High, Y1: each batch's tasks come from one writer. If writers differ in how much their tasks favor an arm, the bound fails: 18% false verdicts at a writer spread of 10 points. The proposed fix is a sealed pool of tasks, written by many writers before the first batch and drawn in a random order. The Medium finding says the cost is low by about 10,000 to 20,000 runs. Draft 4 is not ready to accept. <strong>Draft 5</strong> (not committed, under check) answers Y1. Before a campaign starts, 20 writers write a sealed pool of 400 tasks, and each batch draws from it at random. The simulation: one writer per batch gave 2% to 84% false verdicts, while the pool gave 0% to 1% against its own mean. The bound covers the pool, not every possible writer. With 20 writers, the pool's mean can differ from the mean over all writers by about the writer spread divided by &radic;20. That is stated as a limit, and D15 lets the owner add writers. The cost is now about 37,000 to 70,000 runs and review sessions, plus about 370 sessions to write the pools. The fifth audit rerun (<code>8c50e32</code>) finds no High finding, so the plan is ready for the owner to decide D1a. It leaves 2 Medium and 3 Low open. Z1: a verdict holds for its pool, and near the margin it can be wrong for writers in general in 28% to 48% of simulations, so each verdict should name its pool and show an interval over writers. Z2: where a unit's outcome is fixed (seeds, rules), drawing the same unit again only produces a copy, so each unit should be run once and the verdict read across writers. <strong>Draft 6</strong> (not committed) answers Z1 to Z4. A verdict on an agent column now says "for this pool (20 writers)", and an interval over the writers is shown beside it. On seed and rule columns, the unit is a fresh writer, and each seed is checked once. The bound then covers writers in general, but those columns need about 1,100 to 2,900 writer sessions. Row 18 is now costed at about 150 to 410 attacker sessions. The sixth audit rerun (<code>78790cc</code>) finds no High finding and no lean toward an arm. It leaves 2 Medium and 5 Low open. AA1: draft 6 removed the seed pools of the seeded review columns (C3a, C3b, C3c, N5), so they have no unit, batch or cost. AA2: the share of wrong verdicts that the writer interval flags is 58% to 91% over more seeds, not 77% to 91%. The audit asks for AA1 to be fixed before D1a. <strong>Draft 7</strong> (not committed) answers AA1 to AA6. The seeded review columns get their own seed pools. Over three seeds, the writer note appears on 69% to 85% of verdicts that are wrong for writers in general. A wrong verdict with no note occurs in about 5% to 8% of runs, so the note helps the reader but is not a bound. T1 becomes history, like T2. The cost is now about 39,000 to 75,000 runs and review sessions. The seventh audit rerun (<code>bae8a88</code>) finds no High and no Medium finding, and no lean toward an arm. It leaves 8 Low open. <strong>The plan is ready for the owner to decide D1a.</strong> Two Low findings define units and must be fixed before their first batch: AB3, how one C3 seed goes into each arm's diff, and AB6, the timing runs' cache rule and machine. AB2: at a base rate of 0.5, C3 needs 8 to 23 batches, so the total can reach about 41,000 to 81,000. <strong>Draft 8</strong> (not committed) answers AB1 to AB7. It costs C3 at a base rate of 0.5 too, which gives a total of about 41,000 to 80,000. The eighth audit rerun (<code>3cd21a1</code>) reproduces every simulation output and finds no High finding. It leaves 1 Medium and 7 Low open. AC1: draft 8 clears the build caches before every timing run, but row 15 claims incremental builds. A cold run measures a full check instead, which can lean against V. AC7: given a verdict, a wrong verdict carries no note in 15% to 31% of cases, not 5% to 8% (that rate counted all runs). The plan is ready for D1a once AC1 is fixed or accepted as a named limit. <strong>Draft 9</strong> (not committed) answers AC1 to AC7. Before each timing run, every arm's caches are restored to one fixed warm state, so row 15 measures an incremental check in every arm. The ninth audit rerun (<code>9dfaeb7</code>) reproduces every simulation output. It finds no High and no Medium finding, and leaves 9 Low open. <strong>The plan is ready for the owner to decide D1a.</strong> Three Low findings could lean toward an arm, in a direction not known: AD1, the cache list and the machine load; AD2, no check that row 19 reaches a steady state; and AD3, a seed's "first run" may not exist yet. AD5 corrects an error in the cost: the 5-point columns close inside C1's slowest column, so C1 does not grow at base 0.5, and the worst-case total is about 42,000 to 87,000. <strong>Draft 10</strong> (not committed) answers AD1 to AD8. Each arm has a closed list of caches. The arm order is random and fixed in advance. Row 19's warm-up has a steady-state check, and each seed writer gets its own runs. The tenth audit rerun (<code>cd5ad96</code>) checks the cost totals: about 39,000 to 71,000 at base 0.8, and about 42,000 to 82,000 with every row at base 0.5. It finds no High and no Medium finding, and leaves 8 Low open. <strong>The owner accepted draft 10 (D1a, 2026-11-05).</strong> The amendment of its section 9 is made in <code>plan-r3.md</code>, <code>hypotheses-r3.md</code> and <code>hypotheses-views.md</code>: each old threshold now sets a column's X and stays as a reported reading that no verdict reads. The rows for D1d and D6 stay conditional until the owner decides them. The audit asks that AE1 to AE6 be fixed or named as limits before the phase A dry run. Examples: the dry run has no defined check yet (AE1), and row 19's warm-up rule lets slow drift pass (AE6).</div>
+<p class="meta">Summary of the rows: no measured result yet shows a gain of the language over L. Two measures favor plain Go or L: round 1's success under a tight budget, and check time. One count favors V: L's larger source. Most rows are not tested yet, and four are not built.</p>
+
+<div class="tiles">
+  <div class="tile"><div class="k">Measured gain of the language</div><div class="v">None yet</div></div>
+  <div class="tile"><div class="k">Principles fully tested</div><div class="v">1 of 15</div></div>
+  <div class="tile"><div class="k">Round 3 step</div><div class="v">3 of 8: audit</div></div>
+  <div class="tile"><div class="k">Open High findings (seventh rerun)</div><div class="v">0</div></div>
+  <div class="tile"><div class="k">Wanted rules stated by defaults v1</div><div class="v">8 of 210</div></div>
+</div>
+
+<h2>The question and the arms</h2>
+<p>Does Vulcan, as a language, add measurable value over Go for AI-assisted development? No outcome is wanted. Each verdict has the same burden of proof in each direction.</p>
+<div class="wrap"><table>
+<tr><th>Arm</th><th>What it is</th><th>Check</th></tr>
+<tr><td>P</td><td>Plain Go</td><td><code>go vet</code>, tests</td></tr>
+<tr><td>L</td><td>Vulcan's model as a Go linter and primer</td><td><code>vulcan-lint ./...</code> (VL codes)</td></tr>
+<tr><td>V</td><td>Vulcan</td><td><code>vulcan check</code> (K codes)</td></tr>
+</table></div>
+<p>V against L tests the language. V and L against P test whether the model is worth its cost.</p>
+
+<h2>Results by round</h2>
+<div class="wrap"><table>
+<tr><th>Round</th><th>Runs</th><th>Result</th><th>Record</th></tr>
+<tr><td>1 (2026-10-28)</td><td class="n">72</td><td>No signal. V succeeded in 28 of 36 runs, plain Go in 35 of 36 (−19.4 points, 95% interval −38.9 to −2.8). No arm broke a rule in product code. All 9 failures were runs stopped by the turn budget, which a harness fault set to about 26 turns instead of 60.</td><td><code>results-p5.md</code></td></tr>
+<tr><td>2 (2026-10-29)</td><td class="n">0</td><td>Stopped by its own rule before tasks. Of 28 team rules written blind, V and L each enforce the same 3, and the plan needs 8. A diagnostic found that at most 7 could be reached.</td><td><code>labels-r2.md</code></td></tr>
+<tr><td>3 (from 2026-10-30)</td><td class="n">0</td><td>In progress: default ruleset built, parity audit open.</td><td><code>plan-r3.md</code></td></tr>
+</table></div>
+<p><strong>Accepted conclusion of rounds 1 and 2 (owner, 2026-10-30):</strong> on this application and these rules, Vulcan's checks enforced nothing that the same model could not enforce as a Go linter. Either form enforced only a small share of the rules a team wrote. No measured result shows that Vulcan as a language adds value over Go with a linter.</p>
+
+<h2>Round 3: plan and progress</h2>
+<p>Round 3 ships a best-practice default ruleset, written at <code>init</code>, that a team can change or delete. It then measures the ruleset on rules written blind. The same shared engine (<code>internal/rules</code>) serves L and V.</p>
+<div class="wrap"><table>
+<tr><th>Step</th><th>What</th><th>Status</th></tr>
+<tr><td>1</td><td>Wishlist of 210 wanted rules, by an isolated author</td><td class="ok">Done</td></tr>
+<tr><td>2</td><td>Rules file, <code>init</code>, rule kinds, baseline, fixes of holes H6 and H7</td><td class="ok">Built; changed by each audit</td></tr>
+<tr><td>3</td><td>Independent parity audit of L and V. Gate: no open High finding</td><td>Gate passed on the seventh rerun (<code>29750f4</code>)</td></tr>
+<tr><td>4</td><td>Freeze <code>defaults v1</code> and its hash</td><td>Waits for step 3</td></tr>
+<tr><td>5 to 7</td><td>T1 (fresh rule writer, labeler, blind judge), T3, T2 with sealed seeded cases, QN by a fresh session</td><td>Waits</td></tr>
+<tr><td>8</td><td>Agent runs</td><td>Waits for the owner</td></tr>
+</table></div>
+
+<h3>Coverage of the default ruleset (draft, not frozen)</h3>
+<p>How many of the 210 wanted rules <code>defaults v1</code> states, by the strict test and by two looser readings:</p>
+<div class="wrap"><table>
+<tr><th>Reading</th><th>Stated</th><th>In part</th><th>Not stated</th><th></th></tr>
+<tr><td>Strict (used)</td><td class="n">8</td><td class="n">48</td><td class="n">154</td><td style="width:40%"><div class="bar"><span style="width:3.8%;background:var(--ok)"></span><span style="width:22.9%;background:var(--warn)"></span><span style="width:73.3%;background:var(--line)"></span></div></td></tr>
+<tr><td>Looser, builder</td><td class="n">41</td><td class="n">15</td><td class="n">154</td><td><div class="bar"><span style="width:19.5%;background:var(--ok)"></span><span style="width:7.1%;background:var(--warn)"></span><span style="width:73.3%;background:var(--line)"></span></div></td></tr>
+<tr><td>Looser, auditor</td><td class="n">34</td><td class="n">22</td><td class="n">154</td><td><div class="bar"><span style="width:16.2%;background:var(--ok)"></span><span style="width:10.5%;background:var(--warn)"></span><span style="width:73.3%;background:var(--line)"></span></div></td></tr>
+</table></div>
+<p class="meta">Green: stated. Amber: in part. Grey: not stated, with reasons in <code>r3/defaults/NOT-STATED.md</code>. Base findings on the base apps: V 284, L 285.</p>
+
+<h3>Parity audit history (step 3)</h3>
+<p>Each audit is by an independent session that built none of the code. It looks for differences that favor L as hard as for those that favor V.</p>
+<div class="wrap"><table>
+<tr><th>Audit</th><th>High</th><th>Main Highs</th><th>Gate</th></tr>
+<tr><td>First (1f8a7fe)</td><td class="n">4</td><td>H1 to H4: generated comments read as reasons, wires through helpers, <code>testdata</code>, a panic on a test type error. Also 13 Medium, 10 Low</td><td class="bad">Fail</td></tr>
+<tr><td>Rerun 1</td><td class="n">2</td><td>N1, N2</td><td class="bad">Fail</td></tr>
+<tr><td>Rerun 2</td><td class="n">1</td><td>N10</td><td class="bad">Fail</td></tr>
+<tr><td>Rerun 3</td><td class="n">2</td><td>N16, N17: module escape by <code>replace</code>, defaults rejecting harmless shapes</td><td class="bad">Fail</td></tr>
+<tr><td>Rerun 4</td><td class="n">2</td><td>N23, N28</td><td class="bad">Fail</td></tr>
+<tr><td>Rerun 5 (6038e4a)</td><td class="n">1</td><td>N31: a junction outside the project to <code>.vulcan/build</code> passed L on Windows. Also 3 Medium, 4 Low</td><td class="bad">Fail</td></tr>
+<tr><td>Rerun 6 (2ab8bf2)</td><td class="n">2</td><td>The fifth rerun's fixes hold, with no regression in 694 cases. Two older escapes, in L only: N39, assembly in L's <code>main</code>; N40, a leaf directory that is a junction. Also 1 Medium in both arms (N41, the <code>ignore</code> directive of <code>go.mod</code>) and 3 Low</td><td class="bad">Fail</td></tr>
+<tr><td>Rerun 7 (29750f4)</td><td class="n">0</td><td>The fixes in <code>bd7fe7d</code> close N39, N40, N41, N42 and N37, in both arms, on Windows and Linux. N43 is a listed limit. 694 cases show 0 changes, which is expected. Both test suites pass, and the hash of <code>defaults v1</code> is unchanged. One new Low, N44: the N40 fix lets a symlinked <code>vendor/modules.txt</code> pass L's walk. It does not reach the grader, which sets <code>-mod=mod</code></td><td>Pass</td></tr>
+</table></div>
+<p>No rerun found a regression. Six forms of the module escape came through one door: a <code>replace</code> by a local path. The owner chose to close the door, not list forms (amendment 12): <strong>both arms now reject every local-path <code>replace</code></strong>. This closes N31, N32 and the listed outside-module limit N8. Its cost: teams that use local <code>replace</code>, monorepos for example, can't use these rules. T2 must confirm that no sealed seeded case depends on one.</p>
+
+<h3>Fixes now in review (rerun 6)</h3>
+<div class="wrap"><table>
+<tr><th>Finding</th><th>Severity</th><th>Fix</th><th>Lean</th></tr>
+<tr><td>N31, N32, N8</td><td>High, Medium</td><td>Reject every local-path <code>replace</code> in <code>go.mod</code> and <code>go.work</code>, through one shared function. Reproduced: L now exits 3 with VL0002 on the N31 workspace.</td><td>Stricter, equal in both arms</td></tr>
+<tr><td>N33</td><td>Medium</td><td>A model error in the final code is no task success in both arms. One-arm codes (19 V, 8 L) are counted apart.</td><td>Unknown codes count as shared: toward no success, both arms</td></tr>
+<tr><td>N34</td><td>Medium</td><td>The grader's copy keeps each regular file except the rules files, skips links and special files, and stops after 2 minutes</td><td>Code that reads a file through a link builds in L, not in V's graded copy: toward L, no known case</td></tr>
+<tr><td>N35, N36, N38</td><td>Low</td><td>Stated as limits</td><td>–</td></tr>
+<tr><td>N37</td><td>Low</td><td>Limits row fixed</td><td>–</td></tr>
+</table></div>
+
+<h3>Blind second reading of verdicts</h3>
+<p>A fresh session read the 32 linter-test verdicts again. 27 of 32 agree (kappa 0.69). They differ on T5, T6, T9, T11 and T24. The owner kept the shortlist and its ranks. T5 is scored on the same fact (the clause holds and no overflow), with the trap count reported beside it.</p>
+
+<h2>Theories of what a language could do that a linter cannot</h2>
+<p><strong>Main finding of the analysis, not a measurement:</strong> Vulcan lowers to Go, so a language cannot differ from Go plus a linter in <em>what it can reject</em>. What remains to test is the cost of a correct program, the meaning of a body, and the size of the holes.</p>
+<div class="wrap"><table>
+<tr><th>Verdict</th><th>Count</th><th>Theories</th></tr>
+<tr><td>Language-only</td><td class="n">1</td><td>T8 (a close call; 0 under a looser line)</td></tr>
+<tr><td>Linter-partial</td><td class="n">9</td><td>T5, T6, T7, T11, T13, T18, T20, T21, T24</td></tr>
+<tr><td>Linter-equal</td><td class="n">16</td><td>T1–T4, T9, T10, T12, T14–T17, T19, T22, T23, T25, T26</td></tr>
+</table></div>
+<div class="wrap"><table>
+<tr><th>Rank</th><th>Theory</th><th>First step</th><th>Status</th></tr>
+<tr><td class="n">1</td><td>T5 with T4: static proof of contracts, and a stricter body meaning</td><td>One verifier, two body meanings, at least 60 clauses, no agent runs</td><td>Not started; Z3 download needs the owner's yes</td></tr>
+<tr><td class="n">2</td><td>T21: the cost of a correct program</td><td>Generator for L, recount, 20 tasks. L has 16.8% more source than V today</td><td>Not started</td></tr>
+<tr><td class="n">3</td><td>T8: safer meanings of body code</td><td>Trap rewriter on round 1's 72 final workspaces</td><td>Not started</td></tr>
+<tr><td class="n">4</td><td>T7: illegal states that cannot be built</td><td><code>enum</code>, <code>match</code>, <code>nozero</code> in V, best equal in L</td><td>Not started</td></tr>
+</table></div>
+<p><strong>Prediction (recorded before measuring):</strong> the most likely end is "no measured gain of the language". About 20% that at least one shortlisted theory gives a replicated gain over L.</p>
+
+<h3>Draft: model views (T27 to T30, not accepted)</h3>
+<p>Written on the owner's request, <code>docs/poc/hypotheses-views.md</code> (commit <code>4752184</code>). It asks whether architecture extraction (T27), diagrams (T28), drift detection (T29) and generated documents (T30) help an agent. V and L both declare the model, so V against L is the language test. Plain Go gets two conditions: a view extracted by a tool, and one written by an agent. The owner must accept it by an amendment and make the choices in its section 7.</p>
+
+<h2>Open items</h2>
+<ul>
+<li>Sixth audit rerun: decides the step 3 gate.</li>
+<li>After the gate: freeze <code>defaults v1</code>; add the rules file, lock and baseline to <code>PROTECTED</code>; steps 5 to 7.</li>
+<li>T2 must confirm that the Go 1.27.3 upgrade, VL0909 and amendment 12 break no sealed seeded case.</li>
+<li><code>spec.md</code>'s K0002 row does not name the local-path rule yet. The analysis reports don't show yet how many runs N33 decided.</li>
+<li>Owner decisions waiting: Z3 download; open-source downloads for QN; the views draft.</li>
+<li>Nothing since <code>08099e0</code> is pushed.</li>
+</ul>
+
+<h2>What these results can't say</h2>
+<ul>
+<li>All results so far come from one application (Stockroom-lite), one agent model in round 1, and one rule writer per round.</li>
+<li>Round 3 has no blind measurement yet. The coverage counts measure a draft against a wishlist, not against rules a team wrote blind.</li>
+<li>L and V share one rule engine, so T1 can't show a difference that comes from that engine itself.</li>
+</ul>
+
+</main>
+</body>
+</html>
