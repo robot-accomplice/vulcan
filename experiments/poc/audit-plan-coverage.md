@@ -3208,3 +3208,238 @@ did not rerun the other scenarios, as the task allows.
   safe and leans toward no arm.
 - I did not time any build, check or request path. AE4 and AE5 are claims about the procedure, not
   measured effects. AE6 rests on my model.
+
+## 18. Eleventh rerun, on draft 11
+
+Object: draft 11 of `plan-coverage.md` (commit `52524b2`, "docs(poc): plan-coverage draft 11 fixes
+AE1 to AE6"), and `experiments/poc/sim/warmup-sim.py` with `sim/out/warmup.txt`. The commit changes
+four files: the plan, `findings-report.html`, `warmup-sim.py` and `warmup.txt`. It does not change
+`cs-sim.py` (`git show --stat` lists no such file). Not read: anything under
+`C:\Users\jonat\vulcan-poc`, and hidden harness material. This section is the only edit I made.
+
+### 18.1 Result
+
+- **Of AE1 to AE6:** 3 are Closed (AE1, AE3, AE5). 3 are Partly closed: AE2 (residual AF1), AE4
+  (residual AF2) and AE6 (residual AF5).
+- **New findings:** High 0, Medium 0, Low 6 (AF1 to AF6).
+- **Open after this rerun,** with each partly closed finding counted once by its residual: High 0,
+  Medium 0, Low 8 (AE7, R17, AF1 to AF6).
+- **Verdict: no High and no Medium finding remains.** Fix AF1 and AF6 before the phase A dry run.
+  Both change what the record may show about the dry run. Name AF2 to AF5 as limits, or fix them.
+  AE7 stays open as the owner decided. Fix it before the C3 seed writers start.
+- **The simulation reproduces.** `python -I experiments/poc/sim/warmup-sim.py` gave output that is
+  byte-identical to `sim/out/warmup.txt` (`cmp`). I did not rerun the other ten outputs. The commit
+  does not touch `cs-sim.py`.
+- **No cost figure changed.** The dry run adds 200 runs of machine time, outside the totals. I
+  rebuilt the count: row 15 is 20 x 2 x 3 = 120, row 19 is 20 x 2 x 2 = 80, total 200. Right. The
+  larger warm-up cap (600 requests, not 400) adds machine time to a row 19 run. Section 6 says
+  that this row has no duration, so no total moves.
+- **Leans.** AF2 (whole-program tools in the scope rule) can lean against the arm with more
+  whole-program checks. I cannot say which arm that is. AF3 (cold tool files) leans toward Within
+  margin, and against the arm that starts more programs. AF4 (warnings off) leans toward V and L on
+  time. AF5 (drift shapes) leans against the arm that settles slower, and the direction is not
+  known. AF1 and AF6 have no lean in a verdict. The only direction that I can prove from the text is
+  AF4.
+
+### 18.2 Status
+
+| Finding | Status | Reason |
+|---|---|---|
+| AE1 | Closed | Rule 6 defines the dry run: one batch of row 15 and one of row 19, on the base apps, by the steps of the rule, with what each arm ships today. P runs the common tools only, and has no assertions in row 19. The record writes the commands before the dry run. The figure is called a lower bound. Section 6 and section 11 agree. The total mixes two rows (AF6) |
+| AE2 | Partly closed | Rule 6 seals the dry-run times: a total over all arms and both machines, never per arm, and no column reads it. Rule 13 reads "phase A'". The seal covers times only. The per-arm counts, the residual drift, the file counts and the kept tool output are not sealed, and they show the same thing (AF1) |
+| AE3 | Closed | Rule 6 and section 5 say that the warnings and fixes of row 11 are off in every arm, so the check is Base. A7 and A8 follow builds 1 and 5 only. This matches section 5 (C2 has them on, timing has them off), rule 2 (`dupl` and `errcheck` stay on in every arm) and the build order. The direction of the omission is not named (AF4) |
+| AE4 | Partly closed | The scope of a change is one rule in every arm. The count of files and packages is recorded. Rules 2 and 6 both say `gopls check`. Section 8 names the dilution lean and the file-count lean. The rule fits tools that take files or packages. It does not say what a whole-program tool reads (AF2) |
+| AE5 | Closed | The four steps are in order: restore, drop, change, time. Row 19 has no restore and no drop. The drop method is named for each machine and is part of the machine (rule 7). "Each row 15 run" replaces "each timing run". Section 8 restates the lean. Cold tool files are a new point (AF3) |
+| AE6 | Partly closed | The new rule is better than the old one for an exponential start-up. The plan quotes a range that `warmup.txt` does not show, the model has one drift shape, and the settings were chosen on the cases that are then quoted (AF5) |
+
+### 18.3 The simulation (AE6)
+
+**Reproduction.** I ran `python -I experiments/poc/sim/warmup-sim.py` and compared the output with
+`sim/out/warmup.txt` (`cmp`). The two were identical. The script seeds its generator
+(`default_rng(1)`) once, so the order of the calls fixes the numbers.
+
+**The plan's figures against the output.**
+
+| Plan statement | Output line | Match |
+|---|---|---|
+| "With this form 8 blocks leave 9% to 66% unsettled" (section 11, AE6) | `2v2 8 0.05`: unsettled 0, 9, 36, 66, 21 (the first case is not slow) | Yes |
+| New rule leaves more than 2% of excess in "0% to 8%" of runs, "except" a time constant near 200 | `2v2 12 0.05`: 0, 0, 8, 100, 0 | Yes |
+| Draft 10 rule: "12% to 97%" (section 8 and section 11) | `nb 8 0.05`: 0, 12, 82, 100, 24. The four slow cases give 12, 82, 100, 24 | **No.** The file shows 12% to 100%. The values 83% and 97% are from my audit run (3,000 runs a case), not from the file that the row cites |
+| Findings report: "from 12%-97% to 0%-8% in three of the four slow cases" | Same lines | The 97% is the same mismatch. "Three of four" is right |
+
+**Does the model support the claim?** It supports a narrower claim than the plan states.
+1. *One drift shape.* The model is a start-up excess `1 + exp(-n/tau)` with independent noise. I
+   ran the plan's rule in a scratch script (`ae6x.py` in the scratchpad, seed 7, 1,500 runs a case)
+   on a power-law decay `1 + (1 + n/50)^(-p)`, with p = 0.5 and p = 1.0. The rule stopped late
+   (about block 6.5 to 7.4 on average). It left more than 2% of excess in the timed window in 100%
+   of runs, at noise 0.1, 0.3 and 0.5. A power-law tail is as plausible as an exponential one (a heap
+   that grows, a cache that fills). The plan says the weak case is "a very slow start" with a time
+   constant near 200. For a power-law tail it is the normal case.
+2. *The cases do not discriminate well.* With tau = 60 the excess is gone before block 4, the first
+   block at which the new rule can stop. Any rule passes those cases. Two cases carry the comparison
+   (tau = 100 and tau = 200). The second fails in 100% of runs for every setting in the file with a
+   cap of 12 or less, and in 99% and 91% with a cap of 16.
+3. *The stop is partly noise.* With no drift at all, the rule stops at block 4 in 99%, 65% and 44% of
+   runs at noise 0.1, 0.3 and 0.5 (my script, case "flat"). The difference of two medians of 100
+   requests has a noise of about 5% at a log standard deviation of 0.3. That is the size of the 5%
+   band. At high noise a stop says little about settling.
+4. *The settings were tried on the same cases.* The file holds seven settings (rule, cap, band). The
+   plan picks the one that scores best on the five cases. This is a choice made on a model, not on
+   data, so it breaks no rule. The plan does not say that the cap and the band were chosen on the
+   cases that it then quotes. The 2% bound is mine, from 17.5.
+5. *Nothing acts on the drift record.* The residual drift is recorded by arm and "no verdict reads
+   it". A run that keeps a drift stays in the verdict.
+
+I judge that the rule leans less than the draft 10 rule for an exponential start-up. The claim of
+less lean is not shown for other shapes. Finding AF5.
+
+### 18.4 The draft 11 choices that the writer named
+
+- **A phase A dry run with a defined check.** The check is defined. The seal is incomplete (AF1) and
+  the total mixes two rows (AF6).
+- **Check is Base, warnings off.** Consistent with sections 5 and 8. The lean has no direction (AF4).
+- **One scope of a change.** Right for file and package tools. Not complete for whole-program tools
+  (AF2).
+- **Order of one row 15 run.** Correct as an order. The cold-file effect on the tools themselves is
+  not named (AF3).
+- **Warm-up of two blocks against two blocks, cap 12.** See 18.3 and AF5. The extra requests (up to
+  700 against 500 for a row 19 run) cost machine time only.
+- **Status text and findings report.** The counts agree with 17.1 (0 High, 0 Medium, 7 Low on draft
+  10). I found no stale "8 blocks", "400 requests" or "phase A result" in the plan outside the
+  history rows of section 11 (AD2 and AC2 describe the older rules on purpose).
+
+### 18.5 New findings
+
+#### AF1. Low. The seal on the dry run covers times only, and per-arm diagnostics carry the same direction
+
+- **Location.** Rule 6: "Its times are sealed like the running interval of an open column. The
+  record gives the total machine time over all arms and both machines, and never a time for an arm";
+  "the record counts these paths per arm" (unsettled paths); the residual drift "by arm"; "the count
+  of files and packages that each tool reads in each run"; "keeps each run's tool output, so that a
+  warm arm shows".
+- **Problem.**
+  1. The dry run produces, per arm: a count of unsettled paths, a residual drift, a count of files
+     per tool and the tool output. Tool output often holds timings. None of these is a "time", and
+     none is under the seal. The unsettled count and the residual drift come from the times. The file
+     count shows which arm does more work.
+  2. The plan does not say who sees them. The analysis session in rule 6 reports "open" or a verdict.
+     The dry run is not a column, so that sentence does not cover it.
+  3. The dry run can lead to a change of procedure ("A fault of the procedure ... is reported").
+     Nothing bars a change to the band, the cap, the fixed set of 40 changes or the drop method after a
+     person has seen a per-arm unsettled count. That is a choice after data, in the sense of rule 6.
+- **Lean.** Unknown. A change made after seeing a per-arm count can favour either arm. The stake is
+  small, as no verdict reads the dry run. The risk is a procedure tuned to the dry run.
+- **Fix.** Write that the per-arm counts, drifts, file counts and tool output of the dry run are sealed
+  with the times. The person who fixes a fault sees the fault, the arm-blind totals and the count of
+  faults only. Write that no rule of rows 15 and 19 changes after the dry run except by an amendment
+  with its reason, made before the batch 1 data, and that the amendment may not cite a per-arm number.
+
+#### AF2. Low. The scope rule does not say what a whole-program tool reads
+
+- **Location.** Rule 6, "The scope of a change (AE4)"; section 8, the AE4 row; section 11, row AE4.
+- **Problem.**
+  1. The rule reads "each tool reads the changed Go file and every Go file that the arm's own build
+     rewrites". It fits the Go tools. P's architecture linter checks the import graph of the module.
+     L's analyzers and V's own checks (contracts, solver, exhaustive and effect checks) can read other
+     files: a changed signature can break a caller in another file. The rule gives them no scope. It
+     is not clear if the rule limits them to the changed file or only describes what they read.
+  2. If it limits them, the checks of V and P do not do the work that they do in use, and the row
+     does not measure the check that a team runs. If it only describes them, the work differs by arm
+     and the record learns it afterwards, from a count per run.
+  3. "The count of files and packages that each tool reads" has no method. The tools do not report it.
+     A trace of file opens is one method. It adds load to the run, so every arm needs the same method
+     before timing.
+  4. The set of 40 changes (a fresh session) can include a change of a signature or an export. The
+     rule does not say if the dependents are in the scope.
+- **Lean.** Against the arm with more whole-program work. I cannot say which arm that is. Section 8
+  names the lean for V only ("if the lowering fans out").
+- **Fix.** For every tool, name the unit that it reads (file, package, module, whole program), by arm,
+  in the commands that the record writes before phase A'. Say that a whole-program tool runs on the
+  whole program in every arm. Name the method that counts files, and test it in the dry run. Say if the
+  set of 40 changes holds a change that breaks a dependent.
+
+#### AF3. Low. The drop of the file cache also removes the files of the tools, and the number of tools differs by arm
+
+- **Location.** Rule 6, step (2) of one row 15 run; section 8, row 15 (AE5).
+- **Problem.** The drop empties the file cache of the system. The files of the programs (the Go
+  toolchain, `staticcheck`, `gopls`, `errcheck`, `exhaustive`, `dupl`, and the architecture linter,
+  the analyzers or V's binary) are then read from disk at the start of the timed check, in every arm.
+  The closed list holds caches. It does not hold the programs. P and L start several programs. V
+  starts one command, which runs the same tools (rule 2). Section 8 names only "cache files from
+  disk". A developer's second check normally finds the program files in the file cache.
+- **Lean.** Two ways. (a) Against the arm that starts more or larger programs. (b) Toward Within
+  margin, if a fixed cold start is large against an incremental check, because it adds a similar
+  amount to every arm (the dilution of AE4). The size is not known. I did not time a check.
+- **Fix.** Name the lean in section 8. Or keep the program files and the toolchain out of the drop and
+  say so in step (2). Or run one untimed check after the drop and before the change, and say so.
+  Choose before the dry run, so that the dry run tests the choice.
+
+#### AF4. Low. The warnings are off in the timed check, and the lean has no direction
+
+- **Location.** Section 5 (timing row: "with the warnings and fixes of row 11 off"); section 8 (row
+  15: "so the row does not measure their time"); rule 6.
+- **Problem.** The check of V and L in C2 runs "Base, fixes (11d) and row 11's warnings". The timed
+  check does not. The check of P runs `dupl` and `errcheck` in every case (rule 2), and these are the
+  P-side equal of the warnings of row 11. So P's measured check holds that work, and the checks of V
+  and L leave their warnings out. The measured check has the least work for V and L. The row then
+  reads "fast verification" for a check that V and L do not ship in the form that C2 tests.
+- **Lean.** Toward V and L on time. The measured check is shorter than the one in use. It follows from
+  the plan's own text. Section 8 says that the row "does not measure" the warnings. That is true. It
+  gives no direction.
+- **Fix.** Add the direction to the section 8 row. Or time the check twice, warnings off and on (a
+  second secondary sequence), if the owner wants the row to speak for the check in use. The second
+  option adds machine time (about 120 runs a batch).
+
+#### AF5. Low. The plan quotes a range that `warmup.txt` does not show, and the model covers one drift shape
+
+- **Location.** Section 8, row 19; section 11, row AE6; `findings-report.html` (draft 11 sentence);
+  `sim/out/warmup.txt`.
+- **Problem.**
+  1. The plan says that the draft 10 rule left excess in "12% to 97%" of the runs of the four slow
+     cases, and cites `warmup-sim.py` and `warmup.txt`. The file shows 12, 82, 100 and 24 for those
+     cases. The range is 12% to 100%. The plan quotes my audit figures (3,000 runs a case). A reader
+     who checks the cited file finds a mismatch in the figure that supports the lean statement.
+  2. The model has one drift shape. A power-law decay leaves more than 2% of excess in 100% of runs
+     (18.3, item 1). The text calls the weak case "a very slow start (a time constant near 200)". For
+     a power-law tail it is not one case.
+  3. The band (5%), the cap (12) and the form (two against two) were chosen by trying seven settings
+     on five cases. The plan says that the cap rose "because with this form 8 blocks leave 9% to 66%
+     ... unsettled". It does not say that the same cases then score the rule.
+  4. The residual drift is recorded, and no rule uses it. A run with a drift stays in the verdict.
+  5. The bound of 2% belongs to the audit. Row 19's margin is ln 1.1, about 10%. The plan does not
+     give a reason for 2%, or say how 2% in one arm compares with the margin.
+- **Lean.** Against the arm that settles slower. The direction is not known. The plan names this lean
+  already. The new points make it larger than the plan says for tails that decay slowly.
+- **Fix.** (1) Quote the file ("12% to 100%"), or change the file to hold the 3,000-run figures. (2)
+  Add a power-law case to `warmup-sim.py`, and say in section 8 how the rule does on it. (3) Say on
+  which cases the settings were chosen. (4) Choose now what the record does with the residual drift.
+  For example, report per arm the share of runs with a drift above the margin, as a limit beside the
+  verdict. (5) Give the reason for the 2% bound, or tie the bound to the margin.
+
+#### AF6. Low. The dry-run total mixes rows 15 and 19, which run for different numbers of batches
+
+- **Location.** Rule 6 ("The record gives the total machine time over all arms and both machines");
+  section 6, cost row "Timing runs".
+- **Problem.** The campaign runs row 15 for 4 to 6 batches and row 19 for 9 to 20 batches. The dry run
+  is one batch of each. One total of the two rows cannot be scaled to the campaign. The factor is 4 to
+  6 for one row and 9 to 20 for the other. One sum S gives a campaign between 4 S and 20 S, a range of
+  five times. The memo session reads the sum "as a lower bound". A bound for the campaign needs the
+  batch counts and a total for each row.
+- **Lean.** None in a verdict. The stake is the funding choice. The risk is a bad size, not a bias.
+- **Fix.** The record gives the total of each row (15, 19) over all arms and both machines, never per
+  arm. The seal still hides the direction of the arms. State that the memo session multiplies each
+  total by the low and high batch counts of section 6.
+
+### 18.6 What I did not do
+
+- I did not rerun the other ten files of `sim/out/`. The commit does not change `cs-sim.py`.
+- I did not time any check, build or request path. AF2 and AF3 are claims about the procedure. AF4
+  follows from the plan's own text. AF5 and the extra cases of 18.3 rest on my model (`ae6x.py` in the
+  scratchpad, seed 7). I also ran step changes of 10% to 20% at request 250, 350 and 450. No rule
+  on a window can see a late step in time, so I did not count them as evidence.
+- I did not recheck AD1 to AD8 or the cost totals. The totals do not change in draft 11. The dry-run
+  count (200 runs) is right.
+- I read rules 2, 5, 6, 7 and 13, sections 5, 6, 8 and 11, and rows 15 and 19 of section 2. I did not
+  read the rest of the plan except by search for stale phrases.
+- I did not read anything under `C:\Users\jonat\vulcan-poc`. I did not commit.
+- AE7 and R17 are unchanged, as the owner decided.
