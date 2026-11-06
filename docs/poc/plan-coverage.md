@@ -1,13 +1,14 @@
 # Plan: close each principle of the initial evaluation
 
-Status: **draft 10, accepted by the owner** (D1a, 2026-11-05). The amendment of section 9 is made in
+Status: **draft 11**: draft 10 accepted by the owner (D1a, 2026-11-05), plus the AE1 to AE6 fixes that
+the tenth audit asked for before the phase A dry run. AE7 and R17 stay open. The amendment of section 9 is made in
 plan-r3, hypotheses-r3 and the views draft. Its rows for D1d and D6 wait on those decisions. Its audit is
 [audit-plan-coverage.md](../../experiments/poc/audit-plan-coverage.md): draft 1 had 12 High, 15
 Medium and 6 Low findings; draft 2, after two reruns, had 6 High open; draft 3 had 1 High (W1);
 draft 4 had 1 High (Y1); draft 5 had no High, and 2 Medium (Z1, Z2) and 3 Low open; draft 6 had no
 High, and 2 Medium (AA1, AA2) and 5 Low open; draft 7 had no High or Medium, and 8 Low open; draft 8 had no High, and 1 Medium (AC1) and 7 Low
 open; draft 9 had no High or Medium, and 9 Low open. Section 11 maps each open finding to the change
-that answers it. The tenth rerun found 0 High and 0 Medium on draft 10. AE1 to AE6 are fixed, or named as limits, before the phase A dry run.
+that answers it. The tenth rerun found 0 High, 0 Medium and 7 Low (AE1 to AE7) on draft 10. Draft 11 fixes AE1 to AE6. AE7 is fixed before the C3 seed writers start.
 
 Each column reads one **confidence sequence**, which stays valid when batches are added without
 limit (rule 5). There are two kinds of column (rule 6):
@@ -43,8 +44,8 @@ test that the model can't be tempted into, and a gate that stops a test do not c
    - L is Vulcan's model as a Go linter, library and primer.
    - V is Vulcan.
 2. **The same common tools in every arm.**
-   - Each arm gets `go vet`, `staticcheck`, `errcheck`, `exhaustive`, `dupl` and `gopls`, pinned at
-     their latest stable versions. L and V add their own checks on top.
+   - Each arm gets `go vet`, `staticcheck`, `errcheck`, `exhaustive`, `dupl` and `gopls` (in the
+     check of row 15, the command `gopls check`), pinned at their latest stable versions. L and V add their own checks on top.
    - P also gets the tool a Go team uses for each job that the model does, where one exists: an
      architecture linter (row 2), a schema compatibility check (row 10), and a conventions file
      (row 12).
@@ -179,27 +180,57 @@ test that the model can't be tempted into, and a gate that stops a test do not c
      (AC1). The **check** of row 15 is one command an arm (AD8). P runs `go vet`, `staticcheck`,
      `errcheck`, `exhaustive`, `dupl`, `gopls check` and its architecture linter. L runs the same
      common tools and L's analyzers. V runs its check command, which runs the same common tools on
-     the lowered Go and V's own checks. The record writes the three commands before phase A'. Before
-     each timing run, the record restores the caches of this **closed list** to their state just
-     after one full check of the unchanged base app (AD1). In every arm: the Go build cache, the Go
-     module cache, the `staticcheck` cache, the `gopls` cache and the build outputs in the working
-     tree. P adds the cache of its architecture linter. L adds the cache of its analyzers. V adds
-     its lowering cache and its lowered Go files. The record also drops the file cache of the
-     system before each timing run, on both machines, in every arm, by one fixed method that it
-     names. Any cache that an arm's tool writes outside this list is a parity-audit finding (rule
-     4): the audit lists the paths that each check writes during one full check, and the build is
-     not accepted until each path is in the list. Then the record applies the one-file change and
-     times the check. So row 15 measures an incremental check, no run depends on an earlier one,
-     and every cache of the list starts in the same kind of state in each arm. The record lists the
-     caches restored in each arm (AC2), and keeps each run's tool output, so that a warm arm shows.
-     In rows 15 and 19, the arms of a draw run in a random order, fixed by a seed before the first
-     batch, and no other load runs on the machine (AD1). Row 19 runs in steady state in every arm: a
-     run starts a fresh process and sends warm-up requests in blocks of 50. The warm-up ends at the
-     first block, from the second, whose median time is within 5% of the median of the block before
-     it (AD2). A path that has not settled after 8 blocks (400 requests) stops there, and the record
-     counts these paths per arm. Then the run times the next 100 requests of its path. The run's
-     time is their median (AC2). Row 18: each pair is four fresh attacker sessions from one fixed prompt per arm,
-     so the pairs are independent with one mean. No writer-level interval applies (rule 5).
+     the lowered Go and V's own checks. The warnings and fixes of row 11 are off in every arm, so the
+     check is Base (section 5, AE3). The record writes the three commands before phase A'.
+     - **The scope of a change** (AE4). In every arm, each tool reads the changed Go file and every
+       Go file that the arm's own build rewrites because of the change. In P and L, this is the
+       changed file. In V, it is the lowered Go of the changed `.vulcan` file, and any other
+       lowered file that the lowering rewrites. A tool that takes packages reads the packages of
+       those files. The record gives the count of files and packages that each tool reads in each
+       run.
+     - **The steps of one row 15 run, in this order** (AE5). (1) The record restores the caches of
+       this **closed list** to their state just after one full check of the unchanged base app
+       (AD1). In every arm: the Go build cache, the Go module cache, the `staticcheck` cache, the
+       `gopls` cache and the build outputs in the working tree. P adds the cache of its
+       architecture linter. L adds the cache of its analyzers. V adds its lowering cache and its
+       lowered Go files. (2) The record drops the file cache of the system, in every arm. The drop
+       follows the restore, so the copy of the caches does not warm the file cache of any arm. The
+       record names one fixed method of the drop for each machine, before any timing. A method is
+       part of its machine (rule 7). (3) The record applies the one-file change. (4) The record
+       times the check. Step 3 follows step 2, so the changed file is in the file cache in every
+       arm. Row 19 has no restore and no drop: its warm-up follows (below).
+     - Any cache that an arm's tool writes outside the closed list is a parity-audit finding (rule
+       4): the audit lists the paths that each check writes during one full check, and the build is
+       not accepted until each path is in the list.
+     - So row 15 measures an incremental check, no run depends on an earlier one, and every cache of
+       the list starts in the same kind of state in each arm. The record lists the caches restored
+       in each arm (AC2), and keeps each run's tool output, so that a warm arm shows.
+     - In rows 15 and 19, the arms of a draw run in a random order, fixed by a seed before the first
+       batch, and no other load runs on the machine (AD1).
+     - **The warm-up of row 19** (AD2, AE6). Row 19 runs in steady state in every arm: a run starts
+       a fresh process and sends warm-up requests in blocks of 50. From block 4, the warm-up ends
+       at the first block where the median time of the last two blocks (100 requests) is within 5%
+       of the median time of the two blocks before them. A path that has not settled after 12
+       blocks (600 requests) stops there, and the record counts these paths per arm. Then the run
+       times the next 100 requests of its path. The run's time is their median (AC2). For each run,
+       the record also gives the median of the timed 100 requests divided by the median of the 100
+       requests before them, as the residual drift, by arm. No verdict reads it.
+     - Row 18: each pair is four fresh attacker sessions from one fixed prompt per arm, so the pairs
+       are independent with one mean. No writer-level interval applies (rule 5).
+   - **The dry run of phase A** (AD8, AE1, AE2). Phase A has no new build, so arm P has no linter
+     and no assertions yet. The dry run runs one batch of row 15 and one batch of row 19, by the
+     steps above, on the base apps, with what each arm ships today. Row 15: P runs the common tools
+     only; L runs the common tools and L's analyzers as they are; V runs its check command as it
+     is. Row 19: P runs the base code with no assertions; V runs the base code. The record writes
+     these commands before the dry run. The dry run sizes the machine time and tests the
+     procedure. Its figure is a **lower bound**, because the check of P in phase A' is longer
+     (its linter) and the code of P in row 19 differs (its assertions).
+     - **Its times are sealed** like the running interval of an open column. The record gives the
+       total machine time over all arms and both machines, and never a time for an arm. No column
+       reads the dry run. A fault of the procedure (a command that fails, a cache outside the
+       closed list) is reported without a time.
+     - The memo session of rule 6 reads this total as a lower bound before batch 1 of the timing
+       campaign, and the total of batch 1 of phase A' before batch 2.
    - **Fixed-outcome columns: the unit is a writer** (Z2). Fresh writers write from the column's
      brief: 10 seeds a writer for a seed column, and one rule set of about 28 rules a writer for
      row 2. Each seed or rule is evaluated once in each condition. The unit's D is the writer's mean
@@ -232,7 +263,8 @@ test that the model can't be tempted into, and a gate that stops a test do not c
    - **Conditions are fixed before a campaign's first batch** (D13), from calibration's pooled values
      only. No condition is cut after a batch (W7).
    - **The running interval of an open column is sealed,** and so are its secondary sequences of
-     rule 7, which show its direction too (Y5). The analysis session that reads them reports only
+     rule 7, which show its direction too (Y5). The times of the dry run of phase A are sealed in
+     the same way (AE2). The analysis session that reads them reports only
      "open" or a verdict, to the owner, to the memo session and to the findings report, until the
      column closes or its campaign stops (W7).
    - So no choice made after data can select a column by its direction, and none can make a verdict
@@ -275,7 +307,7 @@ test that the model can't be tempted into, and a gate that stops a test do not c
     judge matches. The material is sealed, as in rounds 1 to 3. The builder sees ids, counts and
     pass/fail only. Where a judge or reviewer can see the arm (for example a `.vulcan` file), the
     record names this as a limit, and every arm gets one fixed prompt.
-13. **Phase A changes.** A phase A result may drop a later condition only if its own column is
+13. **Phase A' changes.** A phase A' result may drop a later condition only if its own column is
     already closed. Any other change is an amendment, with its reason, before the data it affects.
 14. **Pilots and calibration.** No pilot run, pilot task or calibration run counts in a main result,
     except rows 6a and 6b, whose test is the calibration workspaces, and N5, whose test is its own
@@ -429,7 +461,7 @@ linter configuration frozen with it. Each column closes on the comparison in sec
 | C5, a larger codebase | P; P−tools; L; L−context; V; V−context | Base and `context`, `query` | Rows 13a, 13b |
 | C6, views | As the views draft | Base and the views tools | Row 14 |
 | C7, parallel chains | P; L; V | Base | N6 |
-| Timing, rows 15 and 19 (AD7) | Row 15: P; L; V. Row 19: P; V | Base. Row 19: P has assertions in place of contracts | Rows 15, 19 |
+| Timing, rows 15 and 19 (AD7) | Row 15: P; L; V. Row 19: P; V | Base, with the warnings and fixes of row 11 off (AE3). Row 19: P has assertions in place of contracts | Rows 15, 19 |
 | Attackers, row 18 (AD7) | L; V | Base and `vulcan audit` | Row 18 |
 | Calibration | P; L (with the checked library); V. For N5 only: L and V (stricter mode), on N5's seed pool (AB4) | Base | Rows 6a, 6b, N5 |
 
@@ -439,9 +471,9 @@ linter configuration frozen with it. Each column closes on the comparison in sec
 
 | Phase | Work | Rows |
 |---|---|---|
-| A. No agents, no new build | A7, A8, on the base apps, as a dry run that sizes the machine time; no verdict reads it (AD8) | 15, 19 (dry run) |
+| A. No agents, no new build | A7, A8, on the base apps, as a dry run that sizes the machine time; no verdict reads it, and its times are sealed (AD8, AE1, AE2) | 15, 19 (dry run) |
 | B. Builds, each with a fresh builder of each form and a parity audit, in the order below | See "Build order" | All rows with a build |
-| A'. No agents, after their builds | Plan-r3 T1 with the P column (after P's linter), as history; row 2's fresh rule writers (rule 6); A1, A1b, rank 1 step 1, A3, A4, A5, A5b, A6a, A6b, T20 seeds, rank 4 form and holes; A7 and A8, after builds 1, 5 and 6, with the check of rule 6 (AD8) | 2, 5, 7 (secondary), 9, 10, 11, 15, 19 |
+| A'. No agents, after their builds | Plan-r3 T1 with the P column (after P's linter), as history; row 2's fresh rule writers (rule 6); A1, A1b, rank 1 step 1, A3, A4, A5, A5b, A6a, A6b, T20 seeds, rank 4 form and holes; A7 and A8, after builds 1 and 5, with the check of rule 6 (AD8, AE3) | 2, 5, 7 (secondary), 9, 10, 11, 15, 19 |
 | C. Agent campaigns | Calibration, C1, C2 (after its pilot), C2v (after its pilot), C4, C5, C6, C7, row 18's holes (attacker sessions, AA5), then C3 on the seed writers' diffs (AD3) | 1, 3, 4, 6, 7, 8, 11d, 12, 13, 14, 16, 17, 18, harms |
 
 Replication is inside each sequence (rule 7), so there is no separate phase for it.
@@ -675,7 +707,7 @@ each batch, the conditions that some open column still reads (Y2):
 | Row 18 (Z4) | 12 to 22 batches × 12 attacker sessions: about 150 to 270 sessions, from the `attackers` scenario |
 | Calibration | 10 to 22 batches × 216: about 2,200 to 4,800 runs |
 | **Runs and review sessions** | **about 39,000 to 71,000 at base 0.8; about 41,000 to 76,000 at base 0.5**. With the 5-point success rows at base 0.5 too (the C2 line above): about 42,000 to 82,000 |
-| Timing runs (AB6) | Rows 15 and 19, no agent: 20 draws × 2 machines × the arms a batch. Row 15, 3 arms: 120 runs a batch, 4 to 6 batches, about 480 to 720. Row 19, 2 arms: 80 runs a batch, 9 to 20 batches, about 720 to 1,600. Machine time only; not in the total above. It has no duration: no run of the base apps has been timed, so any figure would be a guess. The first phase A run in each arm gives one, and the record states the total machine time before batch 2 (AC2), and the memo session of rule 6 reads it for the timing campaign (AD7) |
+| Timing runs (AB6) | Rows 15 and 19, no agent: 20 draws × 2 machines × the arms a batch. Row 15, 3 arms: 120 runs a batch, 4 to 6 batches, about 480 to 720. Row 19, 2 arms: 80 runs a batch, 9 to 20 batches, about 720 to 1,600. Machine time only; not in the total above. It has no duration: no run of the base apps has been timed, so any figure would be a guess. The dry run of phase A (one batch of each row, 200 runs, not in the range above) gives a lower bound (AE1). The record states its total over all arms, never per arm (AE2), and the total of batch 1 of phase A' before batch 2 (AC2). The memo session of rule 6 reads both for the timing campaign (AD7) |
 | Task pools (Y3, Z3) | 7 task pools × 20 writers (40 for C1, C4, C5 and C7 if D15's rule applies), and a check of each pool: about 150 to 230 sessions, written once. A failed C2 or C2v pilot adds a pool of 20 writers |
 | Seed pools (AA1) | 4 seed pools (C3a, C3b, C3c, N5) × 20 writers, and a check of each: about 84 sessions. Also one run of the drawn task in each arm for each writer of C3a, C3b and C3c (AD3): about 180 runs |
 | Labelers (AA6) | One labeler a rule set (plan-r3's procedure), 60 to 110, and row 9's labeler: about 60 to 110 sessions |
@@ -718,8 +750,9 @@ shares V's evolution code. P gets a schema with `buf breaking`.
 | L's `context` and `query` give the same output as V's | Toward a null for V against L | The column then measures the code form only, as rule 3 says |
 | Shared engine in rows 2 and 11 | Toward a null for V against L | Rule 3 |
 | One writer plants the same seed in each arm's diff (C3; AB3) | Unknown: the planting can differ in difficulty by arm | The check confirms that the seeds are equal, not that they are equally hard to find. Rule 6 fixes the run (one run made for the seed writer, under the main model; AD3), so the writer does not choose the diff. That run is one sample, and its difficulty can differ by arm. Named as a limit (AC4) |
-| Row 15 restores a warm cache in a fixed state in every arm (AC1) | Toward the arm whose cache saves most work after a one-file change; the direction is not known. The file cache is dropped before each run, so it also leans toward the arm that reads fewer cache files from disk (AD1) | It is the incremental check that the row claims. A cold full check is not measured. The list of caches is closed (rule 6), and a cache outside it is a parity-audit finding. The drop of the file cache is the same in every arm, but a run reads its restored caches from disk |
-| Row 19 runs in steady state: the warm-up ends when a 50-request median is within 5% of the one before (AD2) | Toward the arm with the slower start, less than a fixed count would; the direction is not known | Start-up and first-request time are not measured. A path that does not settle in 400 requests is counted per arm |
+| Row 15 restores a warm cache in a fixed state in every arm (AC1) | Toward the arm whose cache saves most work after a one-file change; the direction is not known. The file cache is dropped after the restore and before each run, so it also leans toward the arm that reads fewer cache files from disk (AD1, AE5). The arm with the largest restored caches reads most from disk; which arm that is, the parity audit's list of paths shows. The direction is not known before it | It is the incremental check that the row claims. A cold full check is not measured. The list of caches is closed (rule 6), and a cache outside it is a parity-audit finding. The drop of the file cache is the same in every arm, but a run reads its restored caches from disk. The changed file is in the file cache in every arm. The warnings and fixes of row 11 are off in the check, so the row does not measure their time (AE3) |
+| The common tools in the check of row 15, and the scope of a change (AE4) | Toward Within margin, in both directions: the time of the common tools is a cost of the same kind in every arm, so it moves the ratio of check times toward 1, and `gopls check` adds one more such term. Also against the arm whose build rewrites more files for one change (V, if the lowering fans out). The size of both is not known | The common tools are rule 2's, and the scope rule is the same in every arm (rule 6). The record gives the count of files each tool reads in each run. No check has been timed |
+| Row 19 runs in steady state: the warm-up ends when the last 100 requests have a median within 5% of the 100 before them, at most 600 requests (AD2, AE6) | Toward the arm that settles slower: a drift left in its timed window reads its time too high. The direction is not known. The rule leans less than the draft 10 rule (neighbouring 50-request blocks), but it is not free of lean | In a model with a start-up excess (audit, 17.5, AE6; not a measurement of the base apps), the draft 10 rule left more than 2% of excess in the timed window in 12% to 97% of the runs of its four slow cases. This rule, run on the same cases, leaves it in 0% to 8% of the runs, except for a very slow start (a time constant near 200 requests), where it still leaves it in almost every run. The plan names that case as a limit. Start-up and first-request time are not measured. A path that does not settle in 600 requests is counted per arm, and the residual drift is recorded (rule 6) |
 | One filter for generated code | Either | The same written rule in every arm; counts reported (rule 2) |
 | A margin of 5 points (row 1 against L, hr3 N1) and ln 1.05 (row 8 against L, rank 2) | Toward more batches, not toward an arm | They are accepted rules. Small margins need many batches (section 6) |
 | A run that does not reach its end point counts its total cost (rule 5) | Against the arm with more failed runs, on cost rows | Leaving such runs out leans the other way, toward that arm (W6). The count of such runs is reported per arm |
@@ -783,6 +816,12 @@ Draft 1's findings that the audit's section 8 closed are not repeated here.
 
 | Finding | Change |
 |---|---|
+| AE1 | Rule 6: the dry run of phase A is defined. It runs one batch of row 15 and one of row 19 on the base apps, by the steps of the rule, with what each arm ships today (P: common tools only, and no assertions in row 19). The record writes its commands before the dry run. Its figure is a lower bound. Section 6: the cost row says so |
+| AE2 | Rule 6: the dry-run times are sealed like an open interval. The record gives the total over all arms and both machines, never per arm. No column reads the dry run. The memo session reads that total and the total of batch 1 of phase A'. Rule 13 reads "A phase A' result" |
+| AE3 | Rule 6 and section 5: the check of row 15 has the warnings and fixes of row 11 off in every arm, which is Base. Phase A' runs A7 and A8 after builds 1 and 5, not 6. Section 8 says that the row does not measure those warnings |
+| AE4 | Rule 6: one scope of a change in every arm (the changed Go file, plus the Go files that the arm's own build rewrites because of the change); the count of files and packages per tool is recorded. Rule 2 names `gopls check`. Section 8: a lean row for the common tools (toward Within margin) and for the scope (against the arm that rewrites more files) |
+| AE5 | Rule 6: each row 15 run takes four steps in this order: restore, drop the file cache, apply the change, time. Row 19 has no restore and no drop. The drop method is named for each machine and is part of the machine (rule 7). Section 8 restates the file-cache lean |
+| AE6 | Rule 6: the warm-up of row 19 compares the last two blocks (100 requests) with the two blocks before them, from block 4, with at most 12 blocks (600 requests); the residual drift is recorded. The cap rises from 8 to 12 blocks, because with this form 8 blocks leave 9% to 66% of the runs of the audit's slow cases unsettled. Run on those cases, the rule leaves more than 2% of excess in 0% to 8% of the runs, against 12% to 97% for draft 10. A very slow start stays a named limit. The model is `experiments/poc/sim/warmup-sim.py` (output `sim/out/warmup.txt`, line `2v2 12 0.05`). Section 8 restates the lean |
 | AD1 | Rule 6: the cache list of row 15 is closed and named for each arm. A cache outside it is a parity-audit finding (rule 4). The record drops the file cache of the system before each row 15 run, in every arm. The arms of a draw run in a random order, fixed by a seed before batch 1. Rows 15 and 19 run with no other load. Section 8 names the file-cache lean |
 | AD2 | Rule 6: row 19 warms up in blocks of 50 requests and ends at the first block, from the second, whose median is within 5% of the block before it, with at most 8 blocks. The record counts unsettled paths per arm. The rule reads no arm difference and is set before any data. Section 8 restates the lean |
 | AD3 | Rule 6: a seed writer draws a task from C2's pool (C3a) or C1's pool (C3b, C3c). One run of that task in each arm, made for the seed writer only, gives the diff. So the diff always exists. Sections 2, 5 and 6 and phase C match. Section 8 names the lean. About 180 runs are added to the seed pool cost |
