@@ -1,0 +1,11 @@
+--- a/api/purchasing/purchasing.go
++++ b/api/purchasing/purchasing.go
+@@ -51,7 +51,7 @@
+ func (s *Service) Create(supplier shop.SupplierID, wants []shop.PurchaseWant) (purchase shop.PurchaseOrder, err error) {
+ 	defer contract.Ensures(func() bool { return err != nil || purchase.Status == shop.PurchaseOpen })
+ 	if len(wants) == 0 {
+-		return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "a purchase order has at least one line")
++		return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "a purchase order needs at least one line")
+ 	}
+ 	seen := map[shop.SKU]bool{}
+ 	var lines []shop.PurchaseLine

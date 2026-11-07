@@ -1,0 +1,14 @@
+--- a/api/purchasing/purchasing.go
++++ b/api/purchasing/purchasing.go
+@@ -132,8 +132,9 @@
+ 			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "sku %s is not on purchase order %s", a.SKU, id)
+ 		}
+ 		l := lines[i]
+-		if l.Received+a.Qty > l.Qty {
+-			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeConflict, "%s: %d more units is more than the %d still to receive", a.SKU, a.Qty, l.Qty-l.Received)
++		left := l.Qty - l.Received
++		if a.Qty > left {
++			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeConflict, "%s: %d more units is more than the %d still to receive", a.SKU, a.Qty, left)
+ 		}
+ 		lines[i] = contract.Valid(shop.PurchaseLine{SKU: l.SKU, Qty: l.Qty, Received: l.Received + a.Qty, Cost: l.Cost})
+ 	}

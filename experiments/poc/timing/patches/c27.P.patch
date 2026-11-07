@@ -1,0 +1,32 @@
+--- a/api/payments/payments.go
++++ b/api/payments/payments.go
+@@ -63,6 +63,11 @@
+ 	return resp.StatusCode, nil
+ }
+ 
++// answered is the error for a status that the card processor should not send.
++func answered(status int) error {
++	return shop.Errorf(shop.CodeUnavailable, "the card processor answered %d", status)
++}
++
+ // Charge charges a customer, and returns the processor's charge id.
+ func (c *Client) Charge(customer shop.CustomerID, amount shop.Money) (string, error) {
+ 	var out struct {
+@@ -75,7 +80,7 @@
+ 	case status == http.StatusPaymentRequired:
+ 		return "", shop.Errorf(shop.CodeDeclined, "the card processor declined the charge")
+ 	case status != http.StatusCreated:
+-		return "", shop.Errorf(shop.CodeUnavailable, "the card processor answered %d", status)
++		return "", answered(status)
+ 	}
+ 	return out.ID, nil
+ }
+@@ -92,7 +97,7 @@
+ 	case status == http.StatusConflict:
+ 		return "", shop.Errorf(shop.CodeConflict, "the card processor refused a refund larger than the charge")
+ 	case status != http.StatusCreated:
+-		return "", shop.Errorf(shop.CodeUnavailable, "the card processor answered %d", status)
++		return "", answered(status)
+ 	}
+ 	return out.ID, nil
+ }

@@ -1,0 +1,65 @@
+{
+  // A FAKE arm set, only to test the harness (test_fake.py). Never use it for a real measurement.
+  "work_root": "C:\\Users\\jonat\\vulcan-timing\\fake-work",
+  "repo": "C:\\code\\vulcan",
+  "harness": "{repo}\\.harness\\harness.exe",
+  "machine": "fake-machine",
+  "constants": { "tool_timeout_s": 60, "port": 28080, "pay_port": 29090 },
+  "warmup": { "block": 50, "from_block": 4, "band": 0.05, "cap_blocks": 12, "timed": 100 },
+  "confirm_path": "/ping",
+  "drop": { "cmd": ["python", "{here}\\fake\\noop.py"] },
+  "tracer": {
+    "start": ["python", "{here}\\fake\\tracer.py", "start", "{log}"],
+    "stop": ["python", "{here}\\fake\\noop.py"],
+    "export": ["python", "{here}\\fake\\tracer.py", "export", "{log}", "{csv}"],
+    "wait_s": 0,
+    "env": { "FAKE_TRACE_LOG": "{log}" }
+  },
+  "env": {},
+  "unset_env": [],
+  "setup_env": {},
+  "sets": {
+    "cache": [
+      { "name": "fake cache", "path": "{cache}\\fakecache" },
+      { "name": "fake outputs in the tree", "path": "{tree}\\.fakeout" }
+    ]
+  },
+  "arms": {
+    "A": {
+      "app_src": "{here}\\fake\\app",
+      "check": [
+        { "name": "fake-file", "unit": "file", "cmd": ["python", "{here}\\fake\\tool.py", "--sleep", "0.05", "--cache", "{cache}\\fakecache", "--out", "{tree}\\.fakeout", "--spawn", "{files}"] },
+        { "name": "fake-mod", "unit": "module", "cmd": ["python", "{here}\\fake\\tool.py", "--sleep", "0.03", "."] }
+      ],
+      "closed_list": ["@cache"],
+      "program_paths": ["{here}\\fake\\tool.py"],
+      "row19": {
+        "app_src": "{here}\\fake\\app",
+        "build": { "cwd": "{armdir}\\row19\\app", "cmd": ["python", "{here}\\fake\\noop.py"] },
+        "run": ["python", "{here}\\fake\\app19.py", "--port", "{port}", "--base-ms", "1", "--amp-ms", "20", "--tau", "60", "--jitter-ms", "0.3"]
+      }
+    },
+    "B": {
+      "app_src": "{here}\\fake\\app",
+      "check": [
+        { "name": "fake-file", "unit": "file", "cmd": ["python", "{here}\\fake\\tool.py", "--sleep", "0.08", "--cache", "{cache}\\fakecache", "{files}"] },
+        { "name": "fake-status", "unit": "package", "cmd": ["python", "{here}\\fake\\tool.py", "--const-status", "3"] }
+      ],
+      "closed_list": ["@cache"],
+      "program_paths": ["{here}\\fake\\tool.py"],
+      "row19": {
+        "app_src": "{here}\\fake\\app",
+        "build": { "cwd": "{armdir}\\row19\\app", "cmd": ["python", "{here}\\fake\\noop.py"] },
+        "run": ["python", "{here}\\fake\\app19.py", "--port", "{port}", "--base-ms", "1", "--amp-ms", "10", "--tau", "400", "--jitter-ms", "0.3"]
+      }
+    },
+    "C": {
+      "app_src": "{here}\\fake\\app",
+      "check": [
+        { "name": "fake-file", "unit": "file", "cmd": ["python", "{here}\\fake\\tool.py", "--sleep", "0.02", "--cache", "{cache}\\fakecache", "{files}"] }
+      ],
+      "closed_list": ["@cache"],
+      "program_paths": ["{here}\\fake\\tool.py"]
+    }
+  }
+}

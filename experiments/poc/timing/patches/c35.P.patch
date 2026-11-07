@@ -1,0 +1,23 @@
+--- a/api/web/web.go
++++ b/api/web/web.go
+@@ -366,7 +366,7 @@
+ }
+ 
+ func (a *API) listOrders(w http.ResponseWriter, r *http.Request) {
+-	customer := strings.TrimSpace(r.URL.Query().Get("customer"))
++	customer := customerParam(r)
+ 	if customer == "" {
+ 		fail(w, shop.Errorf(shop.CodeInvalid, "the query needs customer"))
+ 		return
+@@ -390,6 +390,11 @@
+ 		return
+ 	}
+ 	reply(w, http.StatusOK, toOrderJSON(o))
++}
++
++// customerParam returns the customer of the query, without the spaces around it.
++func customerParam(r *http.Request) string {
++	return strings.TrimSpace(r.URL.Query().Get("customer"))
+ }
+ 
+ func orderAction(act func(shop.OrderID) (shop.Order, error)) http.HandlerFunc {

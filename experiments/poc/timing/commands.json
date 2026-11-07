@@ -1,0 +1,140 @@
+{
+  // JSON with full-line // comments (common.load_config strips them). Written for plan-coverage.md,
+  // section 1, rule 6: the commands of the dry run of phase A. Placeholders: {repo} {work} {armdir}
+  // {tree} {cache} {tools} {gobin} {goroot} {here}; in a tool command {files} and {pkgs} become the
+  // changed files and their packages (the change), or all files and ./... (a full check).
+  "work_root": "C:\\Users\\jonat\\vulcan-timing",
+  "repo": "C:\\code\\vulcan",
+  "tools_dir": "C:\\code\\vulcan\\.harness\\tools",
+  "gobin": "C:\\Users\\jonat\\go\\bin",
+  "goroot": "C:\\Program Files\\Go",
+  "harness": "{repo}\\.harness\\harness.exe",
+  // The record names the machine before any timing (rule 7): set "machine-1" or "machine-2".
+  "machine": "machine-1",
+
+  "constants": { "tool_timeout_s": 1800, "port": 18080, "pay_port": 19090 },
+  // Row 19 (rule 6, AD2, AE6). The same numbers as experiments/poc/sim/warmup-sim.py, rule 2v2.
+  "warmup": { "block": 50, "from_block": 4, "band": 0.05, "cap_blocks": 12, "timed": 100 },
+  "confirm_path": "/health",
+
+  // Step 2 of a row 15 run: drop the file cache of the system. The default FAILS LOUDLY, so no run
+  // starts without a chosen method. The owner must first accept the Sysinternals EULA by running the
+  // tool once by hand, and the tool needs an administrator shell. Do not add -accepteula here.
+  // Intended value on Windows (standby list):
+  //   "cmd": ["C:\\Users\\jonat\\tools\\sysinternals\\rammap\\RAMMap64.exe", "-Et"]
+  "drop": { "cmd": ["C:/Users/jonat/tools/sysinternals/rammap/RAMMap64.exe", "-Et"] },
+
+  // The tracer of the trace runs (rule 6, "The count of files and packages"). The default FAILS LOUDLY.
+  // Intended value on Windows: Process Monitor, which needs administrator rights and an accepted EULA:
+  //   "start":  ["C:\\Users\\jonat\\tools\\sysinternals\\procmon\\Procmon64.exe", "/Quiet", "/Minimized", "/BackingFile", "{log}"],
+  //   "stop":   ["C:\\Users\\jonat\\tools\\sysinternals\\procmon\\Procmon64.exe", "/Terminate"],
+  //   "export": ["C:\\Users\\jonat\\tools\\sysinternals\\procmon\\Procmon64.exe", "/OpenLog", "{log}", "/SaveAs", "{csv}"],
+  //   "wait_s": 5
+  // The export must be a CSV with the columns Process Name, PID, Operation, Path, Result, Detail.
+  "tracer": {
+    "start": ["C:/Users/jonat/tools/sysinternals/procmon/Procmon64.exe", "/Quiet", "/Minimized", "/BackingFile", "{log}"],
+    "stop": ["C:/Users/jonat/tools/sysinternals/procmon/Procmon64.exe", "/Terminate"],
+    "export": ["C:/Users/jonat/tools/sysinternals/procmon/Procmon64.exe", "/OpenLog", "{log}", "/SaveAs", "{csv}"],
+    "wait_s": 0
+  },
+
+  // Every cache of every arm lives under {cache}, so the closed list is exact and restorable.
+  // LOCALAPPDATA is where os.UserCacheDir points on Windows: staticcheck (staticcheck\), gopls (gopls\)
+  // and gopls' goimports index (goimports\) write there. GOFLAGS and the others are unset, so no
+  // setting of the owner's profile reaches a tool. GOPROXY=off in a timed run: no network.
+  "env": {
+    "GOCACHE": "{cache}\\gocache",
+    "GOMODCACHE": "{cache}\\gomodcache",
+    "LOCALAPPDATA": "{cache}\\localappdata",
+    "XDG_CACHE_HOME": "{cache}\\xdg",
+    "GOTOOLCHAIN": "local",
+    "GOWORK": "off",
+    "GOENV": "off",
+    "GOSUMDB": "off",
+    "GOPROXY": "off",
+    "VULCAN_RUNTIME": "{repo}\\vulcan"
+  },
+  "unset_env": ["GOFLAGS", "GOROOT", "GOMOD"],
+  // Setup only: the first full check fills the module cache from the owner's own module cache (no network).
+  "setup_env": { "GOPROXY": "file:///C:/Users/jonat/go/pkg/mod/cache/download" },
+
+  // For `confirm --audit`: places a tool could write a cache outside the closed list. A hit is a finding.
+  "audit_roots": ["%LOCALAPPDATA%\\go-build", "%LOCALAPPDATA%\\staticcheck", "%LOCALAPPDATA%\\gopls", "%LOCALAPPDATA%\\goimports", "%APPDATA%\\go", "%APPDATA%\\gopls", "%USERPROFILE%\\go\\pkg", "%USERPROFILE%\\.cache", "%USERPROFILE%\\.vulcan"],
+
+  "sets": {
+    // The common tools (rule 2) and the unit that each reads (rule 6: scope of a change, whole-program tools).
+    //   go vet, staticcheck, errcheck, exhaustive: take packages -> unit package, the packages of the changed file.
+    //   gopls check: takes files -> unit file, the changed file.
+    //   dupl: reports clones between files, so a run on the changed file alone would find only clones inside
+    //   it -> unit module, the whole module in every arm.
+    "common_tools": [
+      { "name": "go-vet", "unit": "package", "cmd": ["{goroot}\\bin\\go.exe", "vet", "{pkgs}"] },
+      { "name": "staticcheck", "unit": "package", "cmd": ["{gobin}\\staticcheck.exe", "{pkgs}"] },
+      { "name": "errcheck", "unit": "package", "cmd": ["{gobin}\\errcheck.exe", "{pkgs}"] },
+      { "name": "exhaustive", "unit": "package", "cmd": ["{gobin}\\exhaustive.exe", "{pkgs}"] },
+      { "name": "dupl", "unit": "module", "cmd": ["{gobin}\\dupl.exe", "."] },
+      { "name": "gopls-check", "unit": "file", "cmd": ["{gobin}\\gopls.exe", "check", "{files}"] }
+    ],
+    // Closed list of caches (rule 6, step 1). Row 11's warnings and fixes: nothing to switch, because
+    // vulcan check and vulcan-lint have no flag for them; the Base ruleset is what each tool ships.
+    "go_caches": [
+      { "name": "Go build cache", "path": "{cache}\\gocache" },
+      { "name": "Go module cache", "path": "{cache}\\gomodcache" },
+      { "name": "staticcheck cache, gopls cache, goimports cache of gopls", "path": "{cache}\\localappdata" },
+      { "name": "XDG cache home (nothing is expected here)", "path": "{cache}\\xdg" }
+    ],
+    // Closed list of program files (rule 6, step 3): the executables and the toolchain tree that the check
+    // loads. The parity audit may add to it; a file outside it is an audit finding.
+    "go_toolchain": [
+      "{goroot}\\bin", "{goroot}\\pkg", "{goroot}\\src", "{goroot}\\lib", "{goroot}\\VERSION", "{goroot}\\go.env"
+    ],
+    "common_exes": [
+      "{gobin}\\staticcheck.exe", "{gobin}\\errcheck.exe", "{gobin}\\exhaustive.exe", "{gobin}\\dupl.exe", "{gobin}\\gopls.exe"
+    ]
+  },
+
+  "arms": {
+    // P: the common tools only (no architecture linter yet; it comes in phase A').
+    "P": {
+      "app_src": "{repo}\\poc\\app\\go",
+      "check": ["@common_tools"],
+      "closed_list": ["@go_caches"],
+      "program_paths": ["@go_toolchain", "@common_exes"],
+      "row19": {
+        "app_src": "{repo}\\poc\\app\\go",
+        "build": { "cwd": "{armdir}\\row19\\app", "cmd": ["{goroot}\\bin\\go.exe", "build", "-o", "{armdir}\\row19\\stockroom.exe", "./cmd/stockroom"] },
+        "helper": ["{tools}\\fakepay.exe", "-addr", "127.0.0.1:{pay_port}", "-key", "test-key"],
+        "run": ["{armdir}\\row19\\stockroom.exe", "--addr=127.0.0.1:{port}", "--db={db}", "--payments-url=http://127.0.0.1:{pay_port}", "--payments-key=test-key"]
+      }
+    },
+    // L: the common tools, then vulcan-lint (analyzers A1 to A9 in one multichecker, as the README of
+    // poc/app/golint runs it). One process loads the module once for all analyzers, and the analyzers
+    // layout, wiring, ports, contracts and invariants read beyond one file, so the unit is the whole
+    // program (the conservative reading of AF2). It is not split per analyzer: that would add process
+    // starts that L's README check does not have. The owner may decide to split it.
+    "L": {
+      "app_src": "{repo}\\poc\\app\\golint",
+      "check": ["@common_tools", { "name": "vulcan-lint", "unit": "whole program", "cmd": ["{tools}\\vulcan-lint.exe", "./..."] }],
+      "closed_list": ["@go_caches"],
+      "program_paths": ["@go_toolchain", "@common_exes", "{tools}\\vulcan-lint.exe"]
+    },
+    // V: `vulcan check` is the one command. It runs Vulcan's own checks (architecture, wiring, rules of the
+    // default ruleset, contracts), lowers to Go, runs `go build` of the lowered main, and runs `go vet ./...`
+    // on the whole lowered module. It does NOT run staticcheck, errcheck, exhaustive, dupl or gopls (see
+    // internal/driver/driver.go). No wrapper is added. So V's go vet reads the whole lowered module, not the
+    // packages of the change; that is a gap to the scope rule, reported as a fact.
+    // Closed list: V has no cache apart from .vulcan\ (lowered Go and the built program) in the work tree.
+    "V": {
+      "app_src": "{repo}\\poc\\app\\vulcan",
+      "check": [{ "name": "vulcan-check", "unit": "whole program", "cmd": ["{tools}\\vulcan.exe", "check", "."] }],
+      "closed_list": ["@go_caches", { "name": "V lowering cache and lowered Go files (.vulcan)", "path": "{tree}\\.vulcan" }],
+      "program_paths": ["@go_toolchain", "{tools}\\vulcan.exe", "{repo}\\vulcan"],
+      "row19": {
+        "app_src": "{repo}\\poc\\app\\vulcan",
+        "build": { "cwd": "{armdir}\\row19\\app", "cmd": ["{tools}\\vulcan.exe", "build", "-o", "{armdir}\\row19\\stockroom.exe", "."] },
+        "helper": ["{tools}\\fakepay.exe", "-addr", "127.0.0.1:{pay_port}", "-key", "test-key"],
+        "run": ["{armdir}\\row19\\stockroom.exe", "--addr=127.0.0.1:{port}", "--db={db}", "--payments-url=http://127.0.0.1:{pay_port}", "--payments-key=test-key"]
+      }
+    }
+  }
+}

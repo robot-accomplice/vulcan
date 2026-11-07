@@ -1,0 +1,9 @@
+--- a/lib/shop/event.vulcan
++++ b/lib/shop/event.vulcan
+@@ -56,5 +56,5 @@
+ 	Event        Event
+ 	Status       DeliveryStatus
+ 	Attempts     int
+-	Response     int // the HTTP status of the last attempt, or 0
++	Response     int // the HTTP status of the last attempt, or 0 when the subscriber gave no answer
+ }

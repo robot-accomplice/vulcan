@@ -1,0 +1,12 @@
+--- a/api/billing/billing.vulcan
++++ b/api/billing/billing.vulcan
+@@ -35,7 +35,8 @@
+ // NewLedger returns the ledger.
+ func NewLedger() *Ledger { return &Ledger{} }
+ 
+-// accountOf sums the ledger of an order.
++// accountOf sums the ledger of an order: every charge adds to Charged, and every refund adds to
++// Refunded. An entry of another kind is ignored.
+ func accountOf(id shop.OrderID) (*account, error) {
+ 	entries, err := Store.Payments(id)
+ 	if err != nil {

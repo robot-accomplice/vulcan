@@ -1,0 +1,13 @@
+--- a/lib/shop/types.go
++++ b/lib/shop/types.go
+@@ -92,8 +92,8 @@
+ // Total returns the sum of qty × price over the lines.
+ func Total(lines []Line) Money {
+ 	var t Money
+-	for _, l := range lines {
+-		t += Money(l.Qty) * l.Price
++	for i := range lines {
++		t += Money(lines[i].Qty) * lines[i].Price
+ 	}
+ 	return t
+ }

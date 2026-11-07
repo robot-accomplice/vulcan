@@ -1,0 +1,532 @@
+{
+ "_note": "The request paths of row 19 (plan-coverage.md rule 6, AA5), named before any timing from the HTTP API of docs/poc/stockroom.md and of api/web in both base apps. Each run starts a fresh process on an empty database, so the ids in the paths (o-1, s-1, po-1, wh-1) are the first of their kind. 'setup' requests run once per run, untimed. The request is repeated 100 to 700 times on that process: each one is a read of data that does not grow, or a write that is valid every time (a fresh row, or one more unit of an amount of 10,000 or more). A path that can only be sent once (pay, ship, cancel, create a product) is not named. The webhook subscriptions of the setup point at port 19090, the card-processor helper of commands.json (constants.pay_port). The same status is expected in P and V.",
+ "requests": [
+  {
+   "id": "catalog-list",
+   "why": "Read the whole catalog (web, inventory, store); the list never grows",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-2",
+      "name": "Item SKU-2",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-3",
+      "name": "Item SKU-3",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-4",
+      "name": "Item SKU-4",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-5",
+      "name": "Item SKU-5",
+      "price_cents": 1000
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "GET",
+    "path": "/products"
+   }
+  },
+  {
+   "id": "product-get",
+   "why": "Read one product with its stock (web, inventory, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "GET",
+    "path": "/products/SKU-1"
+   }
+  },
+  {
+   "id": "stock-receive",
+   "why": "Receive one unit of stock, a write that stays valid when repeated (web, inventory, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "POST",
+    "path": "/products/SKU-1/receive",
+    "body": {
+     "qty": 1
+    }
+   }
+  },
+  {
+   "id": "order-create",
+   "why": "Create an order of one unit, a write that reserves stock and raises an event (web, orders, inventory, events, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products/SKU-1/receive",
+     "body": {
+      "qty": 10000
+     }
+    }
+   ],
+   "request": {
+    "method": "POST",
+    "path": "/orders",
+    "body": {
+     "customer": "alice",
+     "lines": [
+      {
+       "sku": "SKU-1",
+       "qty": 1
+      }
+     ]
+    },
+    "expect": 201
+   }
+  },
+  {
+   "id": "order-get",
+   "why": "Read one order with its lines (web, orders, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products/SKU-1/receive",
+     "body": {
+      "qty": 10000
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "alice",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "GET",
+    "path": "/orders/o-1"
+   }
+  },
+  {
+   "id": "order-list",
+   "why": "List the orders of a customer (web, orders, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products/SKU-1/receive",
+     "body": {
+      "qty": 10000
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "alice",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "alice",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "alice",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "GET",
+    "path": "/orders?customer=alice"
+   }
+  },
+  {
+   "id": "order-payments",
+   "why": "Read the ledger of a paid order (web, orders, billing, store); the order is paid in the setup through the card processor (payments)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products/SKU-1/receive",
+     "body": {
+      "qty": 10000
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "carol",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/orders/o-1/pay"
+    }
+   ],
+   "request": {
+    "method": "GET",
+    "path": "/orders/o-1/payments"
+   }
+  },
+  {
+   "id": "purchase-create",
+   "why": "Create a purchase order, a write that stays valid when repeated (web, purchasing, inventory, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/suppliers",
+     "body": {
+      "name": "Acme"
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "POST",
+    "path": "/purchase-orders",
+    "body": {
+     "supplier_id": "s-1",
+     "lines": [
+      {
+       "sku": "SKU-1",
+       "qty": 10,
+       "cost_cents": 500
+      }
+     ]
+    },
+    "expect": 201
+   }
+  },
+  {
+   "id": "purchase-receive",
+   "why": "Receive one unit into an open purchase order of 10,000 units, a write that stays valid when repeated (web, purchasing, inventory, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/suppliers",
+     "body": {
+      "name": "Acme"
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/purchase-orders",
+     "body": {
+      "supplier_id": "s-1",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 10000,
+        "cost_cents": 500
+       }
+      ]
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "POST",
+    "path": "/purchase-orders/po-1/receive",
+    "body": {
+     "lines": [
+      {
+       "sku": "SKU-1",
+       "qty": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "webhook-list",
+   "why": "List the webhook subscriptions (web, events, store)",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/webhooks",
+     "body": {
+      "url": "http://127.0.0.1:19090/hook1",
+      "events": [
+       "order.created",
+       "order.paid"
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/webhooks",
+     "body": {
+      "url": "http://127.0.0.1:19090/hook2",
+      "events": [
+       "order.created",
+       "order.paid"
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/webhooks",
+     "body": {
+      "url": "http://127.0.0.1:19090/hook3",
+      "events": [
+       "order.created",
+       "order.paid"
+      ]
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "GET",
+    "path": "/webhooks"
+   }
+  },
+  {
+   "id": "webhook-subscribe",
+   "why": "Subscribe a webhook, a write that stays valid when repeated (web, events, store)",
+   "request": {
+    "method": "POST",
+    "path": "/webhooks",
+    "body": {
+     "url": "http://127.0.0.1:19090/hook",
+     "events": [
+      "order.created",
+      "order.paid"
+     ]
+    },
+    "expect": 201
+   }
+  },
+  {
+   "id": "webhook-deliveries",
+   "why": "Read the deliveries of a subscription (web, events, store); three orders in the setup raise three events, and the subscriber at the card-processor helper port answers them with a non-2xx status, so each delivery is failed",
+   "setup": [
+    {
+     "method": "POST",
+     "path": "/products",
+     "body": {
+      "sku": "SKU-1",
+      "name": "Item SKU-1",
+      "price_cents": 1000
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/products/SKU-1/receive",
+     "body": {
+      "qty": 10000
+     }
+    },
+    {
+     "method": "POST",
+     "path": "/webhooks",
+     "body": {
+      "url": "http://127.0.0.1:19090/hook",
+      "events": [
+       "order.created"
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "alice",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "alice",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    },
+    {
+     "method": "POST",
+     "path": "/orders",
+     "body": {
+      "customer": "alice",
+      "lines": [
+       {
+        "sku": "SKU-1",
+        "qty": 1
+       }
+      ]
+     },
+     "expect": 201
+    }
+   ],
+   "request": {
+    "method": "GET",
+    "path": "/webhooks/wh-1/deliveries"
+   }
+  }
+ ]
+}

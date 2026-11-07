@@ -1,0 +1,9 @@
+{
+  "_note": "EXAMPLE only. The set of 40 one-file changes is written by a fresh session (AA5, AF2). Copy to changes.json. Each change has one entry for each arm. 'patch' is a unified diff with a/ and b/ prefixes, applied by `git apply -p1` in the root of the arm's work tree (relative to this file). 'file' is the changed file, relative to the tree. For V, 'file' is the .vulcan file and 'lowered' lists the lowered Go files that the lowering rewrites (they only matter to tools that take files or packages; V's one command takes neither). 'files' and 'pkgs' can be given to override the defaults (the file or the lowered files; the packages of those files).",
+  "changes": [
+    { "id": "c01", "arms": {
+      "P": { "patch": "patches/c01.P.patch", "file": "api/inventory/inventory.go" },
+      "L": { "patch": "patches/c01.L.patch", "file": "api/inventory/inventory.go" },
+      "V": { "patch": "patches/c01.V.patch", "file": "api/inventory/inventory.vulcan", "lowered": [".vulcan/build/api/inventory/inventory.go"] } } }
+  ]
+}

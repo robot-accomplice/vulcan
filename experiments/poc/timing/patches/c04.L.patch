@@ -1,0 +1,12 @@
+--- a/api/inventory/inventory.go
++++ b/api/inventory/inventory.go
+@@ -19,7 +19,8 @@
+ 
+ var skuPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,32}$`)
+ 
+-// AddProduct adds a product to the catalog, with no stock.
++// AddProduct adds a product to the catalog, with no stock. It checks the SKU, the name, and the
++// price first, and fails with an invalid error on the first one that is out of range.
+ func (c *Catalog) AddProduct(p shop.Product) (shop.Item, error) {
+ 	switch {
+ 	case !skuPattern.MatchString(string(p.SKU)):

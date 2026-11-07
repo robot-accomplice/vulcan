@@ -1,0 +1,7 @@
+{
+  "_note": "EXAMPLE only. The request paths of row 19 are named by the fresh session of the plan (AA5), before any timing. Copy to requests.json and replace. 'setup' requests run once per run, untimed, before the warm-up. 'request' is the repeated, timed request. 'expect' is the status code (default 200). A body is JSON.",
+  "requests": [
+    { "id": "health", "request": { "method": "GET", "path": "/health" } },
+    { "id": "list-products", "request": { "method": "GET", "path": "/products" } }
+  ]
+}

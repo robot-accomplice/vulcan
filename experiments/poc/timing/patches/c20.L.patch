@@ -1,0 +1,12 @@
+--- a/api/events/events.go
++++ b/api/events/events.go
+@@ -39,7 +39,8 @@
+ 		return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "a subscription has at least one event type")
+ 	}
+ 	for i, t := range types {
+-		if !slices.Contains(shop.EventTypes[:], t) {
++		known := slices.Contains(shop.EventTypes[:], t)
++		if !known {
+ 			return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "unknown event type %q", t)
+ 		}
+ 		if slices.Contains(types[:i], t) {

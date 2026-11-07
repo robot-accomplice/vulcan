@@ -1,0 +1,24 @@
+--- a/api/purchasing/purchasing.go
++++ b/api/purchasing/purchasing.go
+@@ -200,10 +200,16 @@
+ 
+ // complete reports whether every line is received in full.
+ func complete(lines []shop.PurchaseLine) bool {
++	return unfinished(lines) == 0
++}
++
++// unfinished counts the lines that are not received in full.
++func unfinished(lines []shop.PurchaseLine) int {
++	n := 0
+ 	for _, l := range lines {
+ 		if l.Received < l.Qty {
+-			return false
+-		}
+-	}
+-	return true
+-}
++			n++
++		}
++	}
++	return n
++}

@@ -1,0 +1,11 @@
+--- a/api/purchasing/purchasing.go
++++ b/api/purchasing/purchasing.go
+@@ -146,7 +146,7 @@
+ 	for _, a := range arrivals {
+ 		i := lineOf(lines, a.SKU)
+ 		if i < 0 {
+-			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "sku %s is not on purchase order %s", a.SKU, id)
++			return shop.PurchaseOrder{}, shop.Errorf(shop.CodeInvalid, "sku %s is not a line of purchase order %s", a.SKU, id)
+ 		}
+ 		l := lines[i]
+ 		if l.Received+a.Qty > l.Qty {

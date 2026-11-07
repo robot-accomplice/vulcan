@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Tests of the timing harness on a FAKE arm set (commands.fake.json). No real arm runs here.
+
+    python test_fake.py
+
+The seal key is a throwaway key from `harness newkey`, set in the environment of this process only, and never printed.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+import numpy as np
+
+import common as C
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+FAKE = os.path.join(HERE, "commands.fake.json")
+CHANGES = os.path.join(HERE, "changes.fake.json")
+REQUESTS = os.path.join(HERE, "requests.fake.json")
+SIM = os.path.normpath(os.path.join(HERE, "..", "sim", "warmup-sim.py"))
+cfg = C.load_config(FAKE)
+WORK = cfg["work_root"]
+results = []
+all_output = []
+
+
+def check(name, ok, why=""):
+    results.append(ok)
+    print(("PASS " if ok else "FAIL ") + name + ("" if ok else ": " + why))
+
+
+def py(script, *args, arms=None):
+    extra = ["--changes", CHANGES] if script == "row15.py" else ["--requests", REQUESTS]
+    if arms:
+        extra += ["--arms", arms]
+    p = subprocess.run([sys.executable, os.path.join(HERE, script), "--config", FAKE] + extra + list(args),
+                       capture_output=True, text=True, cwd=HERE)
+    all_output.append(p.stdout + p.stderr)
+    return p
+
+
+def open_sealed(label, key=None):
+    """Open a sealed file into a temp directory and return its path."""
+    out = os.path.join(WORK, "opened-%s-%s" % (label, "own" if key is None else "other"))
+    C.rmtree(out)
+    env = dict(os.environ)
+    if key:
+        env["VULCAN_SEAL_KEY"] = key
+    p = subprocess.run([C.harness_exe(cfg), "open", "-in", os.path.join(WORK, "sealed", label + ".sealed"), "-dir", out], env=env, capture_output=True)
+    return p.returncode, out
+
+
+def read_runs(label):
+    rc, d = open_sealed(label)
+    assert rc == 0
+    runs = []
+    for n in sorted(os.listdir(os.path.join(d, "runs"))):
+        runs.append(json.load(open(os.path.join(d, "runs", n))))
+    return d, runs
+
+
+def main():
+    C.rmtree(WORK)
+    os.makedirs(WORK)
+    key = subprocess.run([C.harness_exe(cfg), "newkey"], capture_output=True, text=True).stdout.strip()
+    os.environ["VULCAN_SEAL_KEY"] = key
+
+    # --- setup of the fake arms
+    p = py("row15.py", "setup")
+    check("row15 setup prints only 'setup: done'", p.returncode == 0 and p.stdout.strip() == "setup: done", p.stdout + p.stderr)
+    p = py("row19.py", "setup")
+    check("row19 setup prints only 'setup: done'", p.returncode == 0 and p.stdout.strip() == "setup: done", p.stdout + p.stderr)
+
+    # --- arm order: seeded and reproducible
+    ids, arms = ["c1", "c2"], ["A", "B", "C"]
+    p1, p2 = C.make_plan("s1", "1", ids, arms, 20), C.make_plan("s1", "1", ids, arms, 20)
+    p3, p4 = C.make_plan("s2", "1", ids, arms, 20), C.make_plan("s1", "2", ids, arms, 20)
+    orders = {tuple(o) for _, o in p1}
+    check("plan: same seed and batch give the same plan", p1 == p2)
+    check("plan: another seed or batch gives another plan", p1 != p3 and p1 != p4)
+    check("plan: the arm order varies over draws", len(orders) > 1)
+    q = py("row15.py", "run", "--label", "r1", "--seed", "s1", "--batch", "1", "--n", "6", "--only", "c1")
+    q2 = py("row15.py", "run", "--label", "r2", "--seed", "s1", "--batch", "1", "--n", "6", "--only", "c1")
+    d1, runs1 = read_runs("r1")
+    d2, runs2 = read_runs("r2")
+    plan1, plan2 = json.load(open(os.path.join(d1, "plan.json")))["plan"], json.load(open(os.path.join(d2, "plan.json")))["plan"]
+    seq = lambda rs: [(r["draw"], r["arm"], r["change"]) for r in rs]
+    check("two harness runs with one seed run the same arm order", plan1 == plan2 and seq(runs1) == seq(runs2))
+    check("the plan in the record is the plan of make_plan", [(c, o) for c, o in plan1] == C.make_plan("s1", "1", ["c1"], arms, 6))
+
+    # --- clean change, and the printed lines
+    allowed = C.ALLOWED_OUTPUT
+    lines = q.stdout.strip().split("\n")
+    check("clean change: no fault", "faults: none" in lines, q.stdout + q.stderr)
+    check("clean change survives shifted line numbers and the generated-file filter (findings equal the base)",
+          all(t["clean"] for r in runs1 for t in r["tools"]) and any(t["dropped"] > 0 for r in runs1 for t in r["tools"] if t["name"] == "fake-mod"))
+    check("a tool with a nonzero base status counts as clean when it matches the base",
+          all(t["clean"] and t["status"] == 3 for r in runs1 for t in r["tools"] if t["name"] == "fake-status"))
+    check("only the allowed lines print (runs, faults, row15 total)",
+          all(any(a.match(l) for a in allowed) for l in lines) and len(lines) == 3 and lines[0] == "runs: 18" and lines[2].startswith("row15_total_wall_s: "), q.stdout)
+    check("nothing printed names an arm or a per-run figure", not re.search(r"\b[ABC]\b|fake-", q.stdout))
+    check("the raw directory is gone after the seal", not os.path.exists(os.path.join(WORK, "raw", "r1")))
+    check("the sealed file exists and is not plain text", os.path.getsize(os.path.join(WORK, "sealed", "r1.sealed")) > 0 and b"fake-file" not in open(os.path.join(WORK, "sealed", "r1.sealed"), "rb").read())
+    rc, _ = open_sealed("r1")
+    check("the sealed file opens with the test key", rc == 0)
+    other = subprocess.run([C.harness_exe(cfg), "newkey"], capture_output=True, text=True).stdout.strip()
+    rc2, _ = open_sealed("r1", other)
+    check("the sealed file does not open with another key", rc2 != 0)
+    man = json.load(open(os.path.join(d1, "MANIFEST.json")))
+    check("the manifest lists the files with sha256 and the run count",
+          man["runs"] == 18 and man["config_sha256"] == cfg["_sha256"] and all(len(f["sha256"]) == 64 for f in man["files"]) and any(f["path"] == "plan.json" for f in man["files"]))
+    check("the manifest hashes match the opened files", all(C.sha256_file(os.path.join(d1, f["path"])) == f["sha256"] for f in man["files"]))
+    ok_wall = abs(sum(r["wall_ns"] for r in runs1) / 1e9 - float(lines[2].split(": ")[1])) < 0.2
+    check("the printed total is the sum of the whole-run wall times", ok_wall)
+
+    # --- dirty change is a fault
+    q = py("row15.py", "run", "--label", "r3", "--seed", "s1", "--n", "3", "--only", "c2")
+    lines = q.stdout.strip().split("\n")
+    check("a dirty check is reported as a procedure fault (not-clean, per arm and tool, deduplicated)",
+          any(l.startswith("fault: A not-clean tool fake-file") for l in lines) and any(l.startswith("fault: C not-clean tool fake-file") for l in lines)
+          and not any("fake-status" in l for l in lines) and len(lines) == len(set(lines)), q.stdout)
+    check("fault lines show no time and no order", not any(re.search(r"\d+\.\d|order|ns\b", l) for l in lines if l.startswith("fault")))
+    _, runs3 = read_runs("r3")
+    check("the run still records every tool's exit status", all("status" in t for r in runs3 for t in r["tools"]))
+    check("the change is reverted after a dirty run (the next run applies cleanly)", "patch-does-not-apply" not in q.stdout and "revert-mismatch" not in q.stdout)
+
+    # --- restore really restores
+    a = C.arm_cfg(cfg, "A")
+    live = [e["path"] for e in a["closed_list"]][0]
+    snap = C.snap_path(a["_ctx"]["armdir"], 0, a["closed_list"][0]["name"])
+    sentinel = os.path.join(live, "sentinel_written_after_snapshot")
+    ro = os.path.join(live, "readonly_new_file")
+    open(sentinel, "w").write("x")
+    open(ro, "w").write("x")
+    os.chmod(ro, 0o444)
+    kept = [f for f in os.listdir(snap)]
+    victim = os.path.join(live, kept[0]) if kept else None
+    if victim:
+        os.chmod(victim, 0o666)
+        open(victim, "w").write("changed after the snapshot")
+        os.chmod(victim, 0o444)
+    C.restore(a)
+    check("restore: a file written into a cache dir is gone", not os.path.exists(sentinel) and not os.path.exists(ro))
+    check("restore: a file changed after the snapshot has its snapshot content again",
+          victim is None or open(victim).read() == open(os.path.join(snap, kept[0])).read())
+    check("restore: the directory equals the snapshot", sorted(os.listdir(live)) == sorted(os.listdir(snap)))
+    outs = os.path.join(a["_ctx"]["tree"], ".fakeout")
+    check("restore: the tree's build outputs (like .vulcan) are restored as well", os.path.isdir(outs) == os.path.isdir(C.snap_path(a["_ctx"]["armdir"], 1, a["closed_list"][1]["name"])))
+    # markers: each run restores first, so the cache holds the markers of the last run only
+    q = py("row15.py", "run", "--label", "r4", "--seed", "s9", "--n", "5", "--only", "c1")
+    for arm in "ABC":
+        arm_a = C.arm_cfg(cfg, arm)
+        d = os.path.join(arm_a["_ctx"]["cache"], "fakecache")
+        in_snap = len([f for f in os.listdir(C.snap_path(arm_a["_ctx"]["armdir"], 0, "fake cache")) if f.startswith("marker_")])
+        n = len([f for f in os.listdir(d) if f.startswith("marker_")])
+        # 5 runs per arm have happened; if a restore were missing, the markers of the earlier runs would still be here
+        check("restore in a run: cache of arm %s holds the snapshot's markers and those of the last run only" % arm, n == in_snap + 1, "found %d, snapshot %d" % (n, in_snap))
+
+    # --- a drop that fails stops the run loudly
+    bad = C.load_config(FAKE)
+    bad["drop"] = {"cmd": [sys.executable, "-c", "import sys; sys.exit(1)"]}
+    try:
+        import row15
+        row15.run_drop(bad)
+        check("a failing drop command aborts", False, "no abort")
+    except C.Abort:
+        check("a failing drop command aborts", True)
+    real = C.load_config(os.path.join(HERE, "commands.json"))
+    try:
+        row15.run_drop(real)
+        check("the default drop of commands.json fails loudly", False, "it ran")
+    except C.Abort:
+        check("the default drop of commands.json fails loudly", True)
+    t = real["tracer"]["start"]
+    check("the default tracer of commands.json fails loudly", subprocess.run(t, capture_output=True).returncode != 0)
+    src = open(os.path.join(HERE, "commands.json"), encoding="utf-8").read()
+    check("commands.json holds the intended drop and tracer as comments, and no -accepteula in any file",
+          "RAMMap64.exe\", \"-Et\"" in src and "Procmon64.exe" in src and not any(
+              "accepteula" in open(os.path.join(HERE, f), encoding="utf-8").read().lower().replace("do not add -accepteula here", "").replace("no -accepteula", "")
+              for f in ("common.py", "row15.py", "row19.py", "commands.json", "commands.fake.json")))
+
+    # --- trace
+    q = py("row15.py", "trace", "--label", "t1", "--seed", "s1", "--all")
+    lines = q.stdout.strip().split("\n")
+    check("trace prints only runs, faults and the trace total", all(any(a.match(l) for a in allowed) for l in lines) and lines[-1].startswith("trace_total_wall_s: "), q.stdout + q.stderr)
+    check("a tool with no file count is a procedure fault", "fault: B no-file-count tool fake-status" in lines, q.stdout)
+    rc, d = open_sealed("t1")
+    tr = [json.load(open(os.path.join(d, "trace", n))) for n in sorted(os.listdir(os.path.join(d, "trace")))]
+    fa = [c for r in tr if r["arm"] == "A" and r["change"] == "c1" for c in r["counts"]]
+    byname = {c["tool"]: c for c in fa}
+    check("trace counts a file once for each path, only reads, only under the tree, children included",
+          byname["fake-file"]["files_opened"] == 1 and byname["fake-mod"]["files_opened"] == 3, str(fa))
+    check("trace counts cache opens as a second figure", byname["fake-file"]["cache_files_opened"] == 1, str(fa))
+    csvp = os.path.join(WORK, "unit.csv")
+    tree = "C:\\w\\tree"
+    rows = [("100", "Process Create", "x", "SUCCESS", "PID: 200, Command line: y"), ("200", "CreateFile", tree + "\\child.go", "SUCCESS", "Desired Access: Generic Read"),
+            ("300", "CreateFile", tree + "\\other.go", "SUCCESS", "Desired Access: Generic Read"), ("100", "CreateFile", tree + "\\x.vulcan", "SUCCESS", "Desired Access: Read Data/List Directory"),
+            ("100", "CreateFile", tree + "\\n.go", "NAME NOT FOUND", "Desired Access: Generic Read"), ("100", "CreateFile", tree + "\\a.go", "SUCCESS", "Desired Access: Read Attributes")]
+    with open(csvp, "w", newline="") as f:
+        f.write("Time of Day,Process Name,PID,Operation,Path,Result,Detail\n")
+        for pid, op, path, res, det in rows:
+            f.write('0,p.exe,%s,%s,"%s",%s,"%s"\n' % (pid, op, path, res, det))
+    check("trace parser: the process tree, a read access, a success, one path once",
+          C.parse_trace_csv(csvp, tree, 100, ["C:\\w\\cache"]) == (2, 0))
+
+    # --- row 19: the warm-up rule against the simulation's 2v2 rule on fixed sequences
+    check_warmup_against_sim()
+
+    # --- row 19 on the fake app
+    q = py("row19.py", "run", "--label", "w1", "--seed", "s1", "--n", "3", arms="A,B")
+    lines = q.stdout.strip().split("\n")
+    check("row19 prints only runs, faults and the row19 total", all(any(a.match(l) for a in allowed) for l in lines) and len(lines) == 3 and lines[0] == "runs: 6"
+          and lines[1] == "faults: none" and lines[2].startswith("row19_total_wall_s: "), q.stdout + q.stderr)
+    d, runs = read_runs("w1")
+    A = [r for r in runs if r["arm"] == "A"]
+    B = [r for r in runs if r["arm"] == "B"]
+    check("row19: the fast-decay arm settles within the cap, the slow one is flagged unsettled",
+          A and B and not any(r["unsettled"] for r in A) and all(r["unsettled"] and r["warm_blocks"] == 12 for r in B), str([(r["arm"], r["unsettled"], r["warm_blocks"]) for r in runs]))
+    check("row19: a run times 100 requests after the warm-up and keeps the median and the residual fall",
+          all(len(r["samples_ns"]) == r["warm_blocks"] * 50 + 100 and "residual_fall_pct" in r and r["median_ns"] > 0 for r in runs))
+    check("row19: the fake decay shows as a positive residual fall for the unsettled arm", all(r["residual_fall_pct"] > 0 for r in B))
+    check("row19: the median is the median of the timed 100", all(abs(r["median_ns"] - float(np.median(r["samples_ns"][-100:]))) < 1 for r in runs))
+    check("row19: the total printed is the sum of the whole-run wall times", abs(sum(r["wall_ns"] for r in runs) / 1e9 - float(lines[2].split(": ")[1])) < 0.2)
+    check("row19: the raw directory is gone", not os.path.exists(os.path.join(WORK, "raw", "w1")))
+
+    # --- a seal key never printed
+    blob = "\n".join(all_output)
+    check("the seal key is not in any output of any command", key not in blob)
+
+    C.rmtree(WORK)
+    print("%d of %d checks passed" % (sum(results), len(results)))
+    return 0 if all(results) else 1
+
+
+def check_warmup_against_sim():
+    import row19
+    w = cfg["warmup"]
+    simsrc = open(SIM, encoding="utf-8").read().split("for rule,maxb,thr in")[0]
+    ns = {}
+    exec(compile(simsrc, SIM, "exec"), ns)
+
+    class Stub:
+        def __init__(self, v):
+            self.v = v
+
+        def normal(self, mu, sd, size):
+            return self.v[:size]
+    n = np.arange(w["cap_blocks"] * w["block"] + w["timed"])
+    seqs = {
+        "flat": 1000 + (n * 37) % 11,
+        "fast exponential": 1000 * (1 + 3 * np.exp(-n / 60)),
+        "never settles": 1000 * (1 + 5 * np.exp(-n / 400)),
+        "step down at 250": 1000 * np.where(n < 250, 1.3, 1.0),
+        "power law p=1": 1000 * (1 + (1 + n / 50) ** -1.0),
+        "settles late": 1000 * (1 + 2 * np.exp(-n / 150)),
+    }
+    for name, t in seqs.items():
+        it = iter(t.tolist())
+        res = row19.steady_state(lambda: next(it), w)
+        # the simulation with its noise replaced by log(t / (1 + excess)), and a time constant so small that the excess is 0 from request 1 on
+        ns["rng"] = Stub(np.log(t / (1 + np.where(n == 0, 1.0, 0.0))))
+        _, fall, _ = ns["run"](1e-9, 0.0, "2v2", w["cap_blocks"], w["band"], 1, "exp", True)
+        ns["rng"] = Stub(np.log(t / (1 + np.where(n == 0, 1.0, 0.0)))[: w["cap_blocks"] * w["block"]])
+        _, uns = ns["run"](1e-9, 0.0, "2v2", w["cap_blocks"], w["band"], 1, "exp", False)
+        check("warm-up %-18s same residual fall and unsettled flag as sim 2v2 (stop at block %d)" % (name, res["warm_blocks"]),
+              round(res["residual_fall_pct"], 1) == fall and res["unsettled"] == (uns == 100), "harness %.1f/%s, sim %s/%s" % (res["residual_fall_pct"], res["unsettled"], fall, uns))
+    flat = iter(seqs["flat"].tolist())
+    check("warm-up: a flat sequence stops at block 4 (the first block of the rule)", row19.steady_state(lambda: next(flat), w)["warm_blocks"] == 4)
+    nev = iter(seqs["never settles"].tolist())
+    r = row19.steady_state(lambda: next(nev), w)
+    check("warm-up: a sequence that never settles stops at the cap of 12 blocks and times the next 100", r["unsettled"] and r["warm_blocks"] == 12 and len(r["samples_ns"]) == 700)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

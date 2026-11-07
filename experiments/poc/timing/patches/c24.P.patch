@@ -1,0 +1,16 @@
+--- a/api/store/purchases.go
++++ b/api/store/purchases.go
+@@ -11,8 +11,11 @@
+ 
+ // keyOf returns the number of an id such as s-1, or not_found for an id of another form.
+ func keyOf(prefix, id, what string) (int64, error) {
+-	n, err := strconv.ParseInt(strings.TrimPrefix(id, prefix), 10, 64)
+-	if err != nil || !strings.HasPrefix(id, prefix) {
++	if !strings.HasPrefix(id, prefix) {
++		return 0, shop.Errorf(shop.CodeNotFound, "no %s %s", what, id)
++	}
++	n, err := strconv.ParseInt(id[len(prefix):], 10, 64)
++	if err != nil {
+ 		return 0, shop.Errorf(shop.CodeNotFound, "no %s %s", what, id)
+ 	}
+ 	return n, nil

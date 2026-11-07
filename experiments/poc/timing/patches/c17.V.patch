@@ -1,0 +1,11 @@
+--- a/api/events/events.vulcan
++++ b/api/events/events.vulcan
+@@ -37,7 +37,7 @@
+ 			return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "unknown event type %q", t)
+ 		}
+ 		if slices.Contains(types[:i], t) {
+-			return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "event type %s is listed twice", t)
++			return shop.Subscription{}, shop.Errorf(shop.CodeInvalid, "event type %s is listed more than once", t)
+ 		}
+ 	}
+ 	sub := shop.Subscription{URL: target, Events: types, Secret: rand.Text()}

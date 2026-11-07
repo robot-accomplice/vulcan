@@ -1,0 +1,13 @@
+--- a/api/orders/orders.go
++++ b/api/orders/orders.go
+@@ -34,8 +34,8 @@
+ 	if len(wants) == 0 {
+ 		return shop.Order{}, shop.Errorf(shop.CodeInvalid, "an order has at least one line")
+ 	}
+-	seen := map[shop.SKU]bool{}
+-	var lines []shop.Line
++	seen := make(map[shop.SKU]bool, len(wants))
++	lines := make([]shop.Line, 0, len(wants))
+ 	for _, w := range wants {
+ 		if w.Qty <= 0 || w.Qty > shop.MaxQty {
+ 			return shop.Order{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0 and at most %d", shop.MaxQty)

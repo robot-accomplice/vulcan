@@ -1,0 +1,805 @@
+{
+ "_note": "The 40 one-file changes of row 15 (plan-coverage.md rule 6, AA5, AF2). Each is one edit inside one file in each arm, with the same intent in all three arms. None changes a signature or an export: no function signature, type, exported name, contract, effect or variant set. Kinds: error or log text, local variable, unexported helper, loop refactor, function body, comment only (4). Parts: ten parts, four changes each. Selection was by part and kind only; no change was picked for an expected duration.",
+ "changes": [
+  {
+   "id": "c01",
+   "arms": {
+    "P": {
+     "patch": "patches/c01.P.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "L": {
+     "patch": "patches/c01.L.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "V": {
+     "patch": "patches/c01.V.patch",
+     "file": "api/inventory/inventory.vulcan",
+     "lowered": [
+      ".vulcan/build/api/inventory/inventory.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c02",
+   "arms": {
+    "P": {
+     "patch": "patches/c02.P.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "L": {
+     "patch": "patches/c02.L.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "V": {
+     "patch": "patches/c02.V.patch",
+     "file": "api/inventory/inventory.vulcan",
+     "lowered": [
+      ".vulcan/build/api/inventory/inventory.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c03",
+   "arms": {
+    "P": {
+     "patch": "patches/c03.P.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "L": {
+     "patch": "patches/c03.L.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "V": {
+     "patch": "patches/c03.V.patch",
+     "file": "api/inventory/inventory.vulcan",
+     "lowered": [
+      ".vulcan/build/api/inventory/inventory.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c04",
+   "arms": {
+    "P": {
+     "patch": "patches/c04.P.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "L": {
+     "patch": "patches/c04.L.patch",
+     "file": "api/inventory/inventory.go"
+    },
+    "V": {
+     "patch": "patches/c04.V.patch",
+     "file": "api/inventory/inventory.vulcan",
+     "lowered": [
+      ".vulcan/build/api/inventory/inventory.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c05",
+   "arms": {
+    "P": {
+     "patch": "patches/c05.P.patch",
+     "file": "api/orders/orders.go"
+    },
+    "L": {
+     "patch": "patches/c05.L.patch",
+     "file": "api/orders/orders.go"
+    },
+    "V": {
+     "patch": "patches/c05.V.patch",
+     "file": "api/orders/orders.vulcan",
+     "lowered": [
+      ".vulcan/build/api/orders/orders.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c06",
+   "arms": {
+    "P": {
+     "patch": "patches/c06.P.patch",
+     "file": "api/orders/orders.go"
+    },
+    "L": {
+     "patch": "patches/c06.L.patch",
+     "file": "api/orders/orders.go"
+    },
+    "V": {
+     "patch": "patches/c06.V.patch",
+     "file": "api/orders/orders.vulcan",
+     "lowered": [
+      ".vulcan/build/api/orders/orders.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c07",
+   "arms": {
+    "P": {
+     "patch": "patches/c07.P.patch",
+     "file": "api/orders/orders.go"
+    },
+    "L": {
+     "patch": "patches/c07.L.patch",
+     "file": "api/orders/orders.go"
+    },
+    "V": {
+     "patch": "patches/c07.V.patch",
+     "file": "api/orders/orders.vulcan",
+     "lowered": [
+      ".vulcan/build/api/orders/orders.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c08",
+   "arms": {
+    "P": {
+     "patch": "patches/c08.P.patch",
+     "file": "api/orders/orders.go"
+    },
+    "L": {
+     "patch": "patches/c08.L.patch",
+     "file": "api/orders/orders.go"
+    },
+    "V": {
+     "patch": "patches/c08.V.patch",
+     "file": "api/orders/orders.vulcan",
+     "lowered": [
+      ".vulcan/build/api/orders/orders.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c09",
+   "arms": {
+    "P": {
+     "patch": "patches/c09.P.patch",
+     "file": "api/billing/billing.go"
+    },
+    "L": {
+     "patch": "patches/c09.L.patch",
+     "file": "api/billing/billing.go"
+    },
+    "V": {
+     "patch": "patches/c09.V.patch",
+     "file": "api/billing/billing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/billing/billing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c10",
+   "arms": {
+    "P": {
+     "patch": "patches/c10.P.patch",
+     "file": "api/billing/billing.go"
+    },
+    "L": {
+     "patch": "patches/c10.L.patch",
+     "file": "api/billing/billing.go"
+    },
+    "V": {
+     "patch": "patches/c10.V.patch",
+     "file": "api/billing/billing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/billing/billing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c11",
+   "arms": {
+    "P": {
+     "patch": "patches/c11.P.patch",
+     "file": "api/billing/billing.go"
+    },
+    "L": {
+     "patch": "patches/c11.L.patch",
+     "file": "api/billing/billing.go"
+    },
+    "V": {
+     "patch": "patches/c11.V.patch",
+     "file": "api/billing/billing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/billing/billing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c12",
+   "arms": {
+    "P": {
+     "patch": "patches/c12.P.patch",
+     "file": "api/billing/billing.go"
+    },
+    "L": {
+     "patch": "patches/c12.L.patch",
+     "file": "api/billing/billing.go"
+    },
+    "V": {
+     "patch": "patches/c12.V.patch",
+     "file": "api/billing/billing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/billing/billing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c13",
+   "arms": {
+    "P": {
+     "patch": "patches/c13.P.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "L": {
+     "patch": "patches/c13.L.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "V": {
+     "patch": "patches/c13.V.patch",
+     "file": "api/purchasing/purchasing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/purchasing/purchasing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c14",
+   "arms": {
+    "P": {
+     "patch": "patches/c14.P.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "L": {
+     "patch": "patches/c14.L.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "V": {
+     "patch": "patches/c14.V.patch",
+     "file": "api/purchasing/purchasing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/purchasing/purchasing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c15",
+   "arms": {
+    "P": {
+     "patch": "patches/c15.P.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "L": {
+     "patch": "patches/c15.L.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "V": {
+     "patch": "patches/c15.V.patch",
+     "file": "api/purchasing/purchasing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/purchasing/purchasing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c16",
+   "arms": {
+    "P": {
+     "patch": "patches/c16.P.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "L": {
+     "patch": "patches/c16.L.patch",
+     "file": "api/purchasing/purchasing.go"
+    },
+    "V": {
+     "patch": "patches/c16.V.patch",
+     "file": "api/purchasing/purchasing.vulcan",
+     "lowered": [
+      ".vulcan/build/api/purchasing/purchasing.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c17",
+   "arms": {
+    "P": {
+     "patch": "patches/c17.P.patch",
+     "file": "api/events/events.go"
+    },
+    "L": {
+     "patch": "patches/c17.L.patch",
+     "file": "api/events/events.go"
+    },
+    "V": {
+     "patch": "patches/c17.V.patch",
+     "file": "api/events/events.vulcan",
+     "lowered": [
+      ".vulcan/build/api/events/events.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c18",
+   "arms": {
+    "P": {
+     "patch": "patches/c18.P.patch",
+     "file": "api/events/events.go"
+    },
+    "L": {
+     "patch": "patches/c18.L.patch",
+     "file": "api/events/events.go"
+    },
+    "V": {
+     "patch": "patches/c18.V.patch",
+     "file": "api/events/events.vulcan",
+     "lowered": [
+      ".vulcan/build/api/events/events.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c19",
+   "arms": {
+    "P": {
+     "patch": "patches/c19.P.patch",
+     "file": "api/events/events.go"
+    },
+    "L": {
+     "patch": "patches/c19.L.patch",
+     "file": "api/events/events.go"
+    },
+    "V": {
+     "patch": "patches/c19.V.patch",
+     "file": "api/events/events.vulcan",
+     "lowered": [
+      ".vulcan/build/api/events/events.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c20",
+   "arms": {
+    "P": {
+     "patch": "patches/c20.P.patch",
+     "file": "api/events/events.go"
+    },
+    "L": {
+     "patch": "patches/c20.L.patch",
+     "file": "api/events/events.go"
+    },
+    "V": {
+     "patch": "patches/c20.V.patch",
+     "file": "api/events/events.vulcan",
+     "lowered": [
+      ".vulcan/build/api/events/events.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c21",
+   "arms": {
+    "P": {
+     "patch": "patches/c21.P.patch",
+     "file": "api/store/store.go"
+    },
+    "L": {
+     "patch": "patches/c21.L.patch",
+     "file": "api/store/store.go"
+    },
+    "V": {
+     "patch": "patches/c21.V.patch",
+     "file": "api/store/store.vulcan",
+     "lowered": [
+      ".vulcan/build/api/store/store.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c22",
+   "arms": {
+    "P": {
+     "patch": "patches/c22.P.patch",
+     "file": "api/store/store.go"
+    },
+    "L": {
+     "patch": "patches/c22.L.patch",
+     "file": "api/store/store.go"
+    },
+    "V": {
+     "patch": "patches/c22.V.patch",
+     "file": "api/store/store.vulcan",
+     "lowered": [
+      ".vulcan/build/api/store/store.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c23",
+   "arms": {
+    "P": {
+     "patch": "patches/c23.P.patch",
+     "file": "api/store/events.go"
+    },
+    "L": {
+     "patch": "patches/c23.L.patch",
+     "file": "api/store/events.go"
+    },
+    "V": {
+     "patch": "patches/c23.V.patch",
+     "file": "api/store/events.vulcan",
+     "lowered": [
+      ".vulcan/build/api/store/events.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c24",
+   "arms": {
+    "P": {
+     "patch": "patches/c24.P.patch",
+     "file": "api/store/purchases.go"
+    },
+    "L": {
+     "patch": "patches/c24.L.patch",
+     "file": "api/store/purchases.go"
+    },
+    "V": {
+     "patch": "patches/c24.V.patch",
+     "file": "api/store/purchases.vulcan",
+     "lowered": [
+      ".vulcan/build/api/store/purchases.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c25",
+   "arms": {
+    "P": {
+     "patch": "patches/c25.P.patch",
+     "file": "api/payments/payments.go"
+    },
+    "L": {
+     "patch": "patches/c25.L.patch",
+     "file": "api/payments/payments.go"
+    },
+    "V": {
+     "patch": "patches/c25.V.patch",
+     "file": "api/payments/payments.vulcan",
+     "lowered": [
+      ".vulcan/build/api/payments/payments.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c26",
+   "arms": {
+    "P": {
+     "patch": "patches/c26.P.patch",
+     "file": "api/payments/payments.go"
+    },
+    "L": {
+     "patch": "patches/c26.L.patch",
+     "file": "api/payments/payments.go"
+    },
+    "V": {
+     "patch": "patches/c26.V.patch",
+     "file": "api/payments/payments.vulcan",
+     "lowered": [
+      ".vulcan/build/api/payments/payments.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c27",
+   "arms": {
+    "P": {
+     "patch": "patches/c27.P.patch",
+     "file": "api/payments/payments.go"
+    },
+    "L": {
+     "patch": "patches/c27.L.patch",
+     "file": "api/payments/payments.go"
+    },
+    "V": {
+     "patch": "patches/c27.V.patch",
+     "file": "api/payments/payments.vulcan",
+     "lowered": [
+      ".vulcan/build/api/payments/payments.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c28",
+   "arms": {
+    "P": {
+     "patch": "patches/c28.P.patch",
+     "file": "api/payments/payments.go"
+    },
+    "L": {
+     "patch": "patches/c28.L.patch",
+     "file": "api/payments/payments.go"
+    },
+    "V": {
+     "patch": "patches/c28.V.patch",
+     "file": "api/payments/payments.vulcan",
+     "lowered": [
+      ".vulcan/build/api/payments/payments.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c29",
+   "arms": {
+    "P": {
+     "patch": "patches/c29.P.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "L": {
+     "patch": "patches/c29.L.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "V": {
+     "patch": "patches/c29.V.patch",
+     "file": "api/webhooks/webhooks.vulcan",
+     "lowered": [
+      ".vulcan/build/api/webhooks/webhooks.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c30",
+   "arms": {
+    "P": {
+     "patch": "patches/c30.P.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "L": {
+     "patch": "patches/c30.L.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "V": {
+     "patch": "patches/c30.V.patch",
+     "file": "api/webhooks/webhooks.vulcan",
+     "lowered": [
+      ".vulcan/build/api/webhooks/webhooks.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c31",
+   "arms": {
+    "P": {
+     "patch": "patches/c31.P.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "L": {
+     "patch": "patches/c31.L.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "V": {
+     "patch": "patches/c31.V.patch",
+     "file": "api/webhooks/webhooks.vulcan",
+     "lowered": [
+      ".vulcan/build/api/webhooks/webhooks.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c32",
+   "arms": {
+    "P": {
+     "patch": "patches/c32.P.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "L": {
+     "patch": "patches/c32.L.patch",
+     "file": "api/webhooks/webhooks.go"
+    },
+    "V": {
+     "patch": "patches/c32.V.patch",
+     "file": "api/webhooks/webhooks.vulcan",
+     "lowered": [
+      ".vulcan/build/api/webhooks/webhooks.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c33",
+   "arms": {
+    "P": {
+     "patch": "patches/c33.P.patch",
+     "file": "api/web/web.go"
+    },
+    "L": {
+     "patch": "patches/c33.L.patch",
+     "file": "api/web/web.go"
+    },
+    "V": {
+     "patch": "patches/c33.V.patch",
+     "file": "api/web/web.vulcan",
+     "lowered": [
+      ".vulcan/build/api/web/web.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c34",
+   "arms": {
+    "P": {
+     "patch": "patches/c34.P.patch",
+     "file": "api/web/web.go"
+    },
+    "L": {
+     "patch": "patches/c34.L.patch",
+     "file": "api/web/web.go"
+    },
+    "V": {
+     "patch": "patches/c34.V.patch",
+     "file": "api/web/web.vulcan",
+     "lowered": [
+      ".vulcan/build/api/web/web.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c35",
+   "arms": {
+    "P": {
+     "patch": "patches/c35.P.patch",
+     "file": "api/web/web.go"
+    },
+    "L": {
+     "patch": "patches/c35.L.patch",
+     "file": "api/web/web.go"
+    },
+    "V": {
+     "patch": "patches/c35.V.patch",
+     "file": "api/web/web.vulcan",
+     "lowered": [
+      ".vulcan/build/api/web/web.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c36",
+   "arms": {
+    "P": {
+     "patch": "patches/c36.P.patch",
+     "file": "api/web/web.go"
+    },
+    "L": {
+     "patch": "patches/c36.L.patch",
+     "file": "api/web/web.go"
+    },
+    "V": {
+     "patch": "patches/c36.V.patch",
+     "file": "api/web/web.vulcan",
+     "lowered": [
+      ".vulcan/build/api/web/web.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c37",
+   "arms": {
+    "P": {
+     "patch": "patches/c37.P.patch",
+     "file": "lib/shop/purchase.go"
+    },
+    "L": {
+     "patch": "patches/c37.L.patch",
+     "file": "lib/shop/purchase.go"
+    },
+    "V": {
+     "patch": "patches/c37.V.patch",
+     "file": "lib/shop/purchase.vulcan",
+     "lowered": [
+      ".vulcan/build/lib/shop/purchase.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c38",
+   "arms": {
+    "P": {
+     "patch": "patches/c38.P.patch",
+     "file": "lib/shop/types.go"
+    },
+    "L": {
+     "patch": "patches/c38.L.patch",
+     "file": "lib/shop/types.go"
+    },
+    "V": {
+     "patch": "patches/c38.V.patch",
+     "file": "lib/shop/types.vulcan",
+     "lowered": [
+      ".vulcan/build/lib/shop/types.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c39",
+   "arms": {
+    "P": {
+     "patch": "patches/c39.P.patch",
+     "file": "lib/shop/errors.go"
+    },
+    "L": {
+     "patch": "patches/c39.L.patch",
+     "file": "lib/shop/errors.go"
+    },
+    "V": {
+     "patch": "patches/c39.V.patch",
+     "file": "lib/shop/errors.vulcan",
+     "lowered": [
+      ".vulcan/build/lib/shop/errors.go"
+     ]
+    }
+   }
+  },
+  {
+   "id": "c40",
+   "arms": {
+    "P": {
+     "patch": "patches/c40.P.patch",
+     "file": "lib/shop/event.go"
+    },
+    "L": {
+     "patch": "patches/c40.L.patch",
+     "file": "lib/shop/event.go"
+    },
+    "V": {
+     "patch": "patches/c40.V.patch",
+     "file": "lib/shop/event.vulcan",
+     "lowered": [
+      ".vulcan/build/lib/shop/event.go"
+     ]
+    }
+   }
+  }
+ ]
+}

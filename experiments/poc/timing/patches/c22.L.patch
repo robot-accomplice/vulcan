@@ -1,0 +1,12 @@
+--- a/api/store/store.go
++++ b/api/store/store.go
+@@ -235,6 +235,9 @@
+ 
+ // changeStock applies change to the stock of each line in one transaction.
+ func (d *DB) changeStock(lines []shop.Line, change func(shop.Stock, int) (shop.Stock, error)) error {
++	if len(lines) == 0 {
++		return nil
++	}
+ 	tx, err := d.db.Begin()
+ 	if err != nil {
+ 		return err

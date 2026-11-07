@@ -1,0 +1,18 @@
+--- a/api/events/events.go
++++ b/api/events/events.go
+@@ -167,11 +167,14 @@
+ 	d.Attempts++
+ 	d.Response = status
+ 	d.Status = shop.Failed
+-	if err == nil && status/100 == 2 {
++	if err == nil && isSuccess(status) {
+ 		d.Status = shop.Delivered
+ 	}
+ 	return d
+ }
++
++// isSuccess reports whether an HTTP status is in the 2xx class.
++func isSuccess(status int) bool { return status/100 == 2 }
+ 
+ // sign returns the signature of a body: sha256= and the hex HMAC-SHA256 with the secret.
+ func sign(secret string, body []byte) string {

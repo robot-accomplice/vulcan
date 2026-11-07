@@ -1,0 +1,11 @@
+--- a/api/webhooks/webhooks.vulcan
++++ b/api/webhooks/webhooks.vulcan
+@@ -38,6 +38,7 @@
+ 		return 0, err
+ 	}
+ 	defer resp.Body.Close()
+-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
++	const maxDrain = 64 << 10 // read at most this many bytes of the answer
++	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxDrain))
+ 	return resp.StatusCode, nil
+ }

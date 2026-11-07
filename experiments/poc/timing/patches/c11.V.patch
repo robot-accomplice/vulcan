@@ -1,0 +1,14 @@
+--- a/api/billing/billing.vulcan
++++ b/api/billing/billing.vulcan
+@@ -78,8 +78,9 @@
+ 	if err != nil {
+ 		return shop.Payment{}, err
+ 	}
+-	if amount > a.Charged-a.Refunded {
+-		return shop.Payment{}, shop.Errorf(shop.CodeConflict, "refund %d is more than the %d that can be refunded", amount, a.Charged-a.Refunded)
++	refundable := a.Charged - a.Refunded
++	if amount > refundable {
++		return shop.Payment{}, shop.Errorf(shop.CodeConflict, "refund %d is more than the %d that can be refunded", amount, refundable)
+ 	}
+ 	id, err := Card.Refund(o.PaymentID, amount)
+ 	if err != nil {

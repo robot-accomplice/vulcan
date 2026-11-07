@@ -1,0 +1,14 @@
+--- a/lib/shop/errors.vulcan
++++ b/lib/shop/errors.vulcan
+@@ -31,8 +31,8 @@
+ // CodeOf returns the code of an error, or "" for an error without one.
+ func CodeOf(err error) string {
+ 	var e *Error
+-	if errors.As(err, &e) {
+-		return e.Code
++	if !errors.As(err, &e) {
++		return ""
+ 	}
+-	return ""
++	return e.Code
+ }

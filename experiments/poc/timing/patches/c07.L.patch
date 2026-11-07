@@ -1,0 +1,18 @@
+--- a/api/orders/orders.go
++++ b/api/orders/orders.go
+@@ -3,6 +3,7 @@
+ 
+ import (
+ 	"fmt"
++	"log"
+ 	"sync"
+ 	"unicode/utf8"
+ 
+@@ -152,6 +153,7 @@
+ 	if err := s.store.SaveOrder(o); err != nil {
+ 		return shop.Order{}, err
+ 	}
++	log.Printf("order %s cancelled; refunded %d of %d cents", o.ID, o.Refunded, o.Charged)
+ 	s.events.Publish(shop.EventOrderCancelled, string(o.ID))
+ 	return o, nil
+ }

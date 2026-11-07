@@ -1,0 +1,11 @@
+--- a/api/store/store.go
++++ b/api/store/store.go
+@@ -128,7 +128,7 @@
+ 		return err
+ 	}
+ 	if n > 0 {
+-		return shop.Errorf(shop.CodeConflict, "product %s exists", p.SKU)
++		return shop.Errorf(shop.CodeConflict, "product %s already exists", p.SKU)
+ 	}
+ 	if _, err := tx.Exec(`insert into products (sku, name, price) values (?, ?, ?)`, string(p.SKU), p.Name, int64(p.Price)); err != nil {
+ 		return err

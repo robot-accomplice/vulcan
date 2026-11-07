@@ -1,0 +1,12 @@
+--- a/api/web/web.vulcan
++++ b/api/web/web.vulcan
+@@ -219,7 +219,8 @@
+ 	reply(w, status, map[string]string{"error": code, "message": msg})
+ }
+ 
+-// decode reads a JSON body; an unknown field or a bad value is invalid.
++// decode reads a JSON body; an unknown field or a bad value is invalid. A reply to the caller
++// carries the decoder message, so the caller sees where the body is wrong.
+ func decode(r *http.Request, v any) error {
+ 	dec := json.NewDecoder(r.Body)
+ 	dec.DisallowUnknownFields()

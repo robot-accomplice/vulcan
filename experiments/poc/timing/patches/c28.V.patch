@@ -1,0 +1,11 @@
+--- a/api/payments/payments.vulcan
++++ b/api/payments/payments.vulcan
+@@ -32,7 +32,7 @@
+ 		return nil, fmt.Errorf("payments-url %q is not an http or https URL", s.URL)
+ 	}
+ 	if s.Key == "" {
+-		return nil, fmt.Errorf("payments-key is empty")
++		return nil, fmt.Errorf("payments-key is empty: set --payments-key or PAYMENTS_KEY")
+ 	}
+ 	return &Client{base: strings.TrimSuffix(s.URL, "/"), key: s.Key, http: &http.Client{Timeout: 10 * time.Second}}, nil
+ }

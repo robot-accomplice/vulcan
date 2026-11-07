@@ -1,0 +1,13 @@
+--- a/api/orders/orders.vulcan
++++ b/api/orders/orders.vulcan
+@@ -134,8 +134,8 @@
+ 	if o.Status != shop.Pending && o.Status != shop.Paid {
+ 		return shop.Order{}, shop.Errorf(shop.CodeConflict, "order %s is %s; only a pending or paid order can be cancelled", id, o.Status)
+ 	}
+-	if rest := o.Charged - o.Refunded; rest > 0 {
+-		p, err := Billing.Refund(o, rest)
++	if outstanding := o.Charged - o.Refunded; outstanding > 0 {
++		p, err := Billing.Refund(o, outstanding)
+ 		if err != nil {
+ 			return shop.Order{}, err
+ 		}

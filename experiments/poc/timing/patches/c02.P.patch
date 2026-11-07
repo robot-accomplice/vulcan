@@ -1,0 +1,14 @@
+--- a/api/inventory/inventory.go
++++ b/api/inventory/inventory.go
+@@ -58,8 +58,9 @@
+ 
+ // Receive adds received units to the stock of a product.
+ func (c *Catalog) Receive(sku shop.SKU, qty int) (shop.Item, error) {
+-	if qty <= 0 || qty > shop.MaxQty {
+-		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0 and at most %d", shop.MaxQty)
++	most := shop.MaxQty
++	if qty <= 0 || qty > most {
++		return shop.Item{}, shop.Errorf(shop.CodeInvalid, "qty must be more than 0 and at most %d", most)
+ 	}
+ 	return c.store.Receive(sku, qty)
+ }

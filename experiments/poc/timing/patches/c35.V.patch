@@ -1,0 +1,23 @@
+--- a/api/web/web.vulcan
++++ b/api/web/web.vulcan
+@@ -310,7 +310,7 @@
+ }
+ 
+ func listOrders(w http.ResponseWriter, r *http.Request) {
+-	customer := strings.TrimSpace(r.URL.Query().Get("customer"))
++	customer := customerParam(r)
+ 	if customer == "" {
+ 		fail(w, shop.Errorf(shop.CodeInvalid, "the query needs customer"))
+ 		return
+@@ -334,6 +334,11 @@
+ 		return
+ 	}
+ 	reply(w, http.StatusOK, toOrderJSON(o))
++}
++
++// customerParam returns the customer of the query, without the spaces around it.
++func customerParam(r *http.Request) string {
++	return strings.TrimSpace(r.URL.Query().Get("customer"))
+ }
+ 
+ func orderAction(act func(shop.OrderID) (shop.Order, error)) http.HandlerFunc {

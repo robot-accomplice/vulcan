@@ -1,0 +1,12 @@
+--- a/api/billing/billing.vulcan
++++ b/api/billing/billing.vulcan
+@@ -42,7 +42,8 @@
+ 		return nil, err
+ 	}
+ 	a := &account{}
+-	for _, p := range entries {
++	for i := range entries {
++		p := entries[i]
+ 		switch p.Kind {
+ 		case shop.KindCharge:
+ 			a.charge(p.Amount)

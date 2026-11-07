@@ -1,0 +1,11 @@
+--- a/api/web/web.go
++++ b/api/web/web.go
+@@ -368,7 +368,7 @@
+ func (a *API) listOrders(w http.ResponseWriter, r *http.Request) {
+ 	customer := strings.TrimSpace(r.URL.Query().Get("customer"))
+ 	if customer == "" {
+-		fail(w, shop.Errorf(shop.CodeInvalid, "the query needs customer"))
++		fail(w, shop.Errorf(shop.CodeInvalid, "the query needs a customer parameter"))
+ 		return
+ 	}
+ 	list, err := a.orders.List(shop.CustomerID(customer))

@@ -1,0 +1,21 @@
+--- a/api/webhooks/webhooks.go
++++ b/api/webhooks/webhooks.go
+@@ -8,6 +8,9 @@
+ 	"time"
+ )
+ 
++// sendTimeout is the longest wait for the answer of a subscriber.
++const sendTimeout = 5 * time.Second
++
+ // Sender sends webhooks.
+ type Sender struct {
+ 	http *http.Client
+@@ -17,7 +20,7 @@
+ // redirect.
+ func NewSender() *Sender {
+ 	return &Sender{http: &http.Client{
+-		Timeout: 5 * time.Second,
++		Timeout: sendTimeout,
+ 		CheckRedirect: func(*http.Request, []*http.Request) error {
+ 			return http.ErrUseLastResponse
+ 		},

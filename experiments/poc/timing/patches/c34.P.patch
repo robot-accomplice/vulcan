@@ -1,0 +1,11 @@
+--- a/api/web/web.go
++++ b/api/web/web.go
+@@ -208,7 +208,7 @@
+ 
+ func toOrderJSON(o shop.Order) orderJSON {
+ 	out := orderJSON{
+-		ID: string(o.ID), Customer: string(o.Customer), Status: string(o.Status), Lines: []lineJSON{},
++		ID: string(o.ID), Customer: string(o.Customer), Status: string(o.Status), Lines: make([]lineJSON, 0, len(o.Lines)),
+ 		Total: int64(o.Total), Charged: int64(o.Charged), Refunded: int64(o.Refunded), PaymentID: o.PaymentID,
+ 	}
+ 	for _, l := range o.Lines {

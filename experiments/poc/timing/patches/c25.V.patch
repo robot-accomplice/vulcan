@@ -1,0 +1,11 @@
+--- a/api/payments/payments.vulcan
++++ b/api/payments/payments.vulcan
+@@ -72,7 +72,7 @@
+ 	case err != nil:
+ 		return "", err
+ 	case status == http.StatusPaymentRequired:
+-		return "", shop.Errorf(shop.CodeDeclined, "the card processor declined the charge")
++		return "", shop.Errorf(shop.CodeDeclined, "the card processor declined the charge; no money was taken")
+ 	case status != http.StatusCreated:
+ 		return "", shop.Errorf(shop.CodeUnavailable, "the card processor answered %d", status)
+ 	}

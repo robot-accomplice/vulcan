@@ -1,0 +1,11 @@
+--- a/api/billing/billing.go
++++ b/api/billing/billing.go
+@@ -82,7 +82,7 @@
+ 		return shop.Payment{}, err
+ 	}
+ 	if amount > a.Charged-a.Refunded {
+-		return shop.Payment{}, shop.Errorf(shop.CodeConflict, "refund %d is more than the %d that can be refunded", amount, a.Charged-a.Refunded)
++		return shop.Payment{}, shop.Errorf(shop.CodeConflict, "refund of %d cents is more than the %d cents that can be refunded", amount, a.Charged-a.Refunded)
+ 	}
+ 	id, err := l.card.Refund(o.PaymentID, amount)
+ 	if err != nil {

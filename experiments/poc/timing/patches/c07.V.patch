@@ -1,0 +1,18 @@
+--- a/api/orders/orders.vulcan
++++ b/api/orders/orders.vulcan
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"fmt"
++	"log"
+ 	"sync"
+ 	"unicode/utf8"
+ 
+@@ -148,6 +149,7 @@
+ 	if err := Store.SaveOrder(o); err != nil {
+ 		return shop.Order{}, err
+ 	}
++	log.Printf("order %s cancelled; refunded %d of %d cents", o.ID, o.Refunded, o.Charged)
+ 	Events.Publish(shop.EventOrderCancelled, string(o.ID))
+ 	return o, nil
+ }

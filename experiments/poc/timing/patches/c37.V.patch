@@ -1,0 +1,15 @@
+--- a/lib/shop/purchase.vulcan
++++ b/lib/shop/purchase.vulcan
+@@ -56,9 +56,9 @@
+ 
+ // PurchaseTotal returns the sum of qty × cost over the lines.
+ func PurchaseTotal(lines []PurchaseLine) Money {
+-	var t Money
++	var total Money
+ 	for _, l := range lines {
+-		t += Money(l.Qty) * l.Cost
++		total += Money(l.Qty) * l.Cost
+ 	}
+-	return t
++	return total
+ }

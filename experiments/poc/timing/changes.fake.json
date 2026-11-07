@@ -1,0 +1,12 @@
+{
+  "changes": [
+    { "id": "c1", "arms": {
+      "A": { "patch": "fake/patches/c1.patch", "file": "pkg/a.go" },
+      "B": { "patch": "fake/patches/c1.patch", "file": "pkg/a.go" },
+      "C": { "patch": "fake/patches/c1.patch", "file": "pkg/a.go" } } },
+    { "id": "c2", "arms": {
+      "A": { "patch": "fake/patches/c2.patch", "file": "pkg/b.go" },
+      "B": { "patch": "fake/patches/c2.patch", "file": "pkg/b.go" },
+      "C": { "patch": "fake/patches/c2.patch", "file": "pkg/b.go" } } }
+  ]
+}

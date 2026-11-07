@@ -1,0 +1,18 @@
+--- a/api/webhooks/webhooks.go
++++ b/api/webhooks/webhooks.go
+@@ -16,12 +16,13 @@
+ // NewSender returns a sender that waits at most 5 seconds for an answer, and follows no
+ // redirect.
+ func NewSender() *Sender {
+-	return &Sender{http: &http.Client{
++	client := &http.Client{
+ 		Timeout: 5 * time.Second,
+ 		CheckRedirect: func(*http.Request, []*http.Request) error {
+ 			return http.ErrUseLastResponse
+ 		},
+-	}}
++	}
++	return &Sender{http: client}
+ }
+ 
+ // Send posts one webhook, and returns the HTTP status of the answer, or 0 and the error when

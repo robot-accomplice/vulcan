@@ -1,0 +1,11 @@
+--- a/api/payments/payments.go
++++ b/api/payments/payments.go
+@@ -73,7 +73,7 @@
+ 	case err != nil:
+ 		return "", err
+ 	case status == http.StatusPaymentRequired:
+-		return "", shop.Errorf(shop.CodeDeclined, "the card processor declined the charge")
++		return "", shop.Errorf(shop.CodeDeclined, "the card processor declined the charge; no money was taken")
+ 	case status != http.StatusCreated:
+ 		return "", shop.Errorf(shop.CodeUnavailable, "the card processor answered %d", status)
+ 	}

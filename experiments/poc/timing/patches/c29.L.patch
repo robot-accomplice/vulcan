@@ -1,0 +1,11 @@
+--- a/api/webhooks/webhooks.go
++++ b/api/webhooks/webhooks.go
+@@ -39,6 +39,7 @@
+ 		return 0, err
+ 	}
+ 	defer resp.Body.Close()
+-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
++	const maxDrain = 64 << 10 // read at most this many bytes of the answer
++	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxDrain))
+ 	return resp.StatusCode, nil
+ }

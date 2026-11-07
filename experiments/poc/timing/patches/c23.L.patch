@@ -1,0 +1,18 @@
+--- a/api/store/events.go
++++ b/api/store/events.go
+@@ -23,11 +23,11 @@
+ }
+ 
+ func joinTypes(types []shop.EventType) string {
+-	s := make([]string, len(types))
+-	for i, t := range types {
+-		s[i] = string(t)
++	names := make([]string, 0, len(types))
++	for _, t := range types {
++		names = append(names, string(t))
+ 	}
+-	return strings.Join(s, ",")
++	return strings.Join(names, ",")
+ }
+ 
+ func scanSubscription(r scanner) (shop.Subscription, error) {

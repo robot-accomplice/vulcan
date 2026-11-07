@@ -1,0 +1,12 @@
+--- a/api/billing/billing.go
++++ b/api/billing/billing.go
+@@ -44,7 +44,8 @@
+ // NewLedger returns the ledger.
+ func NewLedger(card Card, store Store) *Ledger { return &Ledger{card: checkedCard{card}, store: store} }
+ 
+-// accountOf sums the ledger of an order.
++// accountOf sums the ledger of an order: every charge adds to Charged, and every refund adds to
++// Refunded. An entry of another kind is ignored.
+ func (l *Ledger) accountOf(id shop.OrderID) (*account, error) {
+ 	entries, err := l.store.Payments(id)
+ 	if err != nil {

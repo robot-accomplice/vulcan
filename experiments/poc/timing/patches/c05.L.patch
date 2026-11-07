@@ -1,0 +1,11 @@
+--- a/api/orders/orders.go
++++ b/api/orders/orders.go
+@@ -32,7 +32,7 @@
+ 		return shop.Order{}, shop.Errorf(shop.CodeInvalid, "customer must be 1 to 64 characters")
+ 	}
+ 	if len(wants) == 0 {
+-		return shop.Order{}, shop.Errorf(shop.CodeInvalid, "an order has at least one line")
++		return shop.Order{}, shop.Errorf(shop.CodeInvalid, "an order needs at least one line")
+ 	}
+ 	seen := map[shop.SKU]bool{}
+ 	var lines []shop.Line

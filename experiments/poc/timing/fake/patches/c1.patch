@@ -1,0 +1,9 @@
+--- a/pkg/a.go
++++ b/pkg/a.go
+@@ -1,4 +1,6 @@
+ package pkg
++// a harmless comment
++// and another
+ 
+ // TODO first item
+ func A() int { return 1 }

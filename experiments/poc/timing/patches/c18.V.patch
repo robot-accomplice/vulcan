@@ -1,0 +1,11 @@
+--- a/api/events/events.vulcan
++++ b/api/events/events.vulcan
+@@ -78,7 +78,7 @@
+ // logged; it never fails the action that raised the event.
+ func (h *Hub) Publish(t shop.EventType, subject string) {
+ 	if err := h.publish(t, subject); err != nil {
+-		log.Printf("publish %s of %s: %v", t, subject, err)
++		log.Printf("publish of event %s for %s failed: %v", t, subject, err)
+ 	}
+ }
+ 

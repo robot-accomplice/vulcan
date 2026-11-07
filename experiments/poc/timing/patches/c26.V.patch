@@ -1,0 +1,12 @@
+--- a/api/payments/payments.vulcan
++++ b/api/payments/payments.vulcan
+@@ -54,7 +54,8 @@
+ 		return 0, shop.Errorf(shop.CodeUnavailable, "the card processor cannot be reached: %v", err)
+ 	}
+ 	defer resp.Body.Close()
+-	if resp.StatusCode/100 == 2 && out != nil {
++	success := resp.StatusCode/100 == 2
++	if success && out != nil {
+ 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+ 			return resp.StatusCode, shop.Errorf(shop.CodeUnavailable, "the card processor sent a bad response: %v", err)
+ 		}

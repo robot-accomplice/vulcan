@@ -1,0 +1,12 @@
+--- a/api/billing/billing.go
++++ b/api/billing/billing.go
+@@ -51,7 +51,8 @@
+ 		return nil, err
+ 	}
+ 	a := &account{}
+-	for _, p := range entries {
++	for i := range entries {
++		p := entries[i]
+ 		switch p.Kind {
+ 		case shop.KindCharge:
+ 			a.charge(p.Amount)

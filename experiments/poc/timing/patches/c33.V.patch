@@ -1,0 +1,11 @@
+--- a/api/web/web.vulcan
++++ b/api/web/web.vulcan
+@@ -312,7 +312,7 @@
+ func listOrders(w http.ResponseWriter, r *http.Request) {
+ 	customer := strings.TrimSpace(r.URL.Query().Get("customer"))
+ 	if customer == "" {
+-		fail(w, shop.Errorf(shop.CodeInvalid, "the query needs customer"))
++		fail(w, shop.Errorf(shop.CodeInvalid, "the query needs a customer parameter"))
+ 		return
+ 	}
+ 	list, err := Orders.List(shop.CustomerID(customer))
