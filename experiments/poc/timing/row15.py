@@ -206,7 +206,7 @@ def traced_run(cfg, arm, a, ch, spec, raw, draw, pos, pristine_hash):
     idx = raw.next_index()
     tdir = os.path.join(cfg["work_root"], "trace_tmp")
     os.makedirs(tdir, exist_ok=True)
-    tctx = {"log": os.path.join(tdir, "t%05d.log" % idx), "csv": os.path.join(tdir, "t%05d.csv" % idx), "here": C.HERE}
+    tctx = {"log": os.path.join(tdir, "t%05d.pml" % idx), "csv": os.path.join(tdir, "t%05d.csv" % idx), "here": C.HERE}
     env.update({k: C.subst(v, tctx) for k, v in tcfg.get("env", {}).items()})
     steps = {}
     t0 = time.perf_counter_ns()
@@ -264,6 +264,14 @@ def execute(cfg, args, byid, arms, plan, trace):
         raw.json("plan.json", {"seed": args.seed, "batch": args.batch, "plan": plan, "arms": arms,
                                "closed_list": {arm: [e["name"] for e in arm_cfgs[arm]["closed_list"]] for arm in arms}})
         pristine = {arm: C.tree_hash(os.path.join(arm_cfgs[arm]["_ctx"]["armdir"], "pristine")) for arm in arms}
+        # A run that aborted between the change and its revert leaves the change in the tree. Reset such a tree first.
+        for arm in arms:
+            a = arm_cfgs[arm]
+            outputs = [e["path"] for e in a["closed_list"] if e["path"].startswith(a["_ctx"]["tree"])]
+            if C.tree_hash(a["_ctx"]["tree"], outputs) != pristine[arm]:
+                raw.fault(arm, "tree-not-pristine-at-start")
+                C.rmtree(a["_ctx"]["tree"])
+                C.copytree(os.path.join(a["_ctx"]["armdir"], "pristine"), a["_ctx"]["tree"])
         for draw, (cid, order) in enumerate(plan):
             ch = byid[cid]
             for pos, arm in enumerate(order):

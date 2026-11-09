@@ -126,6 +126,14 @@ def main():
     check("the run still records every tool's exit status", all("status" in t for r in runs3 for t in r["tools"]))
     check("the change is reverted after a dirty run (the next run applies cleanly)", "patch-does-not-apply" not in q.stdout and "revert-mismatch" not in q.stdout)
 
+    # --- a change left in the tree by an aborted run is found and reset before the next run
+    aa = C.arm_cfg(cfg, "A")
+    left = [c for c in json.load(open(CHANGES, encoding="utf-8"))["changes"] if c["id"] == "c2"][0]["arms"]["A"]["patch"]
+    check("setup: the left-over change applies to A's tree", C.git_apply(aa["_ctx"]["tree"], os.path.join(HERE, left)))
+    q = py("row15.py", "run", "--label", "r3b", "--seed", "s1", "--n", "3", "--only", "c2")
+    check("a tree left changed by an aborted run is a fault and is reset, so the change applies",
+          "fault: A tree-not-pristine-at-start" in q.stdout and "patch-does-not-apply" not in q.stdout and "revert-mismatch" not in q.stdout, q.stdout)
+
     # --- restore really restores
     a = C.arm_cfg(cfg, "A")
     live = [e["path"] for e in a["closed_list"]][0]
@@ -167,14 +175,7 @@ def main():
         check("a failing drop command aborts", False, "no abort")
     except C.Abort:
         check("a failing drop command aborts", True)
-    real = C.load_config(os.path.join(HERE, "commands.json"))
-    try:
-        row15.run_drop(real)
-        check("the default drop of commands.json fails loudly", False, "it ran")
-    except C.Abort:
-        check("the default drop of commands.json fails loudly", True)
-    t = real["tracer"]["start"]
-    check("the default tracer of commands.json fails loudly", subprocess.run(t, capture_output=True).returncode != 0)
+    # The real drop and tracer of commands.json need admin and change the machine, so no test runs them.
     src = open(os.path.join(HERE, "commands.json"), encoding="utf-8").read()
     check("commands.json holds the intended drop and tracer as comments, and no -accepteula in any file",
           "RAMMap64.exe\", \"-Et\"" in src and "Procmon64.exe" in src and not any(
