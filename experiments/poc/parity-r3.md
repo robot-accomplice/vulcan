@@ -1626,3 +1626,25 @@ Made by the reviewer of the seventh rerun, at the owner's request, after the sev
 - `internal/rules/defaults/v1.rules` and its hash. The fix is in the walk, not in a rule.
 - The base applications have no link, so `TestDefaultsOnBase` is not affected.
 - The 694 cases of the regression hold no link to a file. I did not rerun them.
+
+### Independent check of the N44 fix
+
+A fresh agent checked 0b81687, read-only, on Windows and on Linux, against its parent ceb0ebe. I reproduced its new finding at bab402b.
+
+**N44: Closed, in both arms.**
+
+- On Linux, each of these now fails in both arms at the link, and passed one arm or both before: a link to a file named `vendor/modules.txt`, a chain of links to it, `vendor/MODULES.TXT`, `api/orders/go.mod`, and `api/orders/GO.MOD`.
+- On Windows, a junction to a file and a symlink that WSL makes now fail in both arms too. Before, a nested `go.mod` of that form passed L and failed V, so the fix also closes that split.
+- A link to a directory at `.git/objects` or `.vulcan/build` fails at the link, before and after. The restructure changes nothing there.
+
+**New findings:**
+
+| # | Severity | Finding |
+|---|---|---|
+| N45 | Low | On Windows, a `.s` file in a leaf that is a junction to a file: V exits 1 on an I/O error ("The directory name is invalid"), and L exits 0 and builds. `rules.AsmFiles` lists the entry by its name. V then fails to read it, and L's `foreignCode` passes over a file that it cannot read. No code that no rule reads gets into the build. This was already so before 0b81687. Low, as N43 was: one arm is stricter, and nothing escapes. By the letter of the scale, a split on Windows could count as High, so the owner should confirm the severity |
+| N46 | Low | `TestLinkedFile` skips on Windows. But a junction to a file works there, and it is the Windows form that the fix changes (ModeIrregular, and `os.Stat` fails). The test has no case for that form, and no case where `os.Stat` fails |
+| N47 | Low | Text. `rules-file.md` says that the go command reads each such file through the link. A link that cannot be followed (dangling, a junction to a file, a WSL symlink seen from Windows) fails the check too, and the go command cannot read it. So there, both arms are stricter than the build, and the text does not say so. The "Rerun-7 fix" section says that my account cannot make a link to a file. That holds for a symlink, not for a junction to a file |
+
+**Tests.** On Windows, both suites pass: 26 packages at the root and 10 in `poc/golint`. On Linux, `TestLinkedFile` and `TestLinkedPart` pass. The Linux full suites do not count as evidence, either way: the same tests fail on ceb0ebe and 0b81687, because their subprocesses run with an empty module cache, and `TestSandboxScript` is a test for Windows paths.
+
+**Not checked:** a real file symlink on Windows, a cloud placeholder or dedup file, and a dangling `.s` symlink on Linux.
