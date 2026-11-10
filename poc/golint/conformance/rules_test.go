@@ -805,15 +805,22 @@ func TestLinkedPart(t *testing.T) {
 
 // TestLinkedFile is audit N44: vendor/modules.txt or a nested go.mod that is a link to a file fails in
 // both arms, as the plain file does. The go command reads each through the link, so with GOFLAGS empty
-// L built vendored code that no rule reads. A link to a file needs a right on Windows that an account
-// may lack; the test then skips.
+// L built vendored code that no rule reads. It is also audit N45: an assembly file that is a link fails
+// in both arms by its name, also where the link cannot be read. On Windows the link is a junction, which
+// needs no right and which os.Stat cannot follow to a file (audit N46); elsewhere it is a symlink.
 func TestLinkedFile(t *testing.T) {
+	const modules = "# example.com/evil v1.0.0\n## explicit; go 1.26.0\nexample.com/evil\n"
 	vulcan := buildVulcan(t)
 	for _, arm := range []struct {
 		name, bin string
 		check     []string
 	}{{"V", vulcan, []string{"check"}}, {"L", lintBin, []string{"./..."}}} {
-		for _, name := range []string{"vendor/modules.txt", "api/orders/go.mod"} {
+		for _, c := range []struct{ name, code, text string }{
+			{"vendor/modules.txt", "(error K0002|VL0002)", modules},
+			{"api/orders/go.mod", "(error K0002|VL0002)", modules},
+			{"api/orders/x_amd64.s", "(error K0126|VL0126)", "// no code\n"},
+		} {
+			name := c.name
 			t.Run(arm.name+"/"+name, func(t *testing.T) {
 				base, err := filepath.EvalSymlinks(t.TempDir())
 				if err != nil {
@@ -827,18 +834,22 @@ func TestLinkedFile(t *testing.T) {
 					}
 				}
 				target := filepath.Join(base, "target")
-				if err := os.WriteFile(target, []byte("# example.com/evil v1.0.0\n## explicit; go 1.26.0\nexample.com/evil\n"), 0o644); err != nil {
+				if err := os.WriteFile(target, []byte(c.text), 0o644); err != nil {
 					t.Fatal(err)
 				}
 				link := filepath.Join(root, filepath.FromSlash(name))
 				if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Symlink(target, link); err != nil {
-					t.Skipf("no link to a file on this host: %v", err)
+				if runtime.GOOS == "windows" {
+					if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
+						t.Fatalf("mklink: %v\n%s", err, out)
+					}
+				} else if err := os.Symlink(target, link); err != nil {
+					t.Fatal(err)
 				}
 				code, out := run(t, root, arm.bin, arm.check...)
-				at := regexp.MustCompile(regexp.QuoteMeta(name) + `:1:1: (error K0002|VL0002)`)
+				at := regexp.MustCompile(regexp.QuoteMeta(name) + `:1:1: ` + c.code)
 				if code == 0 || !at.MatchString(filepath.ToSlash(out)) {
 					t.Errorf("%s as a link to a file passes: exit %d\n%s", name, code, out)
 				}

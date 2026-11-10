@@ -77,12 +77,9 @@ func foreignCode(pass *analysis.Pass, u *model.Unit) {
 	dir := filepath.Join(u.M.Root, filepath.FromSlash(u.Dir))
 	for _, name := range rules.AsmFiles(dir) {
 		file := filepath.Join(dir, name)
-		b, err := os.ReadFile(file)
-		if err != nil {
-			continue
-		}
+		b, _ := os.ReadFile(file) // a file that cannot be read fails by its name, as in V (audit N45)
 		tf := pass.Fset.AddFile(file, -1, len(b)+1)
-		tf.SetLinesForContent(b)
+		tf.SetLinesForContent(append(b, '\n')) // line 1 even when b is empty
 		model.Report(pass, tf.Pos(0), "VL0126", "%s", rules.HoleH6FileMessage(name))
 	}
 }

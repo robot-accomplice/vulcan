@@ -1618,7 +1618,7 @@ Made by the reviewer of the seventh rerun, at the owner's request, after the sev
 ### Tests
 
 - Linux, in WSL, Go 1.27.3: `TestLinkedFile` and `TestLinkedPart` pass. With the old `check.go`, `TestLinkedFile` fails in each of its 4 cases, so the test can fail.
-- Windows, Go 1.27.3: `TestLinkedFile` skips, because my account cannot make a link to a file. `go test -count=1 -timeout 30m ./...` passes at the root (26 packages ok) and in `poc/golint` (10 packages ok).
+- Windows, Go 1.27.3: `TestLinkedFile` skips, because my account cannot make a symlink to a file. (Correction, N47: it can make a junction to a file. The test did not try one; see N46.) `go test -count=1 -timeout 30m ./...` passes at the root (26 packages ok) and in `poc/golint` (10 packages ok).
 - `lx7b.sh` of the seventh rerun, with Linux binaries of this fix: a `vendor/modules.txt` that is a link now gives K0002 and VL0002, with `GOFLAGS=-mod=mod` and with `GOFLAGS` empty, the same as a plain file.
 
 ### What did not change
@@ -1648,3 +1648,32 @@ A fresh agent checked 0b81687, read-only, on Windows and on Linux, against its p
 **Tests.** On Windows, both suites pass: 26 packages at the root and 10 in `poc/golint`. On Linux, `TestLinkedFile` and `TestLinkedPart` pass. The Linux full suites do not count as evidence, either way: the same tests fail on ceb0ebe and 0b81687, because their subprocesses run with an empty module cache, and `TestSandboxScript` is a test for Windows paths.
 
 **Not checked:** a real file symlink on Windows, a cloud placeholder or dedup file, and a dangling `.s` symlink on Linux.
+
+## Fixes of N45, N46 and N47
+
+The owner asked for all three to be fixed. The reviewer who made the N44 fix made these too.
+
+**N45: Closed.** An assembly or object file now fails by its name in both arms, also where it is a link that cannot be read.
+
+- `internal/gen/leaves.go`: V's generator copies each file of a part into the build. When it cannot read a file whose name `rules.IsForeign` matches, it now skips that file. K0126 reports the file by its name, so the check still fails. Before, V stopped on the I/O error and gave no K0126.
+- `poc/golint/imports/imports.go`: `foreignCode` now reports VL0126 when it cannot read the file. Before, it passed over the file, and L exited 0. The file set now gets a line 1 even for empty content, so the position is `name:1:1`, as for a readable file.
+- The Windows case of the check (a `.s` file in a leaf that is a junction to a file): V gives K0126 and L gives VL0126, each at `api/orders/x_amd64.s:1:1`. `go build` in L still passes, but the grader does not build when the check fails.
+
+**N46: Closed.** `TestLinkedFile` now makes a junction on Windows, which needs no right, and a symlink elsewhere. It no longer skips. A third case is added: `api/orders/x_amd64.s` as a link, which expects K0126 or VL0126. Each case links to a file with text that fits its name.
+
+| Code | Windows | Linux |
+|---|---|---|
+| The fix | 6 of 6 pass | 6 of 6 pass |
+| N45 edits reversed | The 2 `.s` cases fail | 6 of 6 pass. A symlink can be read on Linux, so N45 is a Windows form only |
+| `check.go` before 0b81687 | The 4 `vendor/modules.txt` and `go.mod` cases fail | Not rerun. The N44 fix section has that result |
+
+**N47: Closed.**
+
+- `rules-file.md` now says that a link that the go command cannot follow fails too (a dangling link, a junction to a file, or a WSL symlink seen from Windows), and that both arms are then stricter than the build. The H6 item says that a foreign file fails by its name, also as a link that cannot be read. The `TestLinkedFile` row names the new case and the junction.
+- The "Rerun-7 fix" section now says "a symlink to a file", with a note that a junction to a file can be made.
+
+**Tests.** On Windows, `go test -count=1 -timeout 30m ./...` passes at the root (exit 0, 26 packages ok) and in `poc/golint` (exit 0, 10 packages ok). The `poc/golint` run started before the last edit to the test, which gives each case its own target text. `TestLinkedFile` was then rerun alone on Windows, and passes.
+
+**Not rerun:** the 694 regression cases. No case holds a foreign file that cannot be read, and the change affects only that read. The defaults and their hash do not change.
+
+**Open now:** 0 High, 0 Medium, 0 Low.

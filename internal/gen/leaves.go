@@ -16,6 +16,7 @@ import (
 	"github.com/robot-accomplice/vulcan/internal/decl"
 	"github.com/robot-accomplice/vulcan/internal/lower"
 	"github.com/robot-accomplice/vulcan/internal/project"
+	"github.com/robot-accomplice/vulcan/internal/rules"
 )
 
 // RuntimeModule is the import path of the runtime module (decision 5).
@@ -277,6 +278,9 @@ func copyAssets(p *project.Project, pkg *project.Package, dir string) error {
 		rel, _ := filepath.Rel(p.Root, full)
 		b, err := os.ReadFile(full)
 		if err != nil {
+			if rules.IsForeign(d.Name()) {
+				return nil // K0126 rejects it by its name; the check reports it there (audit N45)
+			}
 			return err
 		}
 		return write(dir, filepath.ToSlash(rel), b)
