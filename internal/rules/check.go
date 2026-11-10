@@ -532,14 +532,14 @@ func ForeignRoots(root string) []Foreign {
 		}
 		rel = filepath.ToSlash(rel)
 		// A junction is ModeIrregular on Windows, a symlink ModeSymlink. Only one that leads to a
-		// directory can hold a package; os.Stat follows it.
+		// directory can hold a package; os.Stat follows it. A link to a file goes on to the test of its
+		// name, as the go command reads go.mod and vendor/modules.txt through a link (audit N44).
 		if d.Type()&(os.ModeSymlink|os.ModeIrregular) != 0 {
 			if fi, err := os.Stat(full); err == nil && fi.IsDir() {
 				out = append(out, Foreign{rel, 1, fmt.Sprintf("%s is a link to a directory, which go ./... does not follow and a build does, so the check may not read code that the build holds; make it a plain directory", rel)})
+				return nil
 			}
-			return nil
-		}
-		if d.IsDir() {
+		} else if d.IsDir() {
 			if rel == ".git/objects" || rel == ".vulcan/build" {
 				return filepath.SkipDir
 			}

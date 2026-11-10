@@ -803,6 +803,50 @@ func TestLinkedPart(t *testing.T) {
 	}
 }
 
+// TestLinkedFile is audit N44: vendor/modules.txt or a nested go.mod that is a link to a file fails in
+// both arms, as the plain file does. The go command reads each through the link, so with GOFLAGS empty
+// L built vendored code that no rule reads. A link to a file needs a right on Windows that an account
+// may lack; the test then skips.
+func TestLinkedFile(t *testing.T) {
+	vulcan := buildVulcan(t)
+	for _, arm := range []struct {
+		name, bin string
+		check     []string
+	}{{"V", vulcan, []string{"check"}}, {"L", lintBin, []string{"./..."}}} {
+		for _, name := range []string{"vendor/modules.txt", "api/orders/go.mod"} {
+			t.Run(arm.name+"/"+name, func(t *testing.T) {
+				base, err := filepath.EvalSymlinks(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				root := filepath.Join(base, "project")
+				fixture(t, arm.name, root)
+				if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
+					if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module shop\n\ngo 1.26.0\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				target := filepath.Join(base, "target")
+				if err := os.WriteFile(target, []byte("# example.com/evil v1.0.0\n## explicit; go 1.26.0\nexample.com/evil\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				link := filepath.Join(root, filepath.FromSlash(name))
+				if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, link); err != nil {
+					t.Skipf("no link to a file on this host: %v", err)
+				}
+				code, out := run(t, root, arm.bin, arm.check...)
+				at := regexp.MustCompile(regexp.QuoteMeta(name) + `:1:1: (error K0002|VL0002)`)
+				if code == 0 || !at.MatchString(filepath.ToSlash(out)) {
+					t.Errorf("%s as a link to a file passes: exit %d\n%s", name, code, out)
+				}
+			})
+		}
+	}
+}
+
 // TestAgentK35 is what an agent sees during a run, with one new finding (audit k35, amendment 11).
 // V's build and test refuse it, and L's go command does not read rules. That stays, as a measured cost.
 func TestAgentK35(t *testing.T) {

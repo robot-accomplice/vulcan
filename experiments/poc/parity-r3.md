@@ -1606,3 +1606,23 @@ Both test suites pass on Windows: `go test -count=1 -timeout 30m ./...` at the r
 
 - Windows symlinks, which my account cannot make. Junctions stand in for them. On Linux I ran symlinks.
 - The cause of `i2` in the sixth rerun. It is now K0002 and VL0002, so the question no longer affects a verdict.
+
+## Rerun-7 fix
+
+Made by the reviewer of the seventh rerun, at the owner's request, after the seventh rerun. No independent review of this fix has run. The sections above stay as they were.
+
+| Finding | Fix | Arms | Regression test | On the old code (29750f4) |
+|---|---|---|---|---|
+| N44, Low | In `ForeignRoots`, the link branch returns only for a link to a directory. A link to a file goes on to the test of its name, as before bd7fe7d. So a `vendor/modules.txt` or a `go.mod` below the root that is a link to a file fails: K0002 in V, VL0002 in L | Both | `TestLinkedFile`: each of the two names as a link to a file, in each arm | Each of the 4 cases fails the test: no finding at the link. V's `vendor/modules.txt` case exits 0 |
+
+### Tests
+
+- Linux, in WSL, Go 1.27.3: `TestLinkedFile` and `TestLinkedPart` pass. With the old `check.go`, `TestLinkedFile` fails in each of its 4 cases, so the test can fail.
+- Windows, Go 1.27.3: `TestLinkedFile` skips, because my account cannot make a link to a file. `go test -count=1 -timeout 30m ./...` passes at the root (26 packages ok) and in `poc/golint` (10 packages ok).
+- `lx7b.sh` of the seventh rerun, with Linux binaries of this fix: a `vendor/modules.txt` that is a link now gives K0002 and VL0002, with `GOFLAGS=-mod=mod` and with `GOFLAGS` empty, the same as a plain file.
+
+### What did not change
+
+- `internal/rules/defaults/v1.rules` and its hash. The fix is in the walk, not in a rule.
+- The base applications have no link, so `TestDefaultsOnBase` is not affected.
+- The 694 cases of the regression hold no link to a file. I did not rerun them.
