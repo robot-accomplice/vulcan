@@ -13,6 +13,9 @@
   "machine": "machine-1",
 
   "constants": { "tool_timeout_s": 1800, "port": 18080, "pay_port": 19090 },
+  // Rule 6 load gate: before each timed run and trace run, sample the machine for sample_s; start only when total
+  // CPU use <= cpu_max_pct and free memory >= mem_free_min_gb (GiB); wait up to wait_max_s, else skip and fault.
+  "load_gate": { "cpu_max_pct": 25, "mem_free_min_gb": 8, "sample_s": 3, "wait_max_s": 120 },
   // Row 19 (rule 6, AD2, AE6). The same numbers as experiments/poc/sim/warmup-sim.py, rule 2v2.
   "warmup": { "block": 50, "from_block": 4, "band": 0.05, "cap_blocks": 12, "timed": 100 },
   "confirm_path": "/health",

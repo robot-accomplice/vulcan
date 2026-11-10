@@ -20,6 +20,8 @@ import sys
 import tempfile
 import time
 
+import psutil
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # Exit codes of robocopy below this value are success (0 to 7 are "copied" or "nothing to copy").
@@ -29,6 +31,7 @@ STATUS_LAUNCH = -9998
 # Files that robocopy copies in the restore; /MIR also purges what the snapshot lacks.
 ROBOCOPY_FLAGS = ["/MIR", "/COPY:DAT", "/DCOPY:DAT", "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS", "/NP", "/NC", "/NS", "/MT:16"]
 READ_CHUNK = 1 << 20
+BYTES_PER_GB = 1 << 30
 GENERATED = re.compile(r"^// Code generated .* DO NOT EDIT\.\s*$")
 POSITION = re.compile(r"(\.(?:go|vulcan)):\d+(?::\d+)?(?:,\d+)?")
 FILE_TOKEN = re.compile(r"(?P<p>(?:[A-Za-z]:)?[\w.\\/\-]+?\.(?:go|vulcan))(?=[:,\s)]|$)")
@@ -249,7 +252,7 @@ def normalize(output, tree):
     kept, dropped, header = [], 0, {}
     for ln in text.split("\n"):
         ln = ln.strip()
-        if not ln:
+        if not ln or ln.startswith("go: downloading "):  # module fetch notes from the go command, not findings
             continue
         m = FILE_TOKEN.search(ln)
         if m:
@@ -326,6 +329,29 @@ def tree_hash(tree, exclude=()):
     return h.hexdigest()
 
 
+# ---------------------------------------------------------------- load gate
+
+def load_gate(cfg, raw, arm):
+    """Plan rule 6: before a run, sample the machine every sample_s. The run may start when the total CPU use is
+    at most cpu_max_pct and the free memory is at least mem_free_min_gb. It waits up to wait_max_s.
+    A run that never passes is a fault (`load-gate`) and the caller must not run it.
+    Returns the record that is kept with the run: passed, waited_s and every sample. Call it outside the timed interval."""
+    g = cfg["load_gate"]
+    samples = []
+    t0 = time.monotonic()
+    while True:
+        cpu = psutil.cpu_percent(interval=g["sample_s"])
+        free = psutil.virtual_memory().available / BYTES_PER_GB
+        samples.append({"cpu_pct": cpu, "free_gb": free})
+        passed = cpu <= g["cpu_max_pct"] and free >= g["mem_free_min_gb"]
+        waited = time.monotonic() - t0
+        if passed or waited >= g["wait_max_s"]:
+            break
+    if not passed:
+        raw.fault(arm, "load-gate")
+    return {"passed": passed, "waited_s": waited, "samples": samples}
+
+
 # ---------------------------------------------------------------- plan
 
 def make_plan(seed, batch, change_ids, arms, n):
@@ -375,6 +401,8 @@ class Raw:
         return self.n
 
     def seal(self, meta):
+        if self.faults:
+            self.json("faults.json", sorted(self.faults))
         files = []
         for d, _, names in os.walk(self.dir):
             for n in sorted(names):
@@ -402,13 +430,18 @@ def _harness(cfg, args):
         raise Abort("harness %s failed (exit %d)" % (args[0], p.returncode))
 
 
+def open_sealed(cfg, sealed, dest):
+    """Open a sealed file into the directory dest (the key is read from VULCAN_SEAL_KEY by the harness)."""
+    _harness(cfg, ["open", "-in", sealed, "-dir", dest])
+
+
 def seal_dir(cfg, d, out):
     _harness(cfg, ["seal", "-dir", d, "-out", out])
     if not os.path.isfile(out) or os.path.getsize(out) == 0:
         raise Abort("no sealed file written")
     tmp = tempfile.mkdtemp(prefix="vt-open-", dir=cfg["work_root"])
     try:
-        _harness(cfg, ["open", "-in", out, "-dir", tmp])
+        open_sealed(cfg, out, tmp)
         mine = sorted(os.path.relpath(os.path.join(a, f), d) for a, _, fs in os.walk(d) for f in fs)
         back = sorted(os.path.relpath(os.path.join(a, f), tmp) for a, _, fs in os.walk(tmp) for f in fs)
         if mine != back:

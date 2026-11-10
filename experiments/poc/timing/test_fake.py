@@ -31,11 +31,11 @@ def check(name, ok, why=""):
     print(("PASS " if ok else "FAIL ") + name + ("" if ok else ": " + why))
 
 
-def py(script, *args, arms=None):
+def py(script, *args, arms=None, config=FAKE):
     extra = ["--changes", CHANGES] if script == "row15.py" else ["--requests", REQUESTS]
     if arms:
         extra += ["--arms", arms]
-    p = subprocess.run([sys.executable, os.path.join(HERE, script), "--config", FAKE] + extra + list(args),
+    p = subprocess.run([sys.executable, os.path.join(HERE, script), "--config", config] + extra + list(args),
                        capture_output=True, text=True, cwd=HERE)
     all_output.append(p.stdout + p.stderr)
     return p
@@ -59,6 +59,98 @@ def read_runs(label):
     for n in sorted(os.listdir(os.path.join(d, "runs"))):
         runs.append(json.load(open(os.path.join(d, "runs", n))))
     return d, runs
+
+
+def gate_config(name, **gate):
+    """A copy of the fake config with other load_gate limits, written under the work root."""
+    c = {k: v for k, v in C.load_config(FAKE).items() if not k.startswith("_")}
+    c["load_gate"] = dict(c["load_gate"], **gate)
+    path = os.path.join(WORK, name)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(c, f)
+    return path
+
+
+def gate_ok(g):
+    """A gate record that passed: the samples of CPU use and free memory, the wait, and the verdict."""
+    return (isinstance(g, dict) and g.get("passed") is True and isinstance(g.get("waited_s"), float) and g["waited_s"] >= 0
+            and len(g.get("samples", [])) >= 1
+            and all(isinstance(s["cpu_pct"], float) and 0 <= s["cpu_pct"] <= 100 and isinstance(s["free_gb"], float) and s["free_gb"] > 0 for s in g["samples"]))
+
+
+def cache_markers(arm):
+    d = os.path.join(C.arm_cfg(cfg, arm)["_ctx"]["cache"], "fakecache")
+    return sorted(f for f in os.listdir(d) if f.startswith("marker_"))
+
+
+def read_trace(label):
+    rc, d = open_sealed(label)
+    assert rc == 0
+    return [json.load(open(os.path.join(d, "trace", n))) for n in sorted(os.listdir(os.path.join(d, "trace")))]
+
+
+# What the reader may write (the whitelist) and what it must never write.
+READER_KEYS = {"label", "run", "arm", "change", "path", "tools", "name", "status", "output", "counts", "tool", "files_opened",
+               "cache_files_opened", "arms", "faults", "runs", "file"}
+DROPPED_KEYS = {"index", "draw", "position_in_draw", "order", "plan", "seed", "batch", "machine", "unit", "cmd", "ns", "wall_ns", "steps_ns",
+                "wall_ns_total", "clean", "findings", "dropped", "base_status", "load_gate", "samples", "waited_s", "passed", "skipped",
+                "samples_ns", "median_ns", "residual_fall_pct", "unsettled", "warm_blocks", "invalid", "created_utc", "config_sha256", "kind"}
+
+
+def walk(o):
+    """Every (key, value) pair and every bare number of a JSON value."""
+    if isinstance(o, dict):
+        for k, v in o.items():
+            yield k, v
+            yield from walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            yield from walk(v)
+
+
+def times_of(runs):
+    """Every recorded time of the runs, as ns and as the s and ms that a reader could derive."""
+    ns = []
+    for r in runs:
+        ns += [r[k] for k in ("wall_ns", "median_ns") if k in r] + list(r.get("steps_ns", {}).values() if isinstance(r.get("steps_ns"), dict) else [])
+        ns += [t["ns"] for t in r.get("tools", [])] + list(r.get("samples_ns", []))
+    ns = [x for x in ns if isinstance(x, (int, float)) and x > 1000]
+    return {float(x) for x in ns} | {x / 1e9 for x in ns} | {x / 1e6 for x in ns}
+
+
+def reader_view(label):
+    out = os.path.join(WORK, "reader-" + label)
+    C.rmtree(out)
+    p = subprocess.run([sys.executable, os.path.join(HERE, "reader.py"), "--config", FAKE, "--sealed", os.path.join(WORK, "sealed", label + ".sealed"), "--out", out],
+                       capture_output=True, text=True, cwd=HERE)
+    all_output.append(p.stdout + p.stderr)
+    return p, out
+
+
+def reader_files(out):
+    return {n: open(os.path.join(out, n), encoding="utf-8").read() for n in sorted(os.listdir(out))}
+
+
+def check_reader(label, raw_runs):
+    p, out = reader_view(label)
+    check("reader %s: exits 0 and prints nothing" % label, p.returncode == 0 and not p.stdout.strip(), p.stdout + p.stderr)
+    files = reader_files(out)
+    index = json.loads(files["index.json"])
+    views = [json.loads(v) for n, v in files.items() if n != "index.json"]
+    check("reader %s: one file per run, plus index.json" % label, len(views) == len(raw_runs) == len(index["runs"]) and sorted(files) == sorted(["index.json"] + [r["file"] for r in index["runs"]]),
+          "%d views, %d raw runs" % (len(views), len(raw_runs)))
+    keys = {k for text in files.values() for k, _ in walk(json.loads(text))}
+    check("reader %s: every key is on the whitelist and none of the dropped keys is in any file" % label, keys <= READER_KEYS and not (keys & DROPPED_KEYS), str(keys - READER_KEYS))
+    check("reader %s: no key names a time, a wall or a step" % label, not any(k.endswith("_ns") or k.endswith("_s") or "time" in k or "wall" in k or "step" in k for k in keys))
+    recorded = times_of(raw_runs)
+    tokens = {float(t) for text in files.values() for t in re.findall(r"\d+\.\d+(?:[eE][+-]?\d+)?|\d{4,}", text)}
+    floats = {v for text in files.values() for _, v in walk(json.loads(text)) if isinstance(v, float)}
+    check("reader %s: no float and no number in any file equals a recorded time" % label, recorded and not ((tokens | floats) & recorded), str(sorted((tokens | floats) & recorded)[:3]))
+    rl = [(r["arm"], r.get("change", r.get("path"))) for r in index["runs"]]
+    check("reader %s: runs are sorted by arm then id, not by run order" % label, rl == sorted(rl) and [r["run"] for r in index["runs"]] == list(range(1, len(rl) + 1)))
+    check("reader %s: the arm list of the plan and the label are given" % label, index["arms"] == sorted(index["arms"]) and index["label"] == label and len(index["arms"]) >= 2)
+    check("reader %s: the temp directory is gone" % label, not [n for n in os.listdir(WORK) if n.startswith("vt-read-")], str(os.listdir(WORK)))
+    return index, views
 
 
 def main():
@@ -115,6 +207,14 @@ def main():
     ok_wall = abs(sum(r["wall_ns"] for r in runs1) / 1e9 - float(lines[2].split(": ")[1])) < 0.2
     check("the printed total is the sum of the whole-run wall times", ok_wall)
 
+    # --- load gate that passes: the samples are kept with every run
+    check("load gate: every timed run keeps its samples of CPU use and free memory, and passed", all(gate_ok(r.get("load_gate")) for r in runs1))
+    slow = gate_config("commands.gate-slow.json", sample_s=5)
+    py("row15.py", "run", "--label", "g0", "--seed", "s1", "--n", "1", "--only", "c1", arms="C", config=slow)
+    _, runs_g0 = read_runs("g0")
+    check("load gate: the gate time is outside the timed interval (a 5 s sample waits 5 s but the wall time is shorter)",
+          len(runs_g0) == 1 and gate_ok(runs_g0[0]["load_gate"]) and runs_g0[0]["load_gate"]["waited_s"] >= 5 and runs_g0[0]["wall_ns"] / 1e9 < 4, str(runs_g0[0]["wall_ns"] / 1e9))
+
     # --- dirty change is a fault
     q = py("row15.py", "run", "--label", "r3", "--seed", "s1", "--n", "3", "--only", "c2")
     lines = q.stdout.strip().split("\n")
@@ -166,6 +266,10 @@ def main():
         # 5 runs per arm have happened; if a restore were missing, the markers of the earlier runs would still be here
         check("restore in a run: cache of arm %s holds the snapshot's markers and those of the last run only" % arm, n == in_snap + 1, "found %d, snapshot %d" % (n, in_snap))
 
+    # --- the go command's module fetch notes are not findings (they made a clean go vet base read 9)
+    f, _ = C.normalize(b"go: downloading modernc.org/sqlite v1.61.0\nx.go:3:1: real finding\n", WORK)
+    check("go: downloading lines are not counted as findings", len(f) == 1 and "real finding" in f[0], f)
+
     # --- a drop that fails stops the run loudly
     bad = C.load_config(FAKE)
     bad["drop"] = {"cmd": [sys.executable, "-c", "import sys; sys.exit(1)"]}
@@ -206,6 +310,8 @@ def main():
     check("trace parser: the process tree, a read access, a success, one path once",
           C.parse_trace_csv(csvp, tree, 100, ["C:\\w\\cache"]) == (2, 0))
 
+    check("load gate: every trace run keeps its samples and passed", all(gate_ok(r.get("load_gate")) for r in tr))
+
     # --- row 19: the warm-up rule against the simulation's 2v2 rule on fixed sequences
     check_warmup_against_sim()
 
@@ -225,6 +331,54 @@ def main():
     check("row19: the median is the median of the timed 100", all(abs(r["median_ns"] - float(np.median(r["samples_ns"][-100:]))) < 1 for r in runs))
     check("row19: the total printed is the sum of the whole-run wall times", abs(sum(r["wall_ns"] for r in runs) / 1e9 - float(lines[2].split(": ")[1])) < 0.2)
     check("row19: the raw directory is gone", not os.path.exists(os.path.join(WORK, "raw", "w1")))
+    check("load gate: every row19 run keeps its samples and passed", all(gate_ok(r.get("load_gate")) for r in runs))
+
+    # --- load gate that never passes: the run is skipped, nothing runs, and the fault is reported
+    never = gate_config("commands.gate-never.json", cpu_max_pct=-1, wait_max_s=0.5)
+    before = cache_markers("A")
+    q = py("row15.py", "run", "--label", "g15", "--seed", "s1", "--n", "2", "--only", "c1", arms="A", config=never)
+    lines = q.stdout.strip().split("\n")
+    _, rg = read_runs("g15")
+    check("load gate: a row15 run that never passes prints 'fault: A load-gate' and counts its two slots", "fault: A load-gate" in lines and "runs: 2" in lines and "faults: none" not in lines, q.stdout + q.stderr)
+    check("load gate: a skipped row15 run ran no step and no tool, and keeps its failed samples",
+          len(rg) == 2 and all(r["skipped"] == "load-gate" and r["tools"] == [] and "wall_ns" not in r and "steps_ns" not in r
+                               and r["load_gate"]["passed"] is False and len(r["load_gate"]["samples"]) > 1 for r in rg), str(rg))
+    q = py("row15.py", "trace", "--label", "g15t", "--seed", "s1", "--all", arms="A", config=never)
+    lines = q.stdout.strip().split("\n")
+    rt = read_trace("g15t")
+    check("load gate: a trace run that never passes prints 'fault: A load-gate' and counts no file", "fault: A load-gate" in lines and "runs: 2" in lines
+          and len(rt) == 2 and all(r["skipped"] == "load-gate" and r["counts"] == [] and "wall_ns" not in r for r in rt), q.stdout + q.stderr)
+    check("load gate: no tool of a skipped row15 run touched the cache", cache_markers("A") == before)
+    q = py("row19.py", "run", "--label", "g19", "--seed", "s1", "--n", "2", arms="A", config=never)
+    lines = q.stdout.strip().split("\n")
+    _, r19 = read_runs("g19")
+    check("load gate: a row19 run that never passes prints 'fault: A load-gate' and starts no app",
+          "fault: A load-gate" in lines and "runs: 2" in lines and len(r19) == 2
+          and all(r["skipped"] == "load-gate" and "samples_ns" not in r and "wall_ns" not in r and r["load_gate"]["passed"] is False for r in r19), q.stdout + q.stderr)
+
+    # --- the procedure reader's view
+    index, views = check_reader("r1", runs1)
+    raw_out = sorted(open(os.path.join(d1, t["output"]), encoding="utf-8", errors="replace", newline="").read() for r in runs1 for t in r["tools"])
+    check("reader r1: the kept output and exit status of every tool are shown",
+          sorted(t["output"] for v in views for t in v["tools"]) == raw_out and any(t["output"] for v in views for t in v["tools"])
+          and sorted((v["arm"], t["name"], t["status"]) for v in views for t in v["tools"]) == sorted((r["arm"], t["name"], t["status"]) for r in runs1 for t in r["tools"]))
+    tr_runs = read_trace("t1")
+    pt, out_t = reader_view("t1")
+    vt = [json.loads(v) for n, v in reader_files(out_t).items() if n != "index.json"]
+    check("reader t1: the file counts of every trace run are shown, and no other number",
+          pt.returncode == 0 and sorted(json.dumps(v["counts"], sort_keys=True) for v in vt) == sorted(json.dumps(r["counts"], sort_keys=True) for r in tr_runs)
+          and not ({k for v in vt for k, _ in walk(v)} & DROPPED_KEYS), pt.stderr)
+    _, runs3_ = read_runs("r3")
+    index3, _ = check_reader("r3", runs3_)
+    check("reader r3: the fault list of the raw is shown", "A not-clean tool fake-file" in index3["faults"] and index3["faults"] == sorted(index3["faults"]), str(index3["faults"]))
+    index19, views19 = check_reader("w1", runs)
+    check("reader w1: a row19 run shows its arm and request path id only", all(set(v) == {"label", "run", "arm", "path"} for v in views19) and len(views19) == 6)
+    check("reader: it refuses a non-empty output directory and a wrong key",
+          subprocess.run([sys.executable, os.path.join(HERE, "reader.py"), "--config", FAKE, "--sealed", os.path.join(WORK, "sealed", "r1.sealed"), "--out", os.path.join(WORK, "reader-r1")],
+                         capture_output=True, cwd=HERE).returncode != 0
+          and subprocess.run([sys.executable, os.path.join(HERE, "reader.py"), "--config", FAKE, "--sealed", os.path.join(WORK, "sealed", "r1.sealed"), "--out", os.path.join(WORK, "reader-bad")],
+                             capture_output=True, cwd=HERE, env=dict(os.environ, VULCAN_SEAL_KEY=other)).returncode != 0
+          and not [n for n in os.listdir(WORK) if n.startswith("vt-read-")])
 
     # --- a seal key never printed
     blob = "\n".join(all_output)

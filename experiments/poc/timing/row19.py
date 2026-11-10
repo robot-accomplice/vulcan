@@ -124,6 +124,12 @@ def timed_run(cfg, arm, a, req, raw, draw, pos):
     idx = raw.next_index()
     helper = app = None
     rec = {"index": idx, "draw": draw, "position_in_draw": pos, "arm": arm, "machine": cfg.get("machine"), "path": req["id"]}
+    rec["load_gate"] = C.load_gate(cfg, raw, arm)
+    if not rec["load_gate"]["passed"]:
+        # Skipped: no helper and no app started. The slot still counts in `runs`.
+        rec["skipped"] = "load-gate"
+        raw.json("runs/%05d.json" % idx, rec)
+        return
     try:
         if r.get("helper"):
             helper = subprocess.Popen(C.expand(r["helper"], ctx), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -8,7 +8,8 @@
 
 Steps of one run (plan-coverage.md, rule 6): (1) restore the closed list of caches from the snapshot,
 (2) drop the file cache, (3) read the program files back, (4) apply the one-file change, (5) time the
-check. The change is reverted after the run. Every raw record is sealed and the raw directory is deleted.
+check. The change is reverted after the run. Before step 1 of each timed run and trace run, and outside the timed
+interval, the load gate of rule 6 samples the machine (common.load_gate); a run that fails it is skipped. Every raw record is sealed and the raw directory is deleted.
 """
 import argparse
 import json
@@ -140,6 +141,12 @@ def timed_run(cfg, arm, a, base, ch, spec, raw, draw, pos, pristine_hash):
     ctx = a["_ctx"]
     env = C.arm_env(cfg, arm)
     idx = raw.next_index()
+    head = {"index": idx, "draw": draw, "position_in_draw": pos, "arm": arm, "machine": cfg.get("machine"), "change": ch["id"]}
+    gate = C.load_gate(cfg, raw, arm)
+    if not gate["passed"]:
+        # Skipped: no step and no tool ran. The slot still counts in `runs`.
+        raw.json("runs/%05d.json" % idx, dict(head, load_gate=gate, skipped="load-gate", tools=[]))
+        return
     steps = {}
     t0 = time.perf_counter_ns()
     applied = prepare_run(cfg, a, spec, raw, arm, steps)
@@ -168,8 +175,7 @@ def timed_run(cfg, arm, a, base, ch, spec, raw, draw, pos, pristine_hash):
         raw.write(rel, r["output"])
         recs.append({"name": r["name"], "unit": r["unit"], "cmd": r["cmd"], "status": r["status"], "ns": r["ns"], "clean": clean,
                      "findings": len(f), "dropped": d, "base_status": b["status"], "output": rel})
-    raw.json("runs/%05d.json" % idx, {"index": idx, "draw": draw, "position_in_draw": pos, "arm": arm, "machine": cfg.get("machine"),
-                                      "change": ch["id"], "steps_ns": steps, "wall_ns": wall, "tools": recs})
+    raw.json("runs/%05d.json" % idx, dict(head, load_gate=gate, steps_ns=steps, wall_ns=wall, tools=recs))
 
 
 def cmd_run(cfg, args, changes):
@@ -204,6 +210,11 @@ def traced_run(cfg, arm, a, ch, spec, raw, draw, pos, pristine_hash):
     tcfg = cfg["tracer"]
     env = C.arm_env(cfg, arm)
     idx = raw.next_index()
+    head = {"index": idx, "draw": draw, "position_in_draw": pos, "arm": arm, "machine": cfg.get("machine"), "change": ch["id"]}
+    gate = C.load_gate(cfg, raw, arm)
+    if not gate["passed"]:
+        raw.json("trace/%05d.json" % idx, dict(head, load_gate=gate, skipped="load-gate", counts=[]))
+        return
     tdir = os.path.join(cfg["work_root"], "trace_tmp")
     os.makedirs(tdir, exist_ok=True)
     tctx = {"log": os.path.join(tdir, "t%05d.pml" % idx), "csv": os.path.join(tdir, "t%05d.csv" % idx), "here": C.HERE}
@@ -248,8 +259,7 @@ def traced_run(cfg, arm, a, ch, spec, raw, draw, pos, pristine_hash):
             if os.path.exists(tctx[k]):
                 os.remove(tctx[k])
         revert(a, spec, pristine_hash, raw, arm)
-    raw.json("trace/%05d.json" % idx, {"index": idx, "draw": draw, "position_in_draw": pos, "arm": arm, "machine": cfg.get("machine"),
-                                       "change": ch["id"], "wall_ns": wall, "counts": counts})
+    raw.json("trace/%05d.json" % idx, dict(head, load_gate=gate, wall_ns=wall, counts=counts))
 
 
 def execute(cfg, args, byid, arms, plan, trace):

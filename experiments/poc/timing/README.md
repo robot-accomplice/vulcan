@@ -8,12 +8,13 @@ directory is deleted.
 
 | File | What |
 |---|---|
-| `commands.json` | The commands per arm, the unit of each tool, the closed lists, the drop command, the tracer, the warm-up constants. JSON with full-line `//` comments |
-| `common.py` | Restore, program-file read, tool run, findings filter, plan, raw directory, seal, output guard, trace parser |
+| `commands.json` | The commands per arm, the unit of each tool, the closed lists, the drop command, the tracer, the load gate, the warm-up constants. JSON with full-line `//` comments |
+| `common.py` | Restore, program-file read, tool run, findings filter, load gate, plan, raw directory, seal, output guard, trace parser |
 | `row15.py` | `setup`, `run`, `trace`, `confirm` |
 | `row19.py` | `setup`, `run`, `confirm` |
+| `reader.py` | The procedure reader's view of a sealed file: tool output and file counts, no time and no order |
 | `commands.fake.json`, `changes.fake.json`, `requests.fake.json`, `fake/` | A FAKE arm set for `test_fake.py`. Never for a measurement |
-| `test_fake.py` | 55 checks on the fake set |
+| `test_fake.py` | 94 checks on the fake set |
 | `changes.example.json`, `requests.example.json` | The format of the two files that the owner and the fresh sessions supply |
 
 ## What a command prints
@@ -66,6 +67,35 @@ A run is clean when each tool has the exit status and the findings of the same c
 Findings are the output lines with line and column numbers removed (a one-file change shifts them), after the
 one filter of rule 2 (a line about a file that starts with `// Code generated ... DO NOT EDIT.` is dropped).
 
+## Load gate
+
+Before step 1 of each timed run, each trace run and each row-19 run, and outside the timed interval,
+`common.load_gate` samples the machine for `sample_s` (3 s). The run starts only when the total CPU use is at
+most `cpu_max_pct` (25) and the free memory is at least `mem_free_min_gb` (8, in GiB, as psutil `available`).
+It samples again until `wait_max_s` (120 s) has passed. The limits are in the `load_gate` object of the config.
+The record of each run keeps `load_gate`: `passed`, `waited_s` and every sample (`cpu_pct`, `free_gb`), and is
+sealed with the run.
+
+A run that never passes is not run and is a fault (`fault: <arm> load-gate`). Its slot still takes a run
+number and a record (`"skipped": "load-gate"`, no tools, no time), so **`runs:` counts the planned slots, run
+or skipped**, as it already counted a row-19 run that failed. The number of skipped runs is the number of
+`load-gate` faults of the raw (the printed fault line has no count).
+
+## Reader view
+
+```bash
+python reader.py --sealed <label>.sealed --out <empty dir> [--config commands.json]
+```
+
+The sealed file is opened (key from `VULCAN_SEAL_KEY`) into a temporary directory that is deleted at the end.
+Only a whitelist of fields is written to `--out`: per run its label, `run`, `arm`, `change` (row 15) or `path`
+(row 19), each tool's `name`, `status` and kept `output`, and the `counts` (`files_opened`,
+`cache_files_opened`) of a trace run; and in `index.json` the arm list of the plan and the faults of the raw
+(`faults.json`, written by the seal when there is one). No time, draw, position, seed, load sample, latency
+figure, unsettled flag or manifest time is copied. `run` is the number in the sorted list (arm, then change
+id, then a hash of the run's own content), not the harness's run number, because that number is the run order.
+The output is one `run-NNNNN.json` per run and `index.json`.
+
 ## The commands per arm and the unit of each tool
 
 | Arm | Tool | Command | Unit |
@@ -106,9 +136,6 @@ finding.
 
 ## Not built
 
-- The **procedure reader's view** (a tool that opens a sealed file and shows the tool output and the file
-  counts but no time). The sealed files open with `harness open -in <file> -dir <dir>`; a reader that must
-  not see times needs a filtered view first.
 - The audit of **program files loaded** (it needs the tracer; the closed list of program files is by
   directory).
 - The row-19 app for P with assertions (phase A'); the dry run uses the base code.

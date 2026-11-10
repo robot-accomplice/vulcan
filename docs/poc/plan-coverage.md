@@ -1,6 +1,6 @@
 # Plan: close each principle of the initial evaluation
 
-Status: **draft 13 with amendment OW1** (one machine, 2026-11-10): draft 10 accepted by the owner (D1a, 2026-11-05), plus the AE1 to AE6 fixes (draft 11),
+Status: **draft 13 with amendments OW1 to OW3** (2026-11-10: one machine, V's common tools, load gate): draft 10 accepted by the owner (D1a, 2026-11-05), plus the AE1 to AE6 fixes (draft 11),
 the AF1 to AF6 fixes (draft 12) and the AG1 to AG7 fixes (draft 13), all before the phase A dry run. AE7 and R17 stay open. The amendment of section 9 is made in
 plan-r3, hypotheses-r3 and the views draft. Its rows for D1d and D6 wait on those decisions. Its audit is
 [audit-plan-coverage.md](../../experiments/poc/audit-plan-coverage.md): draft 1 had 12 High, 15
@@ -152,7 +152,7 @@ test that the model can't be tempted into, and a gate that stops a test do not c
        verifier runs with a resource limit (the Z3 solver's `rlimit`), not a time limit, so its
        outcome is fixed. Row 11c runs `go test -race` in every arm, and its result depends on
        scheduling. It runs once a seed, by one fixed procedure: `-count=20`, `GOMAXPROCS=4`, on
-       machine 1 of rule 7, with no other load (AA5). The writer unit below is valid whether or not a
+       machine 1 of rule 7, under the load gate of rule 6 (AA5, OW3). The writer unit below is valid whether or not a
        seed's outcome is fixed, because each seed is evaluated once.
    - **Agent columns: a sealed pool, written first** (Y1). Before a campaign's first batch, fresh
      writers write the whole pool from one brief. A task pool is 20 writers of 20 tasks each (400
@@ -179,8 +179,10 @@ test that the model can't be tempted into, and a gate that stops a test do not c
      machine 1 (OW1). Row 15 runs from a **warm cache in a fixed state, set the same way in every arm**
      (AC1). The **check** of row 15 is one command an arm (AD8). P runs `go vet`, `staticcheck`,
      `errcheck`, `exhaustive`, `dupl`, `gopls check` and its architecture linter. L runs the same
-     common tools and L's analyzers. V runs its check command, which runs the same common tools on
-     the lowered Go and V's own checks. The warnings and fixes of row 11 are off in every arm, so the
+     common tools and L's analyzers. V runs its check command and then the same common tools on
+     the lowered Go, by rule 2 (`//line` positions and the one filter rule). `vulcan check` does not
+     run the common tools itself (found in the dry-run setup), so V's one command is a wrapper that
+     runs both (OW2). The warnings and fixes of row 11 are off in every arm, so the
      check is Base (section 5, AE3). The record writes the three commands before phase A'.
      - **The scope of a change** (AE4, AF2). In every arm, each tool reads the changed Go file and every
        Go file that the arm's own build rewrites because of the change. In P and L, this is the
@@ -251,7 +253,13 @@ test that the model can't be tempted into, and a gate that stops a test do not c
        the list starts in the same kind of state in each arm. The record lists the caches restored
        in each arm (AC2), and keeps each run's tool output, so that a warm arm shows.
      - In rows 15 and 19, the arms of a draw run in a random order, fixed by a seed before the first
-       batch, and no other load runs on the machine (AD1).
+       batch. **Load gate** (AD1, OW3): the aim is that no load outside the run slows a run, not that
+       no other program is open. Before each timed run and each trace run, the harness samples the
+       machine for 3 s. The run starts only when total CPU use is at most 25% and free memory is at
+       least 8 GB. It waits up to 120 s; a run that never passes is not run and is a fault
+       (`load-gate`). The sampled CPU use and free memory of each run are kept with the run and
+       sealed like its time. An idle Claude app may stay open; no agent session works during a
+       batch. The random order spreads any steady load equally over the arms.
      - **The warm-up of row 19** (AD2, AE6). Row 19 runs in steady state in every arm: a run starts
        a fresh process and sends warm-up requests in blocks of 50. From block 4, the warm-up ends
        at the first block where the median time of the last two blocks (100 requests) is within 5%
@@ -910,6 +918,8 @@ Draft 1's findings that the audit's section 8 closed are not repeated here.
 
 | Finding | Change |
 |---|---|
+| OW3 (owner, 2026-11-10) | Amendment by rule 13, before the batch 1 data. Reason (owner): the question is not whether other programs are open, but whether load slows the runs. Rule 6 replaces "no other load" with a load gate: at most 25% total CPU and at least 8 GB free memory over 3 s before each timed or trace run, a fault if not met in 120 s, and the sampled values kept and sealed per run. The limits were set from the idle machine with the Claude app open (about 12% CPU, 15 GB free of 31 GB, 16 threads), with no run data. The dry run had no gate; no column reads it |
+| OW2 (owner, 2026-11-10) | Rule 6, no rule change: rule 2 already says the common tools run on V's lowered Go. The dry-run setup found that `vulcan check` does not run them, so the text that said it does is corrected. In phase A' and the timing campaign, V's one command runs `vulcan check` and then the common tools on the lowered Go. The owner chose this over timing V's check alone (which favours V on time) and over cutting P and L to V's tools. The dry run used what each arm ships, by AE1 |
 | OW1 (owner, 2026-11-10) | Amendment by rule 13, made after the phase A dry run and before the batch 1 data of phase A'. Reason (owner): validation on more than one platform is a late concern. A verdict on one platform comes first: if no Gain shows on one platform, repeating the runs on others adds cost and no answer. A Gain on machine 1 would then be tested on other platforms in a later stage. So the second machine (the owner's Mac) does not run in this evaluation. It cites no figure of an arm; the person who wrote it saw only the dry-run run counts, faults and totals. Rule 7: every timing run is on machine 1, and D is its value; the machine sequence is gone. Rule 6: the totals are over all arms on machine 1. Section 6: timing runs halve (row 15: 60 a batch; row 19: 40), and the batch ranges are now a lower guide, because they were set with D as a two-machine mean. Section 8: a lean row for one machine. The dry run on machine 1 is complete, not partial |
 | AG1 | Rule 6: the seal covers the same outputs in phase A' and in every batch of the timing campaign (times, unsettled counts, residual fall, trace file counts, tool output), until the column closes or its campaign stops. A fresh procedure reader reads the tool output and the file counts. It reports "none" or the faults, and gives no count, time, size or order of arms. A fresh procedure fixer sees the faults, the totals and the count of faults. No rule changes after the dry run or after the trace runs of phase A', except by an amendment (rule 13) before the batch 1 data that cites no figure of an arm. The list of covered rules now holds the unit list, the definition of a read and the tracer. After the batch 1 data, a change makes a new column. I named the roles instead of "the person who fixes a fault", because a fault names a tool and may name an arm, so who sees it matters |
 | AG2 | Rule 6 and section 8: "signature or export change" is defined for Go (signature, exported name and type) and for V (`.vulcan` signature, type, exported name, contract, effect, variant set that an exhaustive check reads). A contract or an effect change counts even when the Go signature is the same. Each change must leave the check clean in every arm, with the exit status of each tool kept per run; a run that is not clean is a fault. Section 8: the lean favours the arm whose cross-file checks do the most work (probably V, not timed). The cause is the cross-file check, not the lowering. The scope clause has the lowering as its cause, so the net direction for V is stated as not known. This differs from the audit's "probably toward V" for the net, because the two causes pull in opposite ways |
