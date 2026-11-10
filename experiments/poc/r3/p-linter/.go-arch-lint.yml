@@ -1,0 +1,81 @@
+# go-arch-lint configuration for Stockroom. Run from the app root:
+#   go-arch-lint check --arch-file ../.go-arch-lint.yml --project-path .
+# Config syntax: https://github.com/fe3dback/go-arch-lint/blob/master/docs/syntax/README.md
+version: 3
+workdir: .
+
+allow:
+  depOnAnyVendor: false
+
+components:
+  main:       { in: cmd/stockroom }
+  # Domain services (README: inventory, orders, billing, purchasing, events)
+  inventory:  { in: api/inventory }
+  orders:     { in: api/orders }
+  billing:    { in: api/billing }
+  purchasing: { in: api/purchasing }
+  events:     { in: api/events }
+  # Adapters (README: web, store, payments, webhooks)
+  web:        { in: api/web }
+  store:      { in: api/store }
+  payments:   { in: api/payments }
+  webhooks:   { in: api/webhooks }
+  # Shared domain types and errors
+  shop:       { in: lib/shop }
+
+vendors:
+  sqlite:
+    in:
+      - modernc.org/sqlite
+      - modernc.org/sqlite/**
+
+# R1: The shared domain package is importable by every component, and it
+# imports no other project component (so no library -> api or cmd import).
+# Source: https://www.gobeyond.dev/standard-package-layout/ (rule 1: the root
+# domain package imports no other application package).
+commonComponents:
+  - shop
+
+deps:
+  # R2: main wires everything. It may import any project package; nothing
+  # imports main (Go also forbids importing package main).
+  # Source: https://www.gobeyond.dev/standard-package-layout/ (rule 4: main
+  # wires the dependencies together) and https://go.dev/doc/modules/layout
+  # (commands live in cmd/).
+  main:
+    anyProjectDeps: true
+
+  # R3: shop (library) depends on no project component. Any import of api/* or
+  # cmd/* from lib/* fails.
+  # Source: https://www.gobeyond.dev/standard-package-layout/ (rule 1).
+  # (shop has no entry in deps: a component with no entry may import no other
+  # project component. An empty mayDependOn list is rejected by the tool.)
+
+  # R4: Domain services do not import adapters (web, store, payments,
+  # webhooks) or each other. They depend only on shop. Packages cooperate
+  # through domain types and interfaces that main injects.
+  # Source: https://www.gobeyond.dev/standard-package-layout/ (rule 2: subpackages
+  # talk to each other only through domain interfaces) and
+  # https://alistair.cockburn.us/hexagonal-architecture/ (the application core
+  # does not depend on its adapters).
+  # (inventory, orders, billing, purchasing and events have no deps entry on purpose.)
+
+  # R5: Adapters depend only on shop, not on each other and not on the domain
+  # services. Same sources as R4.
+  # R6: The HTTP layer (web) does not import the persistence layer (store) or
+  # the outbound clients directly; it uses shop interfaces. This is the
+  # "handlers depend on the domain, not on the database" direction.
+  # Source: https://www.gobeyond.dev/standard-package-layout/ (rule 2).
+  # (web, payments and webhooks have no deps entry on purpose.)
+  store:
+    # R7: The SQLite driver is used by the persistence adapter only.
+    # Source: https://www.gobeyond.dev/standard-package-layout/ (rule 2: code
+    # that touches an external system lives in its own adapter subpackage).
+    canUse:
+      - sqlite
+
+# R8: No import cycles. Go rejects cycles at compile time; with the deps above
+# (all edges point to shop or from main) no cycle can form.
+# Source: https://go.dev/ref/spec#Program_initialization_and_execution
+# (packages form an acyclic import graph) -- enforced by the compiler, and
+# kept by the directed edges above.

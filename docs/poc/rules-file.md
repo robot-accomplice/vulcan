@@ -2,7 +2,7 @@
 
 This is what step 2 of [plan-r3.md](plan-r3.md) built, with amendment 6 of its section 9. `vulcan` and `vulcan-lint` have the same commands and read the same format. Both call the package `internal/rules`, so a rule means the same in each arm. `poc/golint/conformance/gen_rule_cases.py` writes the same cases for both.
 
-`defaults v1` is a draft. It is not frozen, and no blind test has run on it. Its list of what it cannot state is in [NOT-STATED.md](../../experiments/poc/r3/defaults/NOT-STATED.md).
+`defaults v1` is **frozen** (plan-r3 step 4, 2026-11-10), together with P's architecture linter configuration. Step 3's parity audit passed its gate at its seventh rerun (29750f4: no High, no Medium, one Low, N44). The fix of N44 (0b81687) changed the checker after that rerun, not the rules text, and has no independent review yet. The frozen texts, as committed (LF line ends): `internal/rules/defaults/v1.rules`, sha256 `14c3ca9a9ac1603d5227ff4275375f2fd38bded91be26887b921929972a6f427`; P's configuration [`experiments/poc/r3/p-linter/.go-arch-lint.yml`](../../experiments/poc/r3/p-linter/.go-arch-lint.yml) (go-arch-lint v1.19.1, 8 rules, written by a fresh session from published Go practice on a copy of P's app outside this repository, before any blind rule was seen; its notes are beside it), sha256 `0a046387fb2f5276b14d1b87e08339a2433d54f7295289e242f190782cfd4726`. A change to either now makes it `v2`, and the tests run again. No blind test has run on it. Its list of what it cannot state is in [NOT-STATED.md](../../experiments/poc/r3/defaults/NOT-STATED.md).
 
 ## Files of a project
 

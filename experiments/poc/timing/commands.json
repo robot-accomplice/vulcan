@@ -97,14 +97,18 @@
   },
 
   "arms": {
-    // P: the common tools only (no architecture linter yet; it comes in phase A').
+    // P: the common tools and P's architecture linter (go-arch-lint v1.19.1, frozen with defaults v1 at plan-r3
+    // step 4; config in experiments/poc/r3/p-linter). The linter reads the whole module (rule 6, AF2). Row 19 runs
+    // P's assertions app (build 1b, OW4). The phase A dry run ran without either, by AE1.
+    // go-arch-lint reads an absolute Windows path (C:\...) as a URL with scheme "c" and fails, so --arch-file is
+    // relative to the tree ({work_root}/arms/P/tree on machine 1); it fails loudly if the layout moves.
     "P": {
       "app_src": "{repo}\\poc\\app\\go",
-      "check": ["@common_tools"],
+      "check": ["@common_tools", { "name": "go-arch-lint", "unit": "whole program", "cmd": ["{gobin}\\go-arch-lint.exe", "check", "--arch-file", "..\\..\\..\\..\\..\\..\\code\\vulcan\\experiments\\poc\\r3\\p-linter\\.go-arch-lint.yml", "--project-path", "."] }],
       "closed_list": ["@go_caches"],
-      "program_paths": ["@go_toolchain", "@common_exes"],
+      "program_paths": ["@go_toolchain", "@common_exes", "{gobin}\\go-arch-lint.exe"],
       "row19": {
-        "app_src": "{repo}\\poc\\app\\go",
+        "app_src": "{repo}\\poc\\app\\go-assert",
         "build": { "cwd": "{armdir}\\row19\\app", "cmd": ["{goroot}\\bin\\go.exe", "build", "-o", "{armdir}\\row19\\stockroom.exe", "./cmd/stockroom"] },
         "helper": ["{tools}\\fakepay.exe", "-addr", "127.0.0.1:{pay_port}", "-key", "test-key"],
         "run": ["{armdir}\\row19\\stockroom.exe", "--addr=127.0.0.1:{port}", "--db={db}", "--payments-url=http://127.0.0.1:{pay_port}", "--payments-key=test-key"]
@@ -121,17 +125,28 @@
       "closed_list": ["@go_caches"],
       "program_paths": ["@go_toolchain", "@common_exes", "{tools}\\vulcan-lint.exe"]
     },
-    // V: `vulcan check` is the one command. It runs Vulcan's own checks (architecture, wiring, rules of the
-    // default ruleset, contracts), lowers to Go, runs `go build` of the lowered main, and runs `go vet ./...`
-    // on the whole lowered module. It does NOT run staticcheck, errcheck, exhaustive, dupl or gopls (see
-    // internal/driver/driver.go). No wrapper is added. So V's go vet reads the whole lowered module, not the
-    // packages of the change; that is a gap to the scope rule, reported as a fact.
+    // V: the check is `vulcan check .`, then the same common tools as P and L on V's lowered Go (plan
+    // amendment OW2; plan-coverage.md rule 2, "The same common tools in every arm", and rule 6, "The scope of a
+    // change"). `vulcan check` runs Vulcan's own checks (architecture, wiring, rules of the default ruleset,
+    // contracts), lowers to Go under .vulcan\build, runs `go build` of the lowered main, and runs `go vet ./...`
+    // on the whole lowered module (it does not run staticcheck, errcheck, exhaustive, dupl or gopls: see
+    // internal/driver/driver.go). It runs first, because it writes the lowered Go. The common tools then are
+    // the SAME entries and versions as @common_tools (spliced, not copied), with one added key, "cwd" = the
+    // lowered module {tree}\.vulcan\build, which has its own go.mod. In the change check they get the files of
+    // the change's "lowered" list and the packages of those files, made relative to that cwd (common.tool_args);
+    // dupl runs on "." of the lowered module, as it runs on the module for P and L. In the full check they get all
+    // lowered files and ./... . Findings keep the one filter of rule 2 (a first line `// Code generated ... DO NOT
+    // EDIT.`). V's go vet thus runs twice (inside `vulcan check` on the whole lowered module, and as a common
+    // tool on the packages of the change); the first stays part of the one command.
     // Closed list: V has no cache apart from .vulcan\ (lowered Go and the built program) in the work tree.
     "V": {
       "app_src": "{repo}\\poc\\app\\vulcan",
-      "check": [{ "name": "vulcan-check", "unit": "whole program", "cmd": ["{tools}\\vulcan.exe", "check", "."] }],
+      "check": [
+        { "name": "vulcan-check", "unit": "whole program", "cmd": ["{tools}\\vulcan.exe", "check", "."] },
+        { "@": "common_tools", "cwd": "{tree}\\.vulcan\\build" }
+      ],
       "closed_list": ["@go_caches", { "name": "V lowering cache and lowered Go files (.vulcan)", "path": "{tree}\\.vulcan" }],
-      "program_paths": ["@go_toolchain", "{tools}\\vulcan.exe", "{repo}\\vulcan"],
+      "program_paths": ["@go_toolchain", "@common_exes", "{tools}\\vulcan.exe", "{repo}\\vulcan"],
       "row19": {
         "app_src": "{repo}\\poc\\app\\vulcan",
         "build": { "cwd": "{armdir}\\row19\\app", "cmd": ["{tools}\\vulcan.exe", "build", "-o", "{armdir}\\row19\\stockroom.exe", "."] },

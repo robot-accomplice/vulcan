@@ -1,6 +1,6 @@
 # Plan: close each principle of the initial evaluation
 
-Status: **draft 13 with amendments OW1 to OW3** (2026-11-10: one machine, V's common tools, load gate): draft 10 accepted by the owner (D1a, 2026-11-05), plus the AE1 to AE6 fixes (draft 11),
+Status: **draft 13 with amendments OW1 to OW4** (2026-11-10: one machine, V's common tools, load gate, P's assertions first): draft 10 accepted by the owner (D1a, 2026-11-05), plus the AE1 to AE6 fixes (draft 11),
 the AF1 to AF6 fixes (draft 12) and the AG1 to AG7 fixes (draft 13), all before the phase A dry run. AE7 and R17 stay open. The amendment of section 9 is made in
 plan-r3, hypotheses-r3 and the views draft. Its rows for D1d and D6 wait on those decisions. Its audit is
 [audit-plan-coverage.md](../../experiments/poc/audit-plan-coverage.md): draft 1 had 12 High, 15
@@ -573,12 +573,13 @@ linter configuration frozen with it. Each column closes on the comparison in sec
 
 Replication is inside each sequence (rule 7), so there is no separate phase for it.
 
-**Build order** (R14), by the rows a build opens, so that a stop leaves a known set of rows built:
+**Build order** (R14), by the rows a build opens, so that a stop leaves a known set of rows built. Amendment OW4 moves P's assertions (part of build 5) to second place, so that row 19 can run in phase A'; the shared fake suites of build 5 keep their place:
 1. P's architecture linter configuration (row 2, C2).
+1b. P's assertions (rows 5a, 19), by OW4.
 2. The tempting tasks and the C2 pilot (rows 3, 11d).
 3. The L generator (row 8).
 4. Hints off, and the hole command and its L equal (rows 12, 16).
-5. P's assertions and shared fake suites (rows 5a, 9).
+5. The shared fake suites (row 9). P's assertions moved to 1b (OW4).
 6. The warnings and fixes of row 11 (11a, 11b, 11d).
 7. The trap rewriter and L's checked-math library (row 6, N5).
 8. The T7 forms and the C2v tasks (row 7).
@@ -839,6 +840,8 @@ more batches) (AG7).
 
 | Lean | Direction | Why it stays |
 |---|---|---|
+| V's go vet runs twice in row 15 (OW2) | Against V on time | `vulcan check` runs `go vet` on the whole lowered module as part of the shipped command, and V's check then runs the common `go vet` on the change's packages, as P and L do. Removing either one would make V's check differ from what V ships or from rule 2 |
+| V builds an invariant's message before its check (parity-1b F2) | Against V on time in row 19 | V's lowering allocates the message string at each invariant check of a built value; P allocates only on failure. It is a real cost of V as built, not a defect of the parity. A change to V's lowering before the first row 19 batch would be a new version of V, decided by the owner |
 | One machine (OW1) | Not known | Every timing verdict of rows 15 and 19 holds for machine 1 only (Windows 11, 16 cores, Go 1.27.3). If an arm gains or loses more on other hardware or another system (for example macOS or fewer cores), no column sees it. The owner dropped machine 2 after the dry run and before any phase A' data, and no figure of an arm was read. Validation on other platforms is a later stage, not part of this evaluation |
 | The pilot gate reads P's breaks (P without its linter) | Favours V and L, against P | A gate on V or L would select on the checks under test. Named, and the pilot is reported in all arms |
 | A third pool with larger changes, after two failed pilots | Favours V and L, against P: the tasks move away from ordinary work | Only a verdict closes rows 2 and 3. The second model is fixed in advance, so it is not chosen for its breaks |
@@ -918,6 +921,7 @@ Draft 1's findings that the audit's section 8 closed are not repeated here.
 
 | Finding | Change |
 |---|---|
+| OW4 (owner, 2026-11-10) | Amendment by rule 13, before the batch 1 data. Reason (owner): row 19 cannot run in phase A' without P's assertions, and builds 2 to 4 are large. P's assertions move from build 5 to 1b, right after P's linter. The shared fake suites stay in build 5. A stop still leaves a known set of rows built. No neutral statement of the contracts exists in the repository yet, so build 1b starts with one: a fresh session writes each contract of V's base app in plain words, with no code. A fresh builder writes P's assertions from that statement alone, and a fresh session audits P against V and L for parity |
 | OW3 (owner, 2026-11-10) | Amendment by rule 13, before the batch 1 data. Reason (owner): the question is not whether other programs are open, but whether load slows the runs. Rule 6 replaces "no other load" with a load gate: at most 25% total CPU and at least 8 GB free memory over 3 s before each timed or trace run, a fault if not met in 120 s, and the sampled values kept and sealed per run. The limits were set from the idle machine with the Claude app open (about 12% CPU, 15 GB free of 31 GB, 16 threads), with no run data. The dry run had no gate; no column reads it |
 | OW2 (owner, 2026-11-10) | Rule 6, no rule change: rule 2 already says the common tools run on V's lowered Go. The dry-run setup found that `vulcan check` does not run them, so the text that said it does is corrected. In phase A' and the timing campaign, V's one command runs `vulcan check` and then the common tools on the lowered Go. The owner chose this over timing V's check alone (which favours V on time) and over cutting P and L to V's tools. The dry run used what each arm ships, by AE1 |
 | OW1 (owner, 2026-11-10) | Amendment by rule 13, made after the phase A dry run and before the batch 1 data of phase A'. Reason (owner): validation on more than one platform is a late concern. A verdict on one platform comes first: if no Gain shows on one platform, repeating the runs on others adds cost and no answer. A Gain on machine 1 would then be tested on other platforms in a later stage. So the second machine (the owner's Mac) does not run in this evaluation. It cites no figure of an arm; the person who wrote it saw only the dry-run run counts, faults and totals. Rule 7: every timing run is on machine 1, and D is its value; the machine sequence is gone. Rule 6: the totals are over all arms on machine 1. Section 6: timing runs halve (row 15: 60 a batch; row 19: 40), and the batch ranges are now a lower guide, because they were set with D as a two-machine mean. Section 8: a lean row for one machine. The dry run on machine 1 is complete, not partial |

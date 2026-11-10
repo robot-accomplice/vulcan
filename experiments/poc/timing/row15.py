@@ -62,7 +62,7 @@ def full_check(cfg, arm, a, setup_env=True):
     out = []
     for tool in a["check"]:
         r = C.run_tool(tool, a["_ctx"], env, a["_ctx"]["tree"], None, "full", cfg["constants"]["tool_timeout_s"])
-        r["findings"], r["dropped"] = C.normalize(r["output"], a["_ctx"]["tree"])
+        r["findings"], r["dropped"] = C.normalize(r["output"], a["_ctx"]["tree"], r["cwd"])
         out.append(r)
     return out
 
@@ -84,12 +84,12 @@ def setup_arm(cfg, arm, changes, faults):
         if not C.git_apply(ctx["tree"], spec["patch"], check=True):
             faults.add("%s patch-does-not-apply" % arm)
         for tool in a["check"]:
-            cmd = C.expand(tool["cmd"], ctx, spec["files"], spec["pkgs"])
+            cmd, _ = C.tool_command(tool, ctx, ctx["tree"], change_files(spec), "change")
             key = C.rendered_key(tool, cmd)
             if key in base:
                 continue
             r = C.run_tool(tool, ctx, env, ctx["tree"], change_files(spec), "change", cfg["constants"]["tool_timeout_s"])
-            f, d = C.normalize(r["output"], ctx["tree"])
+            f, d = C.normalize(r["output"], ctx["tree"], r["cwd"])
             base[key] = {"status": r["status"], "findings": f, "dropped": d}
     C.restore(a)
     with open(state_path(a), "w", encoding="utf-8", newline="\n") as fh:
@@ -162,7 +162,7 @@ def timed_run(cfg, arm, a, base, ch, spec, raw, draw, pos, pristine_hash):
         revert(a, spec, pristine_hash, raw, arm)
     recs = []
     for r in tools:
-        f, d = C.normalize(r["output"], ctx["tree"])
+        f, d = C.normalize(r["output"], ctx["tree"], r["cwd"])
         b = base.get(C.rendered_key(next(t for t in a["check"] if t["name"] == r["name"]), r["cmd"]))
         if b is None:
             raise C.Abort("no baseline for a command of " + arm)
@@ -232,9 +232,8 @@ def traced_run(cfg, arm, a, ch, spec, raw, draw, pos, pristine_hash):
         if tp.poll() not in (None, 0):
             raise C.Abort("tracer start failed")
         for tool in a["check"]:
-            files, pkgs = spec["files"], spec["pkgs"]
-            cmd = C.expand(tool["cmd"], ctx, files, pkgs)
-            p = subprocess.Popen(cmd, cwd=ctx["tree"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            cmd, cwd = C.tool_command(tool, ctx, ctx["tree"], change_files(spec), "change")
+            p = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             pids.append((tool["name"], p.pid))
             p.communicate(timeout=cfg["constants"]["tool_timeout_s"])
         if subprocess.run(C.subst(tcfg["stop"], tctx), capture_output=True).returncode != 0:

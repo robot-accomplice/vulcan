@@ -69,11 +69,15 @@ def subst(x, ctx):
 
 
 def splice(items, sets):
-    """Replace each "@name" item of a list by the items of sets[name]."""
+    """Replace each "@name" item of a list by the items of sets[name]. An item {"@": name, key: value, ...} does the
+    same and adds the keys to each spliced item (the same tools, with a cwd of their own)."""
     out = []
     for it in items:
         if isinstance(it, str) and it.startswith("@"):
             out.extend(splice(sets[it[1:]], sets))
+        elif isinstance(it, dict) and "@" in it:
+            extra = {k: v for k, v in it.items() if k != "@"}
+            out.extend(dict(t, **extra) for t in splice(sets[it["@"]], sets))
         else:
             out.append(it)
     return out
@@ -239,16 +243,18 @@ def run_cmd(cmd, cwd, env, timeout):
     return status, out, time.perf_counter_ns() - t0
 
 
-def normalize(output, tree):
+def normalize(output, tree, cwd=None):
     """The findings of a tool output as a sorted list of lines.
 
     One filter rule (plan rule 2): a line about a file whose first line is the standard
     `// Code generated ... DO NOT EDIT.` header is dropped, and the count dropped is returned.
     Line and column numbers are removed, because a one-file change shifts them.
+    Relative paths in the output are against cwd (the directory the tool ran in; the tree when None).
     Returns (findings, dropped).
     """
     text = output.decode("utf-8", "replace").replace("\r", "").replace("\\", "/")
     root = tree.replace("\\", "/").rstrip("/")
+    base = (cwd or tree).replace("\\", "/").rstrip("/")
     kept, dropped, header = [], 0, {}
     for ln in text.split("\n"):
         ln = ln.strip()
@@ -257,7 +263,7 @@ def normalize(output, tree):
         m = FILE_TOKEN.search(ln)
         if m:
             p = m.group("p")
-            full = p if re.match(r"^([A-Za-z]:)?/", p) else root + "/" + p
+            full = p if re.match(r"^([A-Za-z]:)?/", p) else base + "/" + p
             if full not in header:
                 try:
                     with open(full, encoding="utf-8", errors="replace") as f:
@@ -272,18 +278,40 @@ def normalize(output, tree):
     return sorted(kept), dropped
 
 
+def tool_cwd(tool, tree):
+    """Where a tool runs: its own "cwd" (V's lowered module, which has its own go.mod), else the work tree."""
+    return tool.get("cwd", tree)
+
+
 def tool_args(tool, scope, files, tree):
-    """The files and packages that a tool gets: the change (scope "change") or the whole module ("full")."""
+    """The files and packages that a tool gets: the change (scope "change") or the whole module ("full").
+    Both are relative to the cwd of the tool. The files of a change are relative to the tree, so a tool with
+    a cwd gets them made relative to it, and its packages are those of the made-relative files."""
+    cwd = tool_cwd(tool, tree)
     if scope == "full":
-        return go_files(tree), ["./..."]
-    return files["files"], files["pkgs"]
+        return go_files(cwd), ["./..."]
+    if os.path.normcase(os.path.abspath(cwd)) == os.path.normcase(os.path.abspath(tree)):
+        return files["files"], files["pkgs"]
+    prefix = os.path.relpath(cwd, tree).replace("\\", "/").rstrip("/") + "/"
+    rel = []
+    for f in files["files"]:
+        f = f.replace("\\", "/")
+        if not f.startswith(prefix):
+            raise Abort("a file of the change is outside the cwd of tool " + tool["name"])
+        rel.append(f[len(prefix):])
+    return rel, pkgs_of(rel)
+
+
+def tool_command(tool, ctx, tree, change_files, scope):
+    """The command of a tool and the directory it runs in. One place for the run, the baseline key and the trace."""
+    files, pkgs = tool_args(tool, scope, change_files, tree)
+    return expand(tool["cmd"], ctx, files, pkgs), tool_cwd(tool, tree)
 
 
 def run_tool(tool, ctx, env, tree, change_files, scope, timeout):
-    files, pkgs = tool_args(tool, scope, change_files, tree)
-    cmd = expand(tool["cmd"], ctx, files, pkgs)
-    status, out, dur = run_cmd(cmd, tree, env, timeout)
-    return {"name": tool["name"], "unit": tool["unit"], "cmd": cmd, "status": status, "output": out, "ns": dur}
+    cmd, cwd = tool_command(tool, ctx, tree, change_files, scope)
+    status, out, dur = run_cmd(cmd, cwd, env, timeout)
+    return {"name": tool["name"], "unit": tool["unit"], "cmd": cmd, "cwd": cwd, "status": status, "output": out, "ns": dur}
 
 
 def rendered_key(tool, cmd):
@@ -291,6 +319,11 @@ def rendered_key(tool, cmd):
 
 
 # ---------------------------------------------------------------- changes
+
+def pkgs_of(files):
+    """The package directories of Go files, as ./dir (or . for the root)."""
+    return sorted({"./" + os.path.dirname(f) if os.path.dirname(f) else "." for f in files})
+
 
 def load_changes(path):
     with open(path, encoding="utf-8") as f:
@@ -301,7 +334,7 @@ def load_changes(path):
             spec["patch"] = os.path.join(base, spec["patch"])
             # The files that the tools read: the changed Go file, or the lowered Go of a .vulcan file.
             spec.setdefault("files", spec.get("lowered", [spec["file"]]))
-            spec.setdefault("pkgs", sorted({"./" + os.path.dirname(f) if os.path.dirname(f) else "." for f in spec["files"]}))
+            spec.setdefault("pkgs", pkgs_of(spec["files"]))
     return d["changes"]
 
 

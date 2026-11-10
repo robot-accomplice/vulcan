@@ -14,7 +14,7 @@ directory is deleted.
 | `row19.py` | `setup`, `run`, `confirm` |
 | `reader.py` | The procedure reader's view of a sealed file: tool output and file counts, no time and no order |
 | `commands.fake.json`, `changes.fake.json`, `requests.fake.json`, `fake/` | A FAKE arm set for `test_fake.py`. Never for a measurement |
-| `test_fake.py` | 94 checks on the fake set |
+| `test_fake.py` | 103 checks on the fake set |
 | `changes.example.json`, `requests.example.json` | The format of the two files that the owner and the fresh sessions supply |
 
 ## What a command prints
@@ -107,7 +107,8 @@ The output is one `run-NNNNN.json` per run and `index.json`.
 | P, L | dupl | `dupl .` | module (it compares files with each other) |
 | P, L | gopls check | `gopls check {files}` | file |
 | L | vulcan-lint | `vulcan-lint ./...` | whole program |
-| V | vulcan check | `vulcan check .` | whole program |
+| V | vulcan check | `vulcan check .` (first: it writes the lowered Go) | whole program |
+| V | go vet, staticcheck, errcheck, exhaustive, dupl, gopls check | the same entries as P and L, run in `<tree>\.vulcan\build` on the lowered files and their packages (plan amendment OW2) | as in P and L |
 
 `{pkgs}` is the package directory of each changed file. In a full check it is `./...`.
 
