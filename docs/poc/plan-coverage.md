@@ -1,6 +1,6 @@
 # Plan: close each principle of the initial evaluation
 
-Status: **draft 13**: draft 10 accepted by the owner (D1a, 2026-11-05), plus the AE1 to AE6 fixes (draft 11),
+Status: **draft 13 with amendment OW1** (one machine, 2026-11-10): draft 10 accepted by the owner (D1a, 2026-11-05), plus the AE1 to AE6 fixes (draft 11),
 the AF1 to AF6 fixes (draft 12) and the AG1 to AG7 fixes (draft 13), all before the phase A dry run. AE7 and R17 stay open. The amendment of section 9 is made in
 plan-r3, hypotheses-r3 and the views draft. Its rows for D1d and D6 wait on those decisions. Its audit is
 [audit-plan-coverage.md](../../experiments/poc/audit-plan-coverage.md): draft 1 had 12 High, 15
@@ -8,7 +8,7 @@ Medium and 6 Low findings; draft 2, after two reruns, had 6 High open; draft 3 h
 draft 4 had 1 High (Y1); draft 5 had no High, and 2 Medium (Z1, Z2) and 3 Low open; draft 6 had no
 High, and 2 Medium (AA1, AA2) and 5 Low open; draft 7 had no High or Medium, and 8 Low open; draft 8 had no High, and 1 Medium (AC1) and 7 Low
 open; draft 9 had no High or Medium, and 9 Low open. Section 11 maps each open finding to the change
-that answers it. The tenth rerun found 0 High, 0 Medium and 7 Low (AE1 to AE7) on draft 10. Draft 11 fixes AE1 to AE6. The eleventh rerun, on draft 11, found 0 High, 0 Medium and 8 Low open (AE7, R17 and the new AF1 to AF6). Draft 12 fixes AF1 to AF6. The twelfth rerun, on draft 12, found 0 High, 0 Medium and 9 Low open (AE7, R17 and the new AG1 to AG7). Draft 13 fixes AG1 to AG7. The owner chose to go to the phase A dry run without a further audit. AE7 is fixed before the C3 seed writers start.
+that answers it. The tenth rerun found 0 High, 0 Medium and 7 Low (AE1 to AE7) on draft 10. Draft 11 fixes AE1 to AE6. The eleventh rerun, on draft 11, found 0 High, 0 Medium and 8 Low open (AE7, R17 and the new AF1 to AF6). Draft 12 fixes AF1 to AF6. The twelfth rerun, on draft 12, found 0 High, 0 Medium and 9 Low open (AE7, R17 and the new AG1 to AG7). Draft 13 fixes AG1 to AG7. The owner chose to go to the phase A dry run without a further audit. After the dry run on machine 1, the owner dropped machine 2 (amendment OW1, rule 13, 2026-11-10): every timing run is on machine 1. AE7 is fixed before the C3 seed writers start.
 
 Each column reads one **confidence sequence**, which stays valid when batches are added without
 limit (rule 5). There are two kinds of column (rule 6):
@@ -175,8 +175,8 @@ test that the model can't be tempted into, and a gate that stops a test do not c
      fixed sampling seed (Z2). So the units are independent draws, and the pool never runs out.
    - **Agent columns without writers** (AA5). Rows 15 and 19: one fresh session writes a fixed set of
      40 one-file changes (row 15) or names the request paths of the base apps (row 19), before any
-     timing. Each batch draws 20 of them at random, with replacement, and runs each draw again on
-     both machines. Row 15 runs from a **warm cache in a fixed state, set the same way in every arm**
+     timing. Each batch draws 20 of them at random, with replacement, and runs each draw once, on
+     machine 1 (OW1). Row 15 runs from a **warm cache in a fixed state, set the same way in every arm**
      (AC1). The **check** of row 15 is one command an arm (AD8). P runs `go vet`, `staticcheck`,
      `errcheck`, `exhaustive`, `dupl`, `gopls check` and its architecture linter. L runs the same
      common tools and L's analyzers. V runs its check command, which runs the same common tools on
@@ -284,7 +284,7 @@ test that the model can't be tempted into, and a gate that stops a test do not c
        covers every output that carries the direction of an arm: the times, the count of unsettled
        paths per arm, the residual fall, the file counts and the kept tool output. The record gives
        the total machine time of row 15 and the total of row 19 (defined below, AG6), each over
-       all arms and both machines, and never a figure for an arm. No column reads the dry run.
+       all arms on machine 1, and never a figure for an arm. No column reads the dry run.
      - **Who reads the outputs** (AG1). A fresh session, the **procedure reader**, reads the kept
        tool output and the file counts of each run. It sees no time and no interval. It reports
        "none", or the faults of the procedure: a command that fails, a run that is not clean, a
@@ -301,7 +301,7 @@ test that the model can't be tempted into, and a gate that stops a test do not c
        time, a count of unsettled paths, a residual fall, a file count or a tool output of an arm.
        After the batch 1 data, a change to a rule of the column makes a new column (Y4).
      - **The total machine time** (AG6) of a row is the sum of the wall time of its whole timed
-       runs, over all arms and both machines. For row 15, a whole run is steps 1 to 5 (restore,
+       runs, over all arms on machine 1. For row 15, a whole run is steps 1 to 5 (restore,
        drop, read-back, change, check). For row 19, it is the start of the process, the warm-up
        requests and the timed requests. The untimed trace runs are a third total. The record
        reports it on its own. It is in neither of the two totals, and no batch count multiplies
@@ -361,16 +361,17 @@ test that the model can't be tempted into, and a gate that stops a test do not c
    - **Corpus:** writers are split into two halves by a fixed random draw: an agent pool's writers
      before the pool is sealed, and a fixed-outcome column's writers by a draw of each writer's half
      before it writes. The secondary sequences read each half alone. The verdict reads all units.
-   - **Machine:** every change or request runs on both machines, and the unit's D is the mean of the
-     two. The record names the two machines, machine 1 and machine 2, before any timing (AB6). Each
-      timing column (rows 15 and 19) uses these two machines for every run of both arms of a pair,
-      with their hardware and system fixed for the whole column. A change of machine makes a new
-      column, by an amendment before its data (AC2).
+   - **Machine:** every change or request runs on one machine, machine 1, and the unit's D is its
+     value there (OW1). The record names machine 1 before any timing (AB6): this Windows 11 PC, 16
+     cores, Go 1.27.3. Each timing column (rows 15 and 19) uses machine 1 for every run of every
+     arm, with its hardware and system fixed for the whole column. A change of machine makes a new
+     column, by an amendment before its data (AC2). Until 2026-11-10 this rule named two machines
+     and took the mean of the two; amendment OW1 removed machine 2 before any phase A' data.
    - So every unit has the same mean, the estimand of rule 5, whatever the difference between the
      levels or between writers.
-   - The verdict reads the one sequence. The record also gives the sequence of each model, corpus or
-     machine alone, as secondary. If the two secondary sequences reach different verdicts, or one
-     closes and the other does not, the record says "differs by model" (or corpus, or machine) next
+   - The verdict reads the one sequence. The record also gives the sequence of each model or corpus
+     alone, as secondary (one machine since OW1, so no machine sequence). If the two secondary sequences reach different verdicts, or one
+     closes and the other does not, the record says "differs by model" (or corpus) next
      to the verdict, as a limit.
    - No disagreement is resolved by choosing one side, and no batch is repeated after a result.
 8. **Unit of analysis.** Campaigns are analyzed by task: the unit is a task, and its D is the
@@ -600,7 +601,7 @@ A batch is fixed now, by unit type. It does not change after data (rule 6).
 | Rule (fixed-outcome) | The first read at 10 fresh rule writers; then 10 fresh rule writers |
 | Calibration workspace | 36 workspaces an arm under each model, from 12 draws from the calibration pool of 400 tasks |
 | Attacker | 3 pairs of attacker sessions, both models in each pair |
-| Timing | 20 draws from the fixed set of changes or request paths, each run on both machines (AA5) |
+| Timing | 20 draws from the fixed set of changes or request paths, each run once on machine 1 (AA5, OW1) |
 
 The task batch comes from the equal-cost comparison below: at 200 runs a condition, more tasks with
 fewer runs reach a verdict in fewer runs.
@@ -793,7 +794,7 @@ each batch, the conditions that some open column still reads (Y2):
 | Row 18 (Z4) | 12 to 22 batches × 12 attacker sessions: about 150 to 270 sessions, from the `attackers` scenario |
 | Calibration | 10 to 22 batches × 216: about 2,200 to 4,800 runs |
 | **Runs and review sessions** | **about 39,000 to 71,000 at base 0.8; about 41,000 to 76,000 at base 0.5**. With the 5-point success rows at base 0.5 too (the C2 line above): about 42,000 to 82,000 |
-| Timing runs (AB6) | Rows 15 and 19, no agent: 20 draws × 2 machines × the arms a batch. Row 15, 3 arms: 120 runs a batch, 4 to 6 batches, about 480 to 720. Row 19, 2 arms: 80 runs a batch, 9 to 20 batches, about 720 to 1,600. Machine time only; not in the total above. It has no duration: no run of the base apps has been timed, so any figure would be a guess. The dry run of phase A (one batch of each row, 200 timed runs, and 60 untimed trace runs of row 15, not in the range above) gives a lower bound for each row (AE1, AF2). The record states the total of each row over all arms and both machines, never per arm (AE2, AF6). A total is the wall time of whole timed runs. The trace runs are a third total, on their own, and in neither of the two (AG6). The record states the total of batch 1 of phase A' before batch 2 (AC2). The memo session of rule 6 multiplies the total of row 15 by 4 to 6 batches and that of row 19 by 9 to 20, and reads both for the timing campaign (AD7). Phase A' adds 120 untimed trace runs of row 15, once (40 changes × 3 arms, AF2), and the trace runs on machine 1 only (AG3). Trace runs are machine time only. No fix of draft 13 changes a count above |
+| Timing runs (AB6, OW1) | Rows 15 and 19, no agent: 20 draws × 1 machine × the arms a batch. Row 15, 3 arms: 60 runs a batch, 4 to 6 batches, about 240 to 360. Row 19, 2 arms: 40 runs a batch, 9 to 20 batches, about 360 to 800. The batch ranges were set when D was the mean of two machines; with one machine a unit's spread can be larger, so a column can need more batches than this range (OW1). Machine time only; not in the total above. It has no duration: no run of the base apps has been timed, so any figure would be a guess. The dry run of phase A (one batch of each row, 100 timed runs on machine 1, and 60 untimed trace runs of row 15, not in the range above) gives a lower bound for each row (AE1, AF2). The record states the total of each row over all arms on machine 1, never per arm (AE2, AF6). A total is the wall time of whole timed runs. The trace runs are a third total, on their own, and in neither of the two (AG6). The record states the total of batch 1 of phase A' before batch 2 (AC2). The memo session of rule 6 multiplies the total of row 15 by 4 to 6 batches and that of row 19 by 9 to 20, and reads both for the timing campaign (AD7). Phase A' adds 120 untimed trace runs of row 15, once (40 changes × 3 arms, AF2), and the trace runs on machine 1 only (AG3). Trace runs are machine time only. No fix of draft 13 changes a count above |
 | Task pools (Y3, Z3) | 7 task pools × 20 writers (40 for C1, C4, C5 and C7 if D15's rule applies), and a check of each pool: about 150 to 230 sessions, written once. A failed C2 or C2v pilot adds a pool of 20 writers |
 | Seed pools (AA1) | 4 seed pools (C3a, C3b, C3c, N5) × 20 writers, and a check of each: about 84 sessions. Also one run of the drawn task in each arm for each writer of C3a, C3b and C3c (AD3): about 180 runs |
 | Labelers (AA6) | One labeler a rule set (plan-r3's procedure), 60 to 110, and row 9's labeler: about 60 to 110 sessions |
@@ -830,6 +831,7 @@ more batches) (AG7).
 
 | Lean | Direction | Why it stays |
 |---|---|---|
+| One machine (OW1) | Not known | Every timing verdict of rows 15 and 19 holds for machine 1 only (Windows 11, 16 cores, Go 1.27.3). If an arm gains or loses more on other hardware or another system (for example macOS or fewer cores), no column sees it. The owner dropped machine 2 after the dry run and before any phase A' data, and no figure of an arm was read. Validation on other platforms is a later stage, not part of this evaluation |
 | The pilot gate reads P's breaks (P without its linter) | Favours V and L, against P | A gate on V or L would select on the checks under test. Named, and the pilot is reported in all arms |
 | A third pool with larger changes, after two failed pilots | Favours V and L, against P: the tasks move away from ordinary work | Only a verdict closes rows 2 and 3. The second model is fixed in advance, so it is not chosen for its breaks |
 | C2 on the union of enforced rules, after a failed plan-r3 gate (D1d) | Favours V and L, against P, by the selection of rules; also favours a task test that plan-r3 found not worth its cost | The union includes P's linter. Results are per rule, with T1's share covered |
@@ -908,6 +910,7 @@ Draft 1's findings that the audit's section 8 closed are not repeated here.
 
 | Finding | Change |
 |---|---|
+| OW1 (owner, 2026-11-10) | Amendment by rule 13, made after the phase A dry run and before the batch 1 data of phase A'. Reason (owner): validation on more than one platform is a late concern. A verdict on one platform comes first: if no Gain shows on one platform, repeating the runs on others adds cost and no answer. A Gain on machine 1 would then be tested on other platforms in a later stage. So the second machine (the owner's Mac) does not run in this evaluation. It cites no figure of an arm; the person who wrote it saw only the dry-run run counts, faults and totals. Rule 7: every timing run is on machine 1, and D is its value; the machine sequence is gone. Rule 6: the totals are over all arms on machine 1. Section 6: timing runs halve (row 15: 60 a batch; row 19: 40), and the batch ranges are now a lower guide, because they were set with D as a two-machine mean. Section 8: a lean row for one machine. The dry run on machine 1 is complete, not partial |
 | AG1 | Rule 6: the seal covers the same outputs in phase A' and in every batch of the timing campaign (times, unsettled counts, residual fall, trace file counts, tool output), until the column closes or its campaign stops. A fresh procedure reader reads the tool output and the file counts. It reports "none" or the faults, and gives no count, time, size or order of arms. A fresh procedure fixer sees the faults, the totals and the count of faults. No rule changes after the dry run or after the trace runs of phase A', except by an amendment (rule 13) before the batch 1 data that cites no figure of an arm. The list of covered rules now holds the unit list, the definition of a read and the tracer. After the batch 1 data, a change makes a new column. I named the roles instead of "the person who fixes a fault", because a fault names a tool and may name an arm, so who sees it matters |
 | AG2 | Rule 6 and section 8: "signature or export change" is defined for Go (signature, exported name and type) and for V (`.vulcan` signature, type, exported name, contract, effect, variant set that an exhaustive check reads). A contract or an effect change counts even when the Go signature is the same. Each change must leave the check clean in every arm, with the exit status of each tool kept per run; a run that is not clean is a fault. Section 8: the lean favours the arm whose cross-file checks do the most work (probably V, not timed). The cause is the cross-file check, not the lowering. The scope clause has the lowering as its cause, so the net direction for V is stated as not known. This differs from the audit's "probably toward V" for the net, because the two causes pull in opposite ways |
 | AG3 | Rule 6: a read is an open for reading of a `*.go` or `*.vulcan` file, once for each path in each run, with children and daemons followed. A second figure counts opens of files under the cache directories of the closed list, so a cache hit shows. The first figure is "files opened", not "files in scope". The trace runs on machine 1 only, with one tracer named with the machine before any timing, because a count does not depend on speed and a second tracer would be a second method. It adds no run (60 and 120 stay). The dry run tests the method with the tools that each arm has. P's linter is first traced in phase A'; a fault found there goes by an amendment. I did not add a stand-in linter to the dry run, because a stand-in tests a tool that is not P's. Section 8 adds a row for the trace |
